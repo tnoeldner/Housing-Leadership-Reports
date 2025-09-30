@@ -1,0 +1,154 @@
+import streamlit as st
+from datetime import datetime, timedelta
+
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="Weekly Impact Report",
+    page_icon="🚀",
+    layout="centered"
+)
+
+# --- App Header ---
+st.title("Weekly Impact Report")
+st.markdown("""
+This tool is for the Housing & Residence Life leadership team to submit their weekly reports. 
+Each submission should align with our departmental and university strategic frameworks.
+""")
+
+# --- Mock Data (Replace with your actual team members and pillars) ---
+LEADERSHIP_TEAM = [
+    "Troy Noeldner",
+    "Mathew Muston",
+    "Jane Doe",
+    "John Smith"
+]
+
+ASCEND_VALUES = [
+    "Accountability",
+    "Service",
+    "Community",
+    "Excellence",
+    "Nurture",
+    "Development"
+]
+
+GUIDING_NORTH_PILLARS = [
+    "Enhancing Student Belonging & Success",
+    "Ensuring Operational Excellence",
+    "Fostering a Thriving Staff Environment",
+    "Practicing Intentional Stewardship of Resources"
+]
+
+# --- Reporting Form ---
+st.header("Submit Your Weekly Report")
+
+# Use a form to collect all the inputs before processing
+with st.form(key="weekly_report_form"):
+    
+    # --- Basic Information ---
+    col1, col2 = st.columns(2)
+    with col1:
+        team_member = st.selectbox(
+            "Select Your Name",
+            options=LEADERSHIP_TEAM,
+            index=0
+        )
+    with col2:
+        # Default to the upcoming Friday
+        today = datetime.today()
+        upcoming_friday = today + timedelta((4 - today.weekday() + 7) % 7)
+        week_ending_date = st.date_input("For the Week Ending", value=upcoming_friday)
+
+    st.divider()
+
+    # --- Section 1: ASCEND UND in Action ---
+    st.subheader("ASCEND UND in Action (The 'How')")
+    st.markdown("Describe a key activity and the primary ASCEND value it demonstrated.")
+    
+    ascend_activity = st.text_area(
+        "Activity / Accomplishment",
+        key="ascend_activity",
+        placeholder="Example: Met with RAs to plan a study-skills workshop for residents."
+    )
+    ascend_value = st.selectbox(
+        "Primary ASCEND Value Demonstrated",
+        options=ASCEND_VALUES,
+        index=None,
+        placeholder="Select a value"
+    )
+
+    # --- Section 2: Progress on Guiding NORTH ---
+    st.subheader("Progress on Guiding NORTH (The 'What')")
+    st.markdown("How did your work this week move our departmental goals forward?")
+    
+    guiding_north_activity = st.text_area(
+        "Activity / Accomplishment",
+        key="guiding_north_activity",
+        placeholder="Example: Finalized the budget and vendor selection for new lounge furniture in Brannon Hall."
+    )
+    guiding_north_pillar = st.selectbox(
+        "Relevant Guiding NORTH Pillar",
+        options=GUIDING_NORTH_PILLARS,
+        index=None,
+        placeholder="Select a pillar"
+    )
+
+    st.divider()
+
+    # --- Section 3: Weekly Updates & Outlook ---
+    st.subheader("Weekly Updates & Outlook")
+    
+    personal_check_in = st.text_area(
+        "Personal Check-in (Optional)",
+        placeholder="How are you doing? Any personal wins or challenges you'd like to share?"
+    )
+    
+    professional_development = st.text_area(
+        "Professional Development",
+        placeholder="What did you learn this week? (e.g., articles read, webinars attended, new skills)"
+    )
+    
+    key_topics_lookahead = st.text_area(
+        "Key Topics & Lookahead",
+        placeholder="What are the most important priorities, potential roadblocks, or opportunities for next week?"
+    )
+
+    # --- Form Submission ---
+    st.divider()
+    submitted = st.form_submit_button("Submit Report")
+
+
+# --- Post-Submission Logic ---
+if submitted:
+    # First, validate that required fields are filled
+    if not ascend_value or not guiding_north_pillar:
+        st.warning("Please make sure to select a value for both ASCEND and Guiding NORTH sections.")
+    else:
+        # This is where you will eventually send the data to Supabase
+        # For now, we'll just display the collected data.
+        st.success("✅ Your report has been submitted successfully!")
+        st.balloons()
+        
+        st.subheader("Summary of Your Submission:")
+        
+        report_data = {
+            "Team Member": team_member,
+            "Week Ending": str(week_ending_date),
+            "ASCEND in Action": {
+                "Activity": ascend_activity,
+                "Value": ascend_value
+            },
+            "Guiding NORTH Progress": {
+                "Activity": guiding_north_activity,
+                "Pillar": guiding_north_pillar
+            },
+            "Updates & Outlook": {
+                "Personal Check-in": personal_check_in,
+                "Professional Development": professional_development,
+                "Key Topics": key_topics_lookahead
+            }
+        }
+        
+        st.json(report_data)
+
+        st.info("Next Step: This data will be saved to our Supabase database.")
