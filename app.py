@@ -42,8 +42,6 @@ def login_form():
                     st.session_state['user'] = user_session.user
                     user_id = user_session.user.id
                     
-                    # --- IMPROVED LOGIC ---
-                    # Fetch profile and check if it exists
                     profile_response = supabase.table('profiles').select('role, title, full_name').eq('id', user_id).execute()
                     
                     if profile_response.data:
@@ -90,7 +88,6 @@ def logout():
 # --- Page Definitions ---
 def profile_page():
     st.title("My Profile")
-    # --- DEBUG LINE REMOVED ---
     st.write(f"**Email:** {st.session_state['user'].email}")
     st.write(f"**Role:** {st.session_state.get('role', 'N/A')}")
     with st.form("update_profile"):
@@ -228,9 +225,13 @@ def submit_and_edit_page():
                         add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ➕", key=f"add_c_{section_key}")
             with general_updates_tab:
                 st.subheader("General Updates & Well-being")
+                st.markdown("**Personal Well-being Check-in**")
                 well_being_rating = st.radio("How are you doing this week?", options=[1, 2, 3, 4, 5], captions=["Struggling", "Tough Week", "Okay", "Good Week", "Thriving"], horizontal=True, index=report_data.get('well_being_rating', 3) - 1 if not is_new_report else 2)
                 st.text_area("Personal Check-in Details (Optional)", value=report_data.get('personal_check_in', ''), key="personal_check_in", height=100)
                 st.divider()
+                st.subheader("Other Updates")
+                # --- NEW FIELD ADDED ---
+                st.text_area("Needs or Concerns for Director", value=report_data.get('director_concerns', ''), key="director_concerns", height=150)
                 st.text_area("Professional Development", value=report_data.get('professional_development', ''), key="prof_dev", height=150)
                 st.text_area("Key Topics & Lookahead", value=report_data.get('key_topics_lookahead', ''), key="lookahead", height=150)
             st.divider()
@@ -275,7 +276,8 @@ def submit_and_edit_page():
                         "week_ending_date": str(week_ending_date), "report_body": report_body,
                         "professional_development": st.session_state.prof_dev, "key_topics_lookahead": st.session_state.lookahead,
                         "personal_check_in": st.session_state.personal_check_in, "well_being_rating": well_being_rating,
-                        "individual_summary": individual_summary
+                        "individual_summary": individual_summary,
+                        "director_concerns": st.session_state.director_concerns # --- NEW: Add to draft ---
                     }
                     st.rerun()
 
@@ -311,7 +313,8 @@ def submit_and_edit_page():
             st.session_state['report_to_edit'] = {
                 "id": draft.get('report_id'), "team_member": draft.get('team_member_name'), "week_ending_date": draft.get('week_ending_date'),
                 "report_body": draft.get('report_body'), "professional_development": draft.get('professional_development'), "key_topics_lookahead": draft.get('key_topics_lookahead'),
-                "personal_check_in": draft.get('personal_check_in'), "well_being_rating": draft.get('well_being_rating')
+                "personal_check_in": draft.get('personal_check_in'), "well_being_rating": draft.get('well_being_rating'),
+                "director_concerns": draft.get('director_concerns') # --- NEW: Add to edit data ---
             }
             del st.session_state['draft_report']
             st.rerun()
@@ -329,7 +332,8 @@ def submit_and_edit_page():
                     "user_id": st.session_state['user'].id, "team_member": draft['team_member_name'], "week_ending_date": draft['week_ending_date'],
                     "report_body": final_report_body, "professional_development": draft['professional_development'], "key_topics_lookahead": draft['key_topics_lookahead'],
                     "personal_check_in": draft['personal_check_in'], "well_being_rating": draft['well_being_rating'],
-                    "individual_summary": st.session_state.review_summary
+                    "individual_summary": st.session_state.review_summary,
+                    "director_concerns": draft['director_concerns'] # --- NEW: Add to final data ---
                 }
                 if not draft['is_new_report']: final_upsert_data['id'] = draft['report_id']
                 try:
@@ -351,6 +355,7 @@ def submit_and_edit_page():
                 except Exception as e:
                     st.error(f"An error occurred while saving the final report: {e}")
 
+    # --- Initial call to start the page logic ---
     if 'draft_report' in st.session_state:
         show_review_form()
     elif 'report_to_edit' in st.session_state:
@@ -362,12 +367,14 @@ def dashboard_page():
     st.title("Admin Dashboard")
     st.write("View reports, track submissions, and generate weekly summaries.")
     try:
-        reports_response = supabase.table('reports').select('week_ending_date', count='exact').execute()
+        reports_response = supabase.table('reports').select('*').order('created_at', desc=True).execute()
+        all_reports = reports_response.data
         all_staff_response = supabase.rpc('get_all_staff_profiles').execute()
-        if not reports_response.data:
+        
+        if not all_reports:
             st.info("No reports have been submitted yet."); return
         
-        all_dates = [report['week_ending_date'] for report in reports_response.data]
+        all_dates = [report['week_ending_date'] for report in all_reports]
         unique_dates = sorted(list(set(all_dates)), reverse=True)
         st.divider(); st.subheader("Weekly Submission Status")
         selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates)
@@ -401,8 +408,7 @@ def dashboard_page():
         if st.button(button_text):
             with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
                 try:
-                    full_response = supabase.table('reports').select('*').eq('week_ending_date', selected_date_for_summary).execute()
-                    weekly_reports = full_response.data
+                    weekly_reports = [r for r in all_reports if r['week_ending_date'] == selected_date_for_summary]
                     if not weekly_reports: st.warning("No reports found for the selected week.")
                     else:
                         well_being_scores = [r.get('well_being_rating') for r in weekly_reports if r.get('well_being_rating') is not None]
@@ -411,6 +417,8 @@ def dashboard_page():
                         for r in weekly_reports:
                             reports_text += f"\n---\n**Report from: {r['team_member']}**\n"
                             reports_text += f"Well-being Score: {r.get('well_being_rating')}/5\n"; reports_text += f"Personal Check-in: {r.get('personal_check_in')}\n"; reports_text += f"Lookahead: {r.get('key_topics_lookahead')}\n"
+                            # --- NEW: Include director concerns in the prompt data ---
+                            reports_text += f"Concerns for Director: {r.get('director_concerns')}\n"
                             report_body = r.get('report_body') or {}
                             for sk, sn in CORE_SECTIONS.items():
                                 section_data = report_body.get(sk)
@@ -420,14 +428,14 @@ def dashboard_page():
                                         for success in section_data['successes']: reports_text += f"- Success: {success['text']}\n"
                                     if section_data.get('challenges'):
                                         for challenge in section_data['challenges']: reports_text += f"- Challenge: {challenge['text']}\n"
-                        prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report. The report must contain the following sections, in this order, using markdown headings: 1. A summary of work aligned with the UND LEADS strategic pillars. 2. A summary of overall staff well-being. 3. A summary of key challenges. 4. A summary of upcoming projects. **Instructions for each section:** - **UND LEADS Summary:** Create a markdown heading for each relevant UND LEADS pillar (Learning, Equity, Affinity, Discovery, Service), followed by bullet points of key staff activities that fall under it. - **### Overall Staff Well-being:** Start by stating, "The average well-being score for the week was {average_score} out of 5." Then, provide a 1-2 sentence qualitative summary of the team's morale. Finally, add a subsection `#### Staff to Connect With`. Under this heading, identify by name any staff who reported a low score (1 or 2) or expressed significant negative sentiment in their comments. Briefly state the reason (e.g., "Jane Doe - reported a low score of 1/5"). If everyone is positive, state that. - **### Key Challenges:** Identify and summarize in bullet points any significant or recurring challenges mentioned by the staff. - **### Upcoming Projects & Initiatives:** Based on the 'Lookahead' portion of the reports, list the key upcoming projects in bullet points. The tone should be professional and concise. Here is the raw report data from all reports for the week: {reports_text}"""
+                        prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report. The report must contain the following sections, in this order, using markdown headings: 1. A summary of work aligned with the UND LEADS strategic pillars. 2. A summary of overall staff well-being. 3. A summary of key challenges and concerns for the director. 4. A summary of upcoming projects. **Instructions for each section:** - **UND LEADS Summary:** Create a markdown heading for each relevant UND LEADS pillar (Learning, Equity, Affinity, Discovery, Service), followed by bullet points of key staff activities that fall under it. - **### Overall Staff Well-being:** Start by stating, "The average well-being score for the week was {average_score} out of 5." Then, provide a 1-2 sentence qualitative summary of the team's morale. Finally, add a subsection `#### Staff to Connect With`. Under this heading, identify by name any staff who reported a low score (1 or 2) or expressed significant negative sentiment in their comments. Briefly state the reason (e.g., "Jane Doe - reported a low score of 1/5"). If everyone is positive, state that. - **### Key Challenges & Concerns:** Identify and summarize in bullet points any significant or recurring challenges mentioned by the staff, including any items specifically noted under "Concerns for Director". - **### Upcoming Projects & Initiatives:** Based on the 'Lookahead' portion of the reports, list the key upcoming projects in bullet points. The tone should be professional and concise. Here is the raw report data from all reports for the week: {reports_text}"""
                         model = genai.GenerativeModel('models/gemini-2.5-pro')
                         ai_response = model.generate_content(prompt)
                         st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
                 except Exception as e: st.error(f"An error occurred while generating the summary: {e}")
         if 'last_summary' in st.session_state:
             summary_data = st.session_state['last_summary']
-            if summary_data['date'] == selected_date_for_summary:
+            if 'date' in summary_data and summary_data['date'] == selected_date_for_summary:
                 st.markdown("---"); st.subheader(f"Newly Generated Summary for Week Ending {summary_data['date']}"); st.markdown(summary_data['text'])
                 if st.button("Save this Summary to Annual Report Archive"):
                     try:
@@ -436,8 +444,6 @@ def dashboard_page():
                     except Exception as e: st.error(f"Failed to save summary: {e}")
         
         st.divider(); st.subheader("All Submitted Individual Reports")
-        all_reports_response = supabase.table('reports').select('*').order('created_at', desc=True).execute()
-        all_reports = all_reports_response.data
         if all_reports:
             for report in all_reports:
                 created_date = pd.to_datetime(report['created_at']).strftime('%b %d, %Y')
@@ -448,6 +454,11 @@ def dashboard_page():
                     if rating: st.metric("Well-being Score", f"{rating}/5")
                     if report.get('individual_summary'):
                         st.info(f"**Individual AI Summary:**\n\n{report['individual_summary']}")
+                    
+                    # --- NEW: Display director concerns on dashboard ---
+                    if report.get('director_concerns'):
+                        st.warning(f"**Concerns for Director:** {report.get('director_concerns')}")
+
                     report_body = report.get('report_body') or {}
                     for sk, sn in CORE_SECTIONS.items():
                         section_data = report_body.get(sk)
@@ -473,14 +484,51 @@ def view_summaries_page():
     st.title("Annual Report Archive")
     st.write("This page contains all the saved weekly AI-generated summaries.")
     try:
-        response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
-        summaries = response.data
+        summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
+        all_reports_response = supabase.table('reports').select('*').execute()
+        summaries = summaries_response.data or []
+        all_reports = all_reports_response.data or []
+
         if not summaries:
             st.info("No summaries have been saved yet.")
         else:
+            # Group reports by week ending date for easy lookup
+            reports_by_week = {}
+            for report in all_reports:
+                week = report['week_ending_date']
+                if week not in reports_by_week:
+                    reports_by_week[week] = []
+                reports_by_week[week].append(report)
+
             for summary in summaries:
                 with st.expander(f"Summary for Week Ending {summary['week_ending_date']}"):
+                    st.markdown("### Consolidated Team Summary")
                     st.markdown(summary['summary_text'])
+                    st.divider()
+                    
+                    st.markdown("### Individual Reports for this Week")
+                    weekly_reports = reports_by_week.get(summary['week_ending_date'], [])
+                    if not weekly_reports:
+                        st.warning("No individual reports were found for this summary week.")
+                    else:
+                        for report in weekly_reports:
+                            with st.expander(f"Report from **{report['team_member']}**"):
+                                rating = report.get('well_being_rating')
+                                if rating: st.metric("Well-being Score", f"{rating}/5")
+                                if report.get('individual_summary'):
+                                    st.info(f"**Individual AI Summary:**\n\n{report['individual_summary']}")
+                                report_body = report.get('report_body') or {}
+                                for sk, sn in CORE_SECTIONS.items():
+                                    section_data = report_body.get(sk)
+                                    if section_data and (section_data.get('successes') or section_data.get('challenges')):
+                                        st.markdown(f"#### {sn}")
+                                        if section_data.get('successes'):
+                                            st.markdown("**Successes:**")
+                                            for s in section_data['successes']: st.markdown(f"- {s['text']} `(ASCEND: {s['ascend_category']}, NORTH: {s['north_category']})`")
+                                        if section_data.get('challenges'):
+                                            st.markdown("**Challenges:**")
+                                            for c in section_data['challenges']: st.markdown(f"- {c['text']} `(ASCEND: {c['ascend_category']}, NORTH: {c['north_category']})`")
+                                        st.markdown("---")
     except Exception as e:
         st.error(f"An error occurred while fetching summaries: {e}")
 
@@ -525,7 +573,7 @@ def user_management_page():
                 with col2:
                     if st.button("Reset Password", key=f"reset_{user['id']}", use_container_width=True):
                         try:
-                            response = supabase.auth.admin.generate_link(type="recovery", email=user['email'])
+                            response = supabase.auth.admin.generate_link("recovery", email=user['email'])
                             st.success("Password reset link generated. Please copy and send it to the user. This link is for one-time use.")
                             st.code(response.properties.action_link, language=None)
                         except Exception as e:
@@ -572,3 +620,5 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
+
+
