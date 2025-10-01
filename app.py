@@ -41,11 +41,13 @@ def login_form():
                 user_session = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 st.session_state['user'] = user_session.user
                 user_id = user_session.user.id
-                profile = supabase.table('profiles').select('role', 'title').eq('id', user_id).single().execute()
+                profile = supabase.table('profiles').select('role, title, full_name').eq('id', user_id).single().execute()
                 st.session_state['role'] = profile.data.get('role')
                 st.session_state['title'] = profile.data.get('title')
+                st.session_state['full_name'] = profile.data.get('full_name')
                 st.rerun()
-            except Exception: st.error("Login failed: Invalid login credentials.")
+            except Exception:
+                st.error("Login failed: Invalid login credentials.")
 
 def signup_form():
     st.header("Sign Up")
@@ -57,10 +59,11 @@ def signup_form():
             try:
                 supabase.auth.sign_up({"email": email, "password": password})
                 st.success("Signup successful! Please check your email to confirm your account.")
-            except Exception as e: st.error(f"Signup failed: {e}")
+            except Exception as e:
+                st.error(f"Signup failed: {e}")
 
 def logout():
-    keys_to_delete = ['user', 'role', 'title', 'last_summary', 'report_to_edit']
+    keys_to_delete = ['user', 'role', 'title', 'full_name', 'last_summary', 'report_to_edit']
     for section_key in CORE_SECTIONS.keys():
         if f"{section_key}_success_count" in st.session_state: del st.session_state[f"{section_key}_success_count"]
         if f"{section_key}_challenge_count" in st.session_state: del st.session_state[f"{section_key}_challenge_count"]
@@ -73,16 +76,22 @@ def profile_page():
     st.write(f"**Email:** {st.session_state['user'].email}")
     st.write(f"**Role:** {st.session_state.get('role', 'N/A')}")
     with st.form("update_profile"):
+        current_name = st.session_state.get('full_name', '')
+        new_name = st.text_input("Full Name", value=current_name)
         current_title = st.session_state.get('title', '')
         new_title = st.text_input("Position Title", value=current_title)
         submitted = st.form_submit_button("Update Profile")
         if submitted:
             try:
                 user_id = st.session_state['user'].id
-                supabase.table('profiles').update({'title': new_title}).eq('id', user_id).execute()
+                update_data = {'full_name': new_name, 'title': new_title}
+                supabase.table('profiles').update(update_data).eq('id', user_id).execute()
+                st.session_state['full_name'] = new_name
                 st.session_state['title'] = new_title
                 st.success("Profile updated successfully!")
-            except Exception as e: st.error(f"An error occurred: {e}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
 # --- Submission and Editing Page ---
 def submit_and_edit_page():
@@ -105,22 +114,26 @@ def show_report_list():
     has_submitted_for_current_week = any(report['week_ending_date'] == current_week_end_date_str for report in user_reports)
     if not has_submitted_for_current_week:
         if st.button("📝 Create New Report for week ending " + current_week_saturday.strftime('%m/%d/%Y'), use_container_width=True, type="primary"):
-            st.session_state['report_to_edit'] = {}; st.rerun()
+            st.session_state['report_to_edit'] = {}
+            st.rerun()
     else:
         st.info("You have already submitted your report for the current week. You can edit it below.")
     st.divider()
     if not user_reports:
-        st.info("You have not submitted any other reports yet."); return
+        st.info("You have not submitted any other reports yet.")
+        return
     st.markdown("##### Past Reports")
     for report in user_reports:
         is_locked = report['week_ending_date'] in locked_weeks
         cols = st.columns([4, 1])
         with cols[0]:
-            st.markdown(f"**Week Ending:** {report['week_ending_date']}"); st.caption(f"Status: {'🔒 Locked' if is_locked else '✅ Editable'}")
+            st.markdown(f"**Week Ending:** {report['week_ending_date']}")
+            st.caption(f"Status: {'🔒 Locked' if is_locked else '✅ Editable'}")
         with cols[1]:
             if not is_locked:
                 if st.button("Edit", key=f"edit_{report['id']}", use_container_width=True):
-                    st.session_state['report_to_edit'] = report; st.rerun()
+                    st.session_state['report_to_edit'] = report
+                    st.rerun()
 
 @st.cache_data
 def get_ai_batch_categories(items_to_categorize):
@@ -136,7 +149,8 @@ def get_ai_batch_categories(items_to_categorize):
         categorized_list = json.loads(clean_response)
         return {item['id']: item for item in categorized_list}
     except Exception as e:
-        st.error(f"An AI error occurred during batch categorization: {e}"); return None
+        st.error(f"An AI error occurred during batch categorization: {e}")
+        return None
 
 def dynamic_entry_section(section_key, section_label, report_data):
     st.subheader(section_label)
@@ -157,17 +171,22 @@ def dynamic_entry_section(section_key, section_label, report_data):
             st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
 
 def show_submission_form():
-    report_data = st.session_state['report_to_edit']; is_new_report = not bool(report_data)
+    report_data = st.session_state['report_to_edit']
+    is_new_report = not bool(report_data)
     st.subheader("Editing Report" if not is_new_report else "Creating New Report")
+    
     with st.form(key="weekly_report_form"):
         col1, col2 = st.columns(2)
-        with col1: team_member = st.selectbox("Select Your Name", options=LEADERSHIP_TEAM, index=LEADERSHIP_TEAM.index(report_data['team_member']) if not is_new_report and report_data.get('team_member') in LEADERSHIP_TEAM else 0)
+        with col1:
+            team_member = st.selectbox("Select Your Name", options=LEADERSHIP_TEAM, index=LEADERSHIP_TEAM.index(report_data['team_member']) if not is_new_report and report_data.get('team_member') in LEADERSHIP_TEAM else 0)
         with col2:
             today = datetime.today()
             default_date = pd.to_datetime(report_data['week_ending_date']).date() if not is_new_report else today + timedelta((5 - today.weekday() + 7) % 7)
             week_ending_date = st.date_input("For the Week Ending", value=default_date, format="MM/DD/YYYY")
+        
         st.divider()
         core_activities_tab, general_updates_tab = st.tabs(["📊 Core Activities", "📝 General Updates"])
+
         with core_activities_tab:
             core_tab_list = st.tabs(list(CORE_SECTIONS.values()))
             add_buttons = {}
@@ -177,15 +196,24 @@ def show_submission_form():
                     b1, b2 = st.columns(2)
                     add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ➕", key=f"add_s_{section_key}")
                     add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ➕", key=f"add_c_{section_key}")
+        
         with general_updates_tab:
             st.subheader("General Updates & Well-being")
-            well_being_rating = st.radio("How are you doing this week?", options=[1, 2, 3, 4, 5], captions=["Struggling", "Tough Week", "Okay", "Good Week", "Thriving"], horizontal=True, index=report_data.get('well_being_rating', 3) - 1 if not is_new_report else 2)
+            well_being_rating = st.radio(
+                "How are you doing this week?",
+                options=[1, 2, 3, 4, 5],
+                captions=["Struggling", "Tough Week", "Okay", "Good Week", "Thriving"],
+                horizontal=True,
+                index=report_data.get('well_being_rating', 3) - 1 if not is_new_report else 2
+            )
             st.text_area("Personal Check-in Details (Optional)", value=report_data.get('personal_check_in', ''), key="personal_check_in", height=100)
             st.divider()
             st.text_area("Professional Development", value=report_data.get('professional_development', ''), key="prof_dev", height=150)
             st.text_area("Key Topics & Lookahead", value=report_data.get('key_topics_lookahead', ''), key="lookahead", height=150)
+
         st.divider()
         final_submit_button = st.form_submit_button("Save and Submit Final Report", type="primary")
+    
     if st.button("Cancel"):
         del st.session_state['report_to_edit']
         for sk in CORE_SECTIONS.keys():
@@ -196,6 +224,7 @@ def show_submission_form():
     clicked_button = None
     for key, value in add_buttons.items():
         if value: clicked_button = key; break
+    
     if clicked_button:
         parts = clicked_button.split('_'); section, category = parts[2], parts[1]
         counter_key = f"{section}_{category}_count"
@@ -212,7 +241,9 @@ def show_submission_form():
                 for i in range(st.session_state.get(f"{section_key}_challenge_count", 1)):
                     text = st.session_state.get(f"{section_key}_challenge_{i}")
                     if text: items_to_categorize.append({"id": item_id_counter, "text": text, "section": section_key, "type": "challenges"}); item_id_counter += 1
+            
             categorized_results = get_ai_batch_categories(items_to_categorize)
+
             if categorized_results is not None:
                 report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
                 for item in items_to_categorize:
@@ -231,7 +262,8 @@ def show_submission_form():
                     for sk in CORE_SECTIONS.keys():
                         if f"{sk}_success_count" in st.session_state: del st.session_state[f"{sk}_success_count"]
                         if f"{sk}_challenge_count" in st.session_state: del st.session_state[f"{sk}_challenge_count"]
-                except Exception as e: st.error(f"An error occurred: {e}")
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
 
 def dashboard_page():
     st.title("Admin Dashboard")
@@ -244,9 +276,7 @@ def dashboard_page():
         
         all_dates = [report['week_ending_date'] for report in reports_response.data]
         unique_dates = sorted(list(set(all_dates)), reverse=True)
-        
-        st.divider()
-        st.subheader("Weekly Submission Status")
+        st.divider(); st.subheader("Weekly Submission Status")
         selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates)
         if selected_date_for_status and all_staff_response.data:
             submitted_response = supabase.table('reports').select('user_id').eq('week_ending_date', selected_date_for_status).execute()
@@ -261,11 +291,9 @@ def dashboard_page():
                 else: missing_staff.append(display_info)
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown(f"#### ✅ Submitted ({len(submitted_staff)})")
-                for person in sorted(submitted_staff): st.markdown(f"- {person}")
+                st.markdown(f"#### ✅ Submitted ({len(submitted_staff)})"); [st.markdown(f"- {p}") for p in sorted(submitted_staff)]
             with col2:
-                st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
-                for person in sorted(missing_staff): st.markdown(f"- {person}")
+                st.markdown(f"#### ❌ Missing ({len(missing_staff)})"); [st.markdown(f"- {p}") for p in sorted(missing_staff)]
         
         st.divider()
         summaries_response = supabase.table('weekly_summaries').select('*').execute()
@@ -284,28 +312,24 @@ def dashboard_page():
                     weekly_reports = full_response.data
                     if not weekly_reports: st.warning("No reports found for the selected week.")
                     else:
+                        well_being_scores = [r.get('well_being_rating') for r in weekly_reports if r.get('well_being_rating') is not None]
+                        average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
                         reports_text = ""
                         for r in weekly_reports:
                             reports_text += f"\n---\n**Report from: {r['team_member']}**\n"
-                            reports_text += f"Well-being Score: {r.get('well_being_rating')}/5\n"
-                            reports_text += f"Personal Check-in: {r.get('personal_check_in')}\n"
-                            reports_text += f"Lookahead: {r.get('key_topics_lookahead')}\n"
+                            reports_text += f"Well-being Score: {r.get('well_being_rating')}/5\n"; reports_text += f"Personal Check-in: {r.get('personal_check_in')}\n"; reports_text += f"Lookahead: {r.get('key_topics_lookahead')}\n"
                             report_body = r.get('report_body') or {}
-                            for section_key, section_name in CORE_SECTIONS.items():
-                                section_data = report_body.get(section_key)
+                            for sk, sn in CORE_SECTIONS.items():
+                                section_data = report_body.get(sk)
                                 if section_data and (section_data.get('successes') or section_data.get('challenges')):
-                                    reports_text += f"\n*{section_name}*:\n"
-                                    if section_data.get('successes'):
-                                        for success in section_data['successes']: reports_text += f"- Success: {success['text']}\n"
-                                    if section_data.get('challenges'):
-                                        for challenge in section_data['challenges']: reports_text += f"- Challenge: {challenge['text']}\n"
-                        prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report. The report must contain the following sections, in this order, using markdown headings: 1. A summary of work aligned with the UND LEADS strategic pillars (Learning, Equity, Affinity, Discovery, Service). 2. A summary of overall staff well-being. 3. A summary of key challenges. 4. A summary of upcoming projects. **Instructions for each section:** - **UND LEADS Summary:** Create a markdown heading for each relevant UND LEADS pillar, followed by bullet points of key staff activities that fall under it. - **### Overall Staff Well-being:** Start by stating, "The average well-being score for the week was {round(sum([r.get('well_being_rating') for r in weekly_reports if r.get('well_being_rating') is not None]) / len([r.get('well_being_rating') for r in weekly_reports if r.get('well_being_rating') is not None]), 1) if [r.get('well_being_rating') for r in weekly_reports if r.get('well_being_rating') is not None] else 'N/A'} out of 5." Then, provide a 1-2 sentence qualitative summary of the team's morale. Finally, add a subsection `#### Staff to Connect With`. Under this heading, identify by name any staff who reported a low score (1 or 2) or expressed significant negative sentiment in their comments. Briefly state the reason (e.g., "Jane Doe - reported a low score of 1/5"). If everyone is positive, state that. - **### Key Challenges:** Identify and summarize in bullet points any significant or recurring challenges mentioned by the staff. - **### Upcoming Projects & Initiatives:** Based on the 'Lookahead' portion of the reports, list the key upcoming projects in bullet points. The tone should be professional and concise. Here is the raw data from all reports for the week: {reports_text}"""
+                                    reports_text += f"\n*{sn}*:\n"
+                                    if section_data.get('successes'): [reports_text := reports_text + f"- Success: {s['text']}\n" for s in section_data['successes']]
+                                    if section_data.get('challenges'): [reports_text := reports_text + f"- Challenge: {c['text']}\n" for c in section_data['challenges']]
+                        prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into one cohesive summary report. The report must contain the following sections, in this order, using markdown headings: 1. A summary of work aligned with the UND LEADS strategic pillars. 2. A summary of overall staff well-being. 3. A summary of key challenges. 4. A summary of upcoming projects. **Instructions for each section:** - **UND LEADS Summary:** Create a markdown heading for each relevant UND LEADS pillar (Learning, Equity, Affinity, Discovery, Service), followed by bullet points of key staff activities that fall under it. - **### Overall Staff Well-being:** Start by stating, "The average well-being score for the week was {average_score} out of 5." Then, provide a 1-2 sentence qualitative summary of the team's morale. Finally, add a subsection `#### Staff to Connect With`. Under this heading, identify by name any staff who reported a low score (1 or 2) or expressed significant negative sentiment in their comments. Briefly state the reason (e.g., "Jane Doe - reported a low score of 1/5"). If everyone is positive, state that. - **### Key Challenges:** Identify and summarize in bullet points any significant or recurring challenges mentioned by the staff. - **### Upcoming Projects & Initiatives:** Based on the 'Lookahead' portion of the reports, list the key upcoming projects in bullet points. The tone should be professional and concise. Here is the raw data from all reports for the week: {reports_text}"""
                         model = genai.GenerativeModel('models/gemini-2.5-pro')
                         ai_response = model.generate_content(prompt)
-                        st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}
-                        st.rerun()
+                        st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
                 except Exception as e: st.error(f"An error occurred while generating the summary: {e}")
-        
         if 'last_summary' in st.session_state:
             summary_data = st.session_state['last_summary']
             if summary_data['date'] == selected_date_for_summary:
@@ -326,16 +350,16 @@ def dashboard_page():
                     rating = report.get('well_being_rating')
                     if rating: st.metric("Well-being Score", f"{rating}/5")
                     report_body = report.get('report_body') or {}
-                    for section_key, section_name in CORE_SECTIONS.items():
-                        section_data = report_body.get(section_key)
+                    for sk, sn in CORE_SECTIONS.items():
+                        section_data = report_body.get(sk)
                         if section_data and (section_data.get('successes') or section_data.get('challenges')):
-                            st.markdown(f"#### {section_name}")
+                            st.markdown(f"#### {sn}")
                             if section_data.get('successes'):
                                 st.markdown("**Successes:**")
-                                for success in section_data['successes']: st.markdown(f"- {success['text']} `(ASCEND: {success['ascend_category']}, NORTH: {success['north_category']})`")
+                                for s in section_data['successes']: st.markdown(f"- {s['text']} `(ASCEND: {s['ascend_category']}, NORTH: {s['north_category']})`")
                             if section_data.get('challenges'):
                                 st.markdown("**Challenges:**")
-                                for challenge in section_data['challenges']: st.markdown(f"- {challenge['text']} `(ASCEND: {challenge['ascend_category']}, NORTH: {challenge['north_category']})`")
+                                for c in section_data['challenges']: st.markdown(f"- {c['text']} `(ASCEND: {c['ascend_category']}, NORTH: {c['north_category']})`")
                             st.markdown("---")
                     st.markdown("#### General Updates")
                     st.markdown("**Professional Development:**"); st.write(report['professional_development'])
@@ -368,7 +392,7 @@ if 'user' not in st.session_state:
     if choice == "Login": login_form()
     else: signup_form()
 else:
-    st.sidebar.write(f"Welcome, **{st.session_state.get('title', st.session_state['user'].email)}**")
+    st.sidebar.write(f"Welcome, **{st.session_state.get('full_name', st.session_state.get('title', st.session_state['user'].email))}**")
     pages = { "My Profile": profile_page, "Submit / Edit Report": submit_and_edit_page }
     if st.session_state.get('role') == 'admin':
         pages["Admin Dashboard"] = dashboard_page
