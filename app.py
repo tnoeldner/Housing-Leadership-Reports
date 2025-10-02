@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from supabase import create_client, Client
 import google.generativeai as genai
 import json
+import time
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
@@ -28,6 +29,16 @@ CORE_SECTIONS = {
     "responsibilities": "General Job Responsibilities", "staffing": "Staffing/Personnel", "kpis": "KPIs"
 }
 
+# --- Helper function to clear form state ---
+def clear_form_state():
+    keys_to_clear = ['draft_report', 'report_to_edit']
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    for section_key in CORE_SECTIONS.keys():
+        if f"{section_key}_success_count" in st.session_state: del st.session_state[f"{section_key}_success_count"]
+        if f"{section_key}_challenge_count" in st.session_state: del st.session_state[f"{section_key}_challenge_count"]
+
 # --- User Authentication & Profile Functions ---
 def login_form():
     st.header("Login")
@@ -41,20 +52,13 @@ def login_form():
                 if user_session.user:
                     st.session_state['user'] = user_session.user
                     user_id = user_session.user.id
-                    
                     profile_response = supabase.table('profiles').select('role, title, full_name').eq('id', user_id).execute()
-                    
                     if profile_response.data:
                         profile = profile_response.data[0]
                         st.session_state['role'] = profile.get('role')
                         st.session_state['title'] = profile.get('title')
                         st.session_state['full_name'] = profile.get('full_name')
-
-                        supabase.table('user_logs').insert({
-                            "user_id": user_id,
-                            "event_type": "USER_LOGIN",
-                            "description": "User logged in successfully."
-                        }).execute()
+                        supabase.table('user_logs').insert({"user_id": user_id, "event_type": "USER_LOGIN", "description": "User logged in successfully."}).execute()
                         st.rerun()
                     else:
                         st.error("Login successful, but your user profile could not be found. Please contact an administrator.")
@@ -76,10 +80,7 @@ def signup_form():
                 res = supabase.auth.sign_up({"email": email, "password": password})
                 if res.user:
                     new_user_id = res.user.id
-                    supabase.table('profiles').update({
-                        'full_name': full_name,
-                        'title': title
-                    }).eq('id', new_user_id).execute()
+                    supabase.table('profiles').update({'full_name': full_name, 'title': title}).eq('id', new_user_id).execute()
                     st.success("Signup successful! Please check your email to confirm your account.")
                 else:
                     st.error("Signup failed. A user may already exist with this email.")
@@ -91,11 +92,9 @@ def signup_form():
 
 def logout():
     keys_to_delete = ['user', 'role', 'title', 'full_name', 'last_summary', 'report_to_edit', 'draft_report']
-    for section_key in CORE_SECTIONS.keys():
-        if f"{section_key}_success_count" in st.session_state: del st.session_state[f"{section_key}_success_count"]
-        if f"{section_key}_challenge_count" in st.session_state: del st.session_state[f"{section_key}_challenge_count"]
     for key in keys_to_delete:
         if key in st.session_state: del st.session_state[key]
+    clear_form_state()
     st.rerun()
 
 # --- Page Definitions ---
@@ -117,6 +116,7 @@ def profile_page():
                 st.session_state['full_name'] = new_name
                 st.session_state['title'] = new_title
                 st.success("Profile updated successfully!")
+                time.sleep(1)
                 st.rerun()
             except Exception as e:
                 st.error(f"An error occurred: {e}")
@@ -137,6 +137,7 @@ def submit_and_edit_page():
         has_submitted_for_current_week = any(report['week_ending_date'] == current_week_end_date_str for report in user_reports)
         if not has_submitted_for_current_week:
             if st.button("📝 Create New Report for week ending " + current_week_saturday.strftime('%m/%d/%Y'), use_container_width=True, type="primary"):
+                clear_form_state()
                 st.session_state['report_to_edit'] = {}
                 st.rerun()
         else:
@@ -271,10 +272,7 @@ def submit_and_edit_page():
             st.divider()
             final_submit_button = st.form_submit_button("Generate AI Draft & Review", type="primary")
         if st.button("Cancel"):
-            del st.session_state['report_to_edit']
-            for sk in CORE_SECTIONS.keys():
-                if f"{sk}_success_count" in st.session_state: del st.session_state[f"{sk}_success_count"]
-                if f"{sk}_challenge_count" in st.session_state: del st.session_state[f"{sk}_challenge_count"]
+            clear_form_state()
             st.rerun()
         clicked_button = None
         for key, value in add_buttons.items():
@@ -395,26 +393,26 @@ def submit_and_edit_page():
                 }
                 
                 try:
-                    # --- THIS IS THE FIX ---
-                    if draft.get('report_id'): # If ID exists, it's an update
+                    is_update = bool(draft.get('report_id'))
+                    if is_update:
                         supabase.table("reports").update(final_data).eq("id", draft['report_id']).execute()
-                    else: # Otherwise, it's a new report
+                    else:
                         supabase.table("reports").insert(final_data).execute()
 
                     st.success("✅ Your final report has been saved successfully!")
                     
-                    if draft.get('report_id'):
+                    if is_update:
                         supabase.table('weekly_summaries').delete().eq('week_ending_date', draft['week_ending_date']).execute()
                         st.warning(f"Note: The saved team summary for {draft['week_ending_date']} has been deleted. An admin will need to regenerate it.")
                     
                     supabase.table('user_logs').insert({
                         "user_id": st.session_state['user'].id,
-                        "event_type": "REPORT_UPDATED" if draft.get('report_id') else "REPORT_SUBMITTED",
-                        "description": f"User {'updated' if draft.get('report_id') else 'submitted a new'} report for week ending {draft['week_ending_date']}."
+                        "event_type": "REPORT_UPDATED" if is_update else "REPORT_SUBMITTED",
+                        "description": f"User {'updated' if is_update else 'submitted a new'} report for week ending {draft['week_ending_date']}."
                     }).execute()
-
-                    del st.session_state['draft_report']
-                    if 'report_to_edit' in st.session_state: del st.session_state['report_to_edit']
+                    
+                    clear_form_state()
+                    time.sleep(1)
                     st.rerun()
                 except Exception as e:
                     st.error(f"An error occurred while saving the final report: {e}")
