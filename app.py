@@ -649,6 +649,30 @@ if 'user' not in st.session_state:
     if choice == "Login": login_form()
     else: signup_form()
 else:
+    # --- THIS IS THE NEW LOGIC BLOCK ---
+    # Fetch profile info here if it's missing from the session
+    if 'role' not in st.session_state:
+        try:
+            user_id = st.session_state['user'].id
+            profile_response = supabase.table('profiles').select('role, title, full_name').eq('id', user_id).execute()
+            if profile_response.data:
+                profile = profile_response.data[0]
+                st.session_state['role'] = profile.get('role')
+                st.session_state['title'] = profile.get('title')
+                st.session_state['full_name'] = profile.get('full_name')
+                
+                supabase.table('user_logs').insert({
+                    "user_id": user_id,
+                    "event_type": "USER_LOGIN",
+                    "description": "User logged in successfully (session resumed)."
+                }).execute()
+            else:
+                st.error("Your account is valid, but your user profile is missing. Please contact an administrator to have it created.")
+                st.stop()
+        except Exception as e:
+            st.error(f"Could not fetch user profile: {e}")
+            st.stop()
+            
     st.sidebar.write(f"Welcome, **{st.session_state.get('full_name', st.session_state.get('title', st.session_state['user'].email))}**")
     pages = { "My Profile": profile_page, "Submit / Edit Report": submit_and_edit_page }
     if st.session_state.get('role') == 'admin':
@@ -661,5 +685,3 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
-
