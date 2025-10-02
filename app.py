@@ -645,11 +645,15 @@ else:
                 st.session_state['title'] = profile.get('title')
                 st.session_state['full_name'] = profile.get('full_name')
                 
-                supabase.table('user_logs').insert({
-                    "user_id": user_id,
-                    "event_type": "USER_LOGIN",
-                    "description": "User logged in successfully (session resumed)."
-                }).execute()
+                try:
+                    supabase.table('user_logs').insert({
+                        "user_id": user_id,
+                        "event_type": "USER_LOGIN",
+                        "description": "User logged in successfully (session resumed)."
+                    }).execute()
+                except Exception as log_error:
+                    print(f"NON-BLOCKING ERROR: Failed to write to user_logs: {log_error}")
+
             else:
                 st.error("Your account is valid, but your user profile is missing. Please contact an administrator to have it created.")
                 st.stop()
