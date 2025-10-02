@@ -1,5 +1,3 @@
-# app.py 
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -671,6 +669,4 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
-
 
