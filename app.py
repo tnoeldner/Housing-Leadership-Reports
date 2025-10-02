@@ -113,10 +113,17 @@ def profile_page():
                 user_id = st.session_state['user'].id
                 update_data = {'full_name': new_name, 'title': new_title}
                 supabase.table('profiles').update(update_data).eq('id', user_id).execute()
+                
+                supabase.table('user_logs').insert({
+                    "user_id": user_id,
+                    "event_type": "PROFILE_UPDATE",
+                    "description": "User updated their profile name/title."
+                }).execute()
+                
                 st.session_state['full_name'] = new_name
                 st.session_state['title'] = new_title
                 st.success("Profile updated successfully!")
-                time.sleep(1)
+                time.sleep(2)
                 st.rerun()
             except Exception as e:
                 st.error(f"An error occurred: {e}")
@@ -372,50 +379,50 @@ def submit_and_edit_page():
             st.rerun()
 
         if finalize_button:
-            with st.spinner("Finalizing and saving your report..."):
-                final_report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
-                original_body = draft['report_body']
-                for section_key in CORE_SECTIONS.keys():
-                    for item_type in ['successes', 'challenges']:
-                        for i, item in enumerate(original_body.get(section_key, {}).get(item_type, [])):
-                            final_item = {"text": item['text'], "ascend_category": st.session_state[f"review_{section_key}_{item_type}_{i}_ascend"], "north_category": st.session_state[f"review_{section_key}_{item_type}_{i}_north"]}
-                            final_report_body[section_key][item_type].append(final_item)
-                
-                final_data = {
-                    "user_id": st.session_state['user'].id, "team_member": draft['team_member_name'], "week_ending_date": draft['week_ending_date'],
-                    "report_body": final_report_body,
-                    "professional_development": st.session_state.review_prof_dev,
-                    "key_topics_lookahead": st.session_state.review_lookahead,
-                    "personal_check_in": st.session_state.review_personal_check_in,
-                    "well_being_rating": st.session_state.review_well_being,
-                    "individual_summary": st.session_state.review_summary,
-                    "director_concerns": st.session_state.review_director_concerns
-                }
-                
-                try:
-                    is_update = bool(draft.get('report_id'))
-                    if is_update:
-                        supabase.table("reports").update(final_data).eq("id", draft['report_id']).execute()
-                    else:
-                        supabase.table("reports").insert(final_data).execute()
+            
+            final_report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
+            original_body = draft['report_body']
+            for section_key in CORE_SECTIONS.keys():
+                for item_type in ['successes', 'challenges']:
+                    for i, item in enumerate(original_body.get(section_key, {}).get(item_type, [])):
+                        final_item = {"text": item['text'], "ascend_category": st.session_state[f"review_{section_key}_{item_type}_{i}_ascend"], "north_category": st.session_state[f"review_{section_key}_{item_type}_{i}_north"]}
+                        final_report_body[section_key][item_type].append(final_item)
+            
+            final_data = {
+                "user_id": st.session_state['user'].id, "team_member": draft['team_member_name'], "week_ending_date": draft['week_ending_date'],
+                "report_body": final_report_body,
+                "professional_development": st.session_state.review_prof_dev,
+                "key_topics_lookahead": st.session_state.review_lookahead,
+                "personal_check_in": st.session_state.review_personal_check_in,
+                "well_being_rating": st.session_state.review_well_being,
+                "individual_summary": st.session_state.review_summary,
+                "director_concerns": st.session_state.review_director_concerns
+            }
+            
+            try:
+                is_update = bool(draft.get('report_id'))
+                if is_update:
+                    supabase.table("reports").update(final_data).eq("id", draft['report_id']).execute()
+                else:
+                    supabase.table("reports").insert(final_data).execute()
 
-                    st.success("✅ Your final report has been saved successfully!")
-                    
-                    if is_update:
-                        supabase.table('weekly_summaries').delete().eq('week_ending_date', draft['week_ending_date']).execute()
-                        st.warning(f"Note: The saved team summary for {draft['week_ending_date']} has been deleted. An admin will need to regenerate it.")
-                    
-                    supabase.table('user_logs').insert({
-                        "user_id": st.session_state['user'].id,
-                        "event_type": "REPORT_UPDATED" if is_update else "REPORT_SUBMITTED",
-                        "description": f"User {'updated' if is_update else 'submitted a new'} report for week ending {draft['week_ending_date']}."
-                    }).execute()
-                    
-                    clear_form_state()
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"An error occurred while saving the final report: {e}")
+                st.success("✅ Your final report has been saved successfully!")
+                
+                if is_update:
+                    supabase.table('weekly_summaries').delete().eq('week_ending_date', draft['week_ending_date']).execute()
+                    st.warning(f"Note: The saved team summary for {draft['week_ending_date']} has been deleted. An admin will need to regenerate it.")
+                
+                supabase.table('user_logs').insert({
+                    "user_id": st.session_state['user'].id,
+                    "event_type": "REPORT_UPDATED" if is_update else "REPORT_SUBMITTED",
+                    "description": f"User {'updated' if is_update else 'submitted a new'} report for week ending {draft['week_ending_date']}."
+                }).execute()
+                
+                clear_form_state()
+                time.sleep(1) # Brief pause to let the user see the success message
+                st.rerun()
+            except Exception as e:
+                st.error(f"An error occurred while saving the final report: {e}")
 
     if 'draft_report' in st.session_state:
         show_review_form()
@@ -652,6 +659,4 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
-
 
