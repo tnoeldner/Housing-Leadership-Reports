@@ -6,8 +6,7 @@ from datetime import datetime, timedelta
 from supabase import create_client, Client
 import google.generativeai as genai
 import json
-import secrets
-import string
+import time
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
@@ -52,17 +51,7 @@ def login_form():
                 user_session = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 if user_session.user:
                     st.session_state['user'] = user_session.user
-                    user_id = user_session.user.id
-                    profile_response = supabase.table('profiles').select('role, title, full_name').eq('id', user_id).execute()
-                    if profile_response.data:
-                        profile = profile_response.data[0]
-                        st.session_state['role'] = profile.get('role')
-                        st.session_state['title'] = profile.get('title')
-                        st.session_state['full_name'] = profile.get('full_name')
-                        supabase.table('user_logs').insert({"user_id": user_id, "event_type": "USER_LOGIN", "description": "User logged in successfully."}).execute()
-                        st.rerun()
-                    else:
-                        st.error("Login successful, but your user profile could not be found. Please contact an administrator.")
+                    st.rerun() # Immediately rerun after successful auth to establish session
                 else:
                     st.error("Login failed. Please check your credentials.")
             except Exception:
@@ -115,7 +104,6 @@ def profile_page():
                 update_data = {'full_name': new_name, 'title': new_title}
                 supabase.table('profiles').update(update_data).eq('id', user_id).execute()
                 
-                # --- NEW: Log profile update event ---
                 supabase.table('user_logs').insert({
                     "user_id": user_id,
                     "event_type": "PROFILE_UPDATE",
@@ -125,7 +113,7 @@ def profile_page():
                 st.session_state['full_name'] = new_name
                 st.session_state['title'] = new_title
                 st.success("Profile updated successfully!")
-                time.sleep(1)
+                time.sleep(2)
                 st.rerun()
             except Exception as e:
                 st.error(f"An error occurred: {e}")
@@ -649,8 +637,6 @@ if 'user' not in st.session_state:
     if choice == "Login": login_form()
     else: signup_form()
 else:
-    # --- THIS IS THE NEW LOGIC BLOCK ---
-    # Fetch profile info here if it's missing from the session
     if 'role' not in st.session_state:
         try:
             user_id = st.session_state['user'].id
@@ -685,3 +671,5 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
+
+
