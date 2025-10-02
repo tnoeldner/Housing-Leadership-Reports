@@ -49,7 +49,7 @@ def login_form():
                 user_session = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 if user_session.user:
                     st.session_state['user'] = user_session.user
-                    st.rerun() # Immediately rerun after successful auth to establish session
+                    st.rerun() 
                 else:
                     st.error("Login failed. Please check your credentials.")
             except Exception:
@@ -101,12 +101,6 @@ def profile_page():
                 user_id = st.session_state['user'].id
                 update_data = {'full_name': new_name, 'title': new_title}
                 supabase.table('profiles').update(update_data).eq('id', user_id).execute()
-                
-                supabase.table('user_logs').insert({
-                    "user_id": user_id,
-                    "event_type": "PROFILE_UPDATE",
-                    "description": "User updated their profile name/title."
-                }).execute()
                 
                 st.session_state['full_name'] = new_name
                 st.session_state['title'] = new_title
@@ -193,6 +187,7 @@ def submit_and_edit_page():
         Return a single, valid JSON object with two top-level keys: "categorized_items" and "individual_summary".
         - "categorized_items": Should be a JSON array where each object has the original 'id', and two new keys: "ascend_category" and "north_category". If a category doesn't fit, use "N/A".
         - "individual_summary": Should be a string containing the professional summary.
+        **CRITICAL INSTRUCTION:** The 'id' in each object of your returned "categorized_items" array MUST EXACTLY MATCH the 'id' from the input array for that activity. The number of objects in your output array must be the same as the input array.
         **Example Input:**
         [{{"id": 0, "text": "Organized a community event."}}, {{"id": 1, "text": "Updated the budget spreadsheet."}}]
         **Example Output:**
@@ -291,7 +286,7 @@ def submit_and_edit_page():
                 
                 ai_results = process_report_with_ai(items_to_process)
                 
-                if ai_results and "categorized_items" in ai_results and "individual_summary" in ai_results:
+                if ai_results and "categorized_items" in ai_results and "individual_summary" in ai_results and len(ai_results['categorized_items']) == len(items_to_process):
                     categorized_lookup = {item['id']: item for item in ai_results['categorized_items']}
                     report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
                     for item in items_to_process:
@@ -314,7 +309,7 @@ def submit_and_edit_page():
                     }
                     st.rerun()
                 else:
-                    st.error("The AI failed to process the report. Please try submitting again.")
+                    st.error("The AI failed to process the report consistently. Please check your entries for clarity and try submitting again.")
 
     def show_review_form():
         st.subheader("Review Your AI-Generated Report")
@@ -673,4 +668,5 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
+
 
