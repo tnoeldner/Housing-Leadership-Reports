@@ -395,12 +395,6 @@ def submit_and_edit_page():
                         supabase.table('weekly_summaries').delete().eq('week_ending_date', draft['week_ending_date']).execute()
                         st.warning(f"Note: The saved team summary for {draft['week_ending_date']} has been deleted. An admin will need to regenerate it.")
                     
-                    supabase.table('user_logs').insert({
-                        "user_id": st.session_state['user'].id,
-                        "event_type": "REPORT_UPDATED" if is_update else "REPORT_SUBMITTED",
-                        "description": f"User {'updated' if is_update else 'submitted a new'} report for week ending {draft['week_ending_date']}."
-                    }).execute()
-                    
                     clear_form_state()
                     time.sleep(1)
                     st.rerun()
