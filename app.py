@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -83,7 +85,7 @@ def logout():
     for key in keys_to_delete:
         if key in st.session_state: del st.session_state[key]
     clear_form_state()
-    st.rerun()
+    # No st.rerun() needed here as it's a callback
 
 # --- Page Definitions ---
 def profile_page():
@@ -105,7 +107,7 @@ def profile_page():
                 st.session_state['full_name'] = new_name
                 st.session_state['title'] = new_title
                 st.success("Profile updated successfully!")
-                time.sleep(2)
+                time.sleep(1)
                 st.rerun()
             except Exception as e:
                 st.error(f"An error occurred: {e}")
@@ -120,27 +122,36 @@ def submit_and_edit_page():
         locked_weeks = {item['week_ending_date'] for item in locked_weeks_response.data} if locked_weeks_response.data else set()
         user_reports_response = supabase.table('reports').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
         user_reports = user_reports_response.data or []
+        
         today = datetime.today().date()
         current_week_saturday = today + timedelta((5 - today.weekday() + 7) % 7)
         current_week_end_date_str = current_week_saturday.strftime('%Y-%m-%d')
-        has_submitted_for_current_week = any(report['week_ending_date'] == current_week_end_date_str for report in user_reports)
-        if not has_submitted_for_current_week:
-            if st.button("📝 Create New Report for week ending " + current_week_saturday.strftime('%m/%d/%Y'), use_container_width=True, type="primary"):
+        
+        has_finalized_for_current_week = any(report['week_ending_date'] == current_week_end_date_str and report.get('status') == 'finalized' for report in user_reports)
+
+        if not has_finalized_for_current_week:
+            if st.button("📝 Create or Edit This Week's Report", use_container_width=True, type="primary"):
                 clear_form_state()
-                st.session_state['report_to_edit'] = {}
+                existing_draft = next((r for r in user_reports if r['week_ending_date'] == current_week_end_date_str), None)
+                st.session_state['report_to_edit'] = existing_draft if existing_draft else {}
                 st.rerun()
         else:
-            st.info("You have already submitted your report for the current week. You can edit it below.")
+            st.info("You have already finalized your report for the current week.")
+
         st.divider()
         if not user_reports:
             st.info("You have not submitted any other reports yet.")
             return
-        st.markdown("##### Past Reports")
+        
+        st.markdown("##### All My Reports")
         for report in user_reports:
             is_locked = report['week_ending_date'] in locked_weeks
-            with st.expander(f"Report for week ending {report['week_ending_date']} ({'🔒 Locked' if is_locked else '✅ Editable'})"):
+            status = report.get('status', 'draft').capitalize()
+            
+            with st.expander(f"Report for week ending {report['week_ending_date']} (Status: {status})"):
                 if report.get('individual_summary'):
                     st.info(f"**Your AI-Generated Summary:**\n\n{report['individual_summary']}")
+                
                 report_body = report.get('report_body') or {}
                 for section_key, section_name in CORE_SECTIONS.items():
                     section_data = report_body.get(section_key)
@@ -148,11 +159,12 @@ def submit_and_edit_page():
                         st.markdown(f"#### {section_name}")
                         if section_data.get('successes'):
                             st.markdown("**Successes:**")
-                            for s in section_data['successes']: st.markdown(f"- {s['text']} `(ASCEND: {s['ascend_category']}, NORTH: {s['north_category']})`")
+                            for s in section_data['successes']: st.markdown(f"- {s.get('text', '')} `(ASCEND: {s.get('ascend_category', 'N/A')}, NORTH: {s.get('north_category', 'N/A')})`")
                         if section_data.get('challenges'):
                             st.markdown("**Challenges:**")
-                            for c in section_data['challenges']: st.markdown(f"- {c['text']} `(ASCEND: {c['ascend_category']}, NORTH: {c['north_category']})`")
+                            for c in section_data['challenges']: st.markdown(f"- {c.get('text', '')} `(ASCEND: {c.get('ascend_category', 'N/A')}, NORTH: {c.get('north_category', 'N/A')})`")
                         st.markdown("---")
+                
                 st.markdown("#### General Updates")
                 st.markdown("**Professional Development:**")
                 st.write(report.get('professional_development', ''))
@@ -162,7 +174,8 @@ def submit_and_edit_page():
                 st.write(report.get('personal_check_in', ''))
                 if report.get('director_concerns'):
                     st.warning(f"**Concerns for Director:** {report.get('director_concerns')}")
-                if not is_locked:
+
+                if not is_locked and status != 'Finalized':
                     if st.button("Edit This Report", key=f"edit_{report['id']}", use_container_width=True):
                         st.session_state['report_to_edit'] = report
                         st.rerun()
@@ -259,11 +272,16 @@ def submit_and_edit_page():
                 st.text_area("Needs or Concerns for Director", value=report_data.get('director_concerns', ''), key="director_concerns", height=150)
                 st.text_area("Professional Development", value=report_data.get('professional_development', ''), key="prof_dev", height=150)
                 st.text_area("Key Topics & Lookahead", value=report_data.get('key_topics_lookahead', ''), key="lookahead", height=150)
+            
             st.divider()
-            final_submit_button = st.form_submit_button("Generate AI Draft & Review", type="primary")
+            col1, col2, col3 = st.columns([2,2,1])
+            save_draft_button = col1.form_submit_button("Save Draft", use_container_width=True)
+            review_button = col2.form_submit_button("Proceed to Review & Finalize", type="primary", use_container_width=True)
+
         if st.button("Cancel"):
             clear_form_state()
             st.rerun()
+            
         clicked_button = None
         for key, value in add_buttons.items():
             if value: clicked_button = key; break
@@ -272,8 +290,33 @@ def submit_and_edit_page():
             counter_key = f"{section}_{category}_count"
             if counter_key not in st.session_state: st.session_state[counter_key] = 1
             st.session_state[counter_key] += 1; st.rerun()
-        elif final_submit_button:
-            with st.spinner("Generating AI draft... This may take a moment."):
+
+        elif save_draft_button:
+            with st.spinner("Saving draft..."):
+                report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
+                for section_key in CORE_SECTIONS.keys():
+                    success_texts = [st.session_state[f"{section_key}_success_{i}"] for i in range(st.session_state.get(f"{section_key}_success_count", 1)) if st.session_state.get(f"{section_key}_success_{i}")]
+                    challenge_texts = [st.session_state[f"{section_key}_challenge_{i}"] for i in range(st.session_state.get(f"{section_key}_challenge_count", 1)) if st.session_state.get(f"{section_key}_challenge_{i}")]
+                    report_body[section_key]['successes'] = [{"text": t} for t in success_texts]
+                    report_body[section_key]['challenges'] = [{"text": t} for t in challenge_texts]
+                
+                draft_data = {
+                    "user_id": st.session_state['user'].id, "team_member": team_member_name, "week_ending_date": str(week_ending_date),
+                    "report_body": report_body, "professional_development": st.session_state.prof_dev, "key_topics_lookahead": st.session_state.lookahead,
+                    "personal_check_in": st.session_state.personal_check_in, "well_being_rating": well_being_rating, "director_concerns": st.session_state.director_concerns,
+                    "status": "draft"
+                }
+                try:
+                    supabase.table("reports").upsert(draft_data, on_conflict="user_id, week_ending_date").execute()
+                    st.success("Draft saved successfully!")
+                    clear_form_state()
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred while saving the draft: {e}")
+
+        elif review_button:
+            with st.spinner("Generating AI draft..."):
                 items_to_process = []
                 item_id_counter = 0
                 for section_key in CORE_SECTIONS.keys():
@@ -292,11 +335,7 @@ def submit_and_edit_page():
                     for item in items_to_process:
                         item_id = item['id']
                         categories = categorized_lookup.get(item_id, {})
-                        categorized_item = {
-                            "text": item['text'],
-                            "ascend_category": categories.get("ascend_category", "N/A"),
-                            "north_category": categories.get("north_category", "N/A")
-                        }
+                        categorized_item = {"text": item['text'], "ascend_category": categories.get("ascend_category", "N/A"), "north_category": categories.get("north_category", "N/A")}
                         report_body[item['section']][item['type']].append(categorized_item)
 
                     st.session_state['draft_report'] = {
@@ -315,6 +354,12 @@ def submit_and_edit_page():
         st.subheader("Review Your AI-Generated Report")
         st.info("The AI has categorized your entries and generated a summary. Please review, edit if necessary, and then finalize your submission.")
         draft = st.session_state['draft_report']
+        
+        rating = draft.get('well_being_rating')
+        if rating:
+            st.metric("Your Well-being Score for this Week:", f"{rating}/5")
+        st.markdown("---")
+
         with st.form("review_form"):
             st.markdown(f"**Report for:** {draft['team_member_name']} | **Week Ending:** {draft['week_ending_date']}")
             st.divider()
@@ -379,18 +424,15 @@ def submit_and_edit_page():
                     "personal_check_in": st.session_state.review_personal_check_in,
                     "well_being_rating": st.session_state.review_well_being,
                     "individual_summary": st.session_state.review_summary,
-                    "director_concerns": st.session_state.review_director_concerns
+                    "director_concerns": st.session_state.review_director_concerns,
+                    "status": "finalized"
                 }
                 
                 try:
-                    is_update = bool(draft.get('report_id'))
-                    if is_update:
-                        supabase.table("reports").update(final_data).eq("id", draft['report_id']).execute()
-                    else:
-                        supabase.table("reports").insert(final_data).execute()
-
+                    supabase.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
                     st.success("✅ Your final report has been saved successfully!")
                     
+                    is_update = bool(draft.get('report_id'))
                     if is_update:
                         supabase.table('weekly_summaries').delete().eq('week_ending_date', draft['week_ending_date']).execute()
                         st.warning(f"Note: The saved team summary for {draft['week_ending_date']} has been deleted. An admin will need to regenerate it.")
@@ -412,19 +454,19 @@ def dashboard_page():
     st.title("Admin Dashboard")
     st.write("View reports, track submissions, and generate weekly summaries.")
     try:
-        reports_response = supabase.table('reports').select('*').order('created_at', desc=True).execute()
+        reports_response = supabase.table('reports').select('*').eq('status', 'finalized').order('created_at', desc=True).execute()
         all_reports = reports_response.data
         all_staff_response = supabase.rpc('get_all_staff_profiles').execute()
         
         if not all_reports:
-            st.info("No reports have been submitted yet."); return
+            st.info("No finalized reports have been submitted yet."); return
         
         all_dates = [report['week_ending_date'] for report in all_reports]
         unique_dates = sorted(list(set(all_dates)), reverse=True)
-        st.divider(); st.subheader("Weekly Submission Status")
+        st.divider(); st.subheader("Weekly Submission Status (Finalized Reports)")
         selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates)
         if selected_date_for_status and all_staff_response.data:
-            submitted_response = supabase.table('reports').select('user_id').eq('week_ending_date', selected_date_for_status).execute()
+            submitted_response = supabase.table('reports').select('user_id').eq('week_ending_date', selected_date_for_status).eq('status', 'finalized').execute()
             submitted_user_ids = {item['user_id'] for item in submitted_response.data} if submitted_response.data else set()
             all_staff = all_staff_response.data; submitted_staff, missing_staff = [], []
             for staff_member in all_staff:
@@ -568,25 +610,6 @@ def view_summaries_page():
     except Exception as e:
         st.error(f"An error occurred while fetching summaries: {e}")
 
-def view_logs_page():
-    st.title("User Activity Log")
-    st.write("This log shows recent user logins and report submissions/updates.")
-    
-    try:
-        response = supabase.rpc('get_user_logs').execute()
-        logs = response.data
-        if not logs:
-            st.info("No user activity has been logged yet.")
-        else:
-            df = pd.DataFrame(logs)
-            df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('America/Chicago').dt.strftime('%Y-%m-%d %I:%M %p')
-            df['User'] = df.apply(lambda row: row['full_name'] if pd.notna(row['full_name']) and row['full_name'].strip() != '' else row['email'], axis=1)
-            df_display = df[['created_at', 'User', 'event_type', 'description']]
-            df_display.rename(columns={'created_at': 'Timestamp (CT)', 'event_type': 'Event', 'description': 'Details'}, inplace=True)
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-    except Exception as e:
-        st.error(f"An error occurred while fetching logs: {e}")
-
 def user_management_page():
     st.title("User Management")
     if st.session_state.get('role') != 'admin':
@@ -616,6 +639,51 @@ def user_management_page():
 
     except Exception as e:
         st.error(f"An error occurred while fetching users: {e}")
+        
+def user_manual_page():
+    st.title("User Manual")
+    st.markdown("""
+    Welcome to the Weekly Impact Reporting Tool. This guide will walk you through creating an account and submitting your weekly reports.
+    ### 1. Getting Started
+    - **Creating Your Account:** If you are a new user, select "Sign Up" from the sidebar. You will need to provide your email address, full name, position title, and create a password.
+    - **Confirming Your Email:** After signing up, you will receive a confirmation email from Supabase. You **must** click the link in this email to activate your account. If you don't see the email, please check your junk or spam folder.
+    - **Logging In:** Once your account is confirmed, you can log in using your email and password.
+
+    ### 2. The Reporting Workflow
+    This tool uses a "Draft, Review, Finalize" process to give you flexibility.
+    - **Draft:** You can save your progress at any time without submitting the final report.
+    - **Review:** When you're ready, the tool uses AI to help categorize your entries and generate a summary for your review.
+    - **Finalize:** After you've reviewed and edited the AI's suggestions, you will lock in your report, which submits it for the week.
+
+    ### 3. Step-by-Step Guide
+    - **Create or Edit Your Report:** From the "Submit / Edit Report" page, click the "Create or Edit This Week's Report" button.
+    - **Fill Out Your Report:** Complete the sections under the "Core Activities" and "General Updates" tabs. You can add more entries for successes and challenges as needed.
+    - **Save a Draft (Optional):** If you need to stop and come back later, click the **"Save Draft"** button. Your text will be saved, and you can pick up where you left off by clicking the "Create or Edit" button again.
+    - **Proceed to Review:** When your report is complete, click the **"Proceed to Review & Finalize"** button. This will send your entries to the AI for processing.
+    - **Review the AI's Work:** On the review screen, you will see the categories the AI has assigned and the summary it has written. You can now:
+        - Change any of the ASCEND or Guiding NORTH categories using the dropdown menus.
+        - Edit the text of your individual AI-generated summary.
+        - Make final adjustments to your general updates.
+    - **Finalize Your Submission:** When you are satisfied with the entire report, click the **"Lock and Submit Report"** button. This is the final step and will make your report visible to the admin.
+    
+    ### 4. Framework Definitions
+    Below are the definitions for the strategic frameworks used for categorization.
+    
+    #### ASCEND Framework
+    - **Accountability:** Taking ownership of responsibilities, delivering on commitments, and ensuring the integrity of our processes.
+    - **Service:** Providing exceptional support and creating positive experiences for our students, staff, and campus partners.
+    - **Community:** Fostering a sense of belonging, inclusion, and connection among residents and staff.
+    - **Excellence:** Striving for the highest quality in our work, facilities, and programs.
+    - **Nurture:** Supporting the holistic well-being and personal growth of our students and team members.
+    - **Development:** Creating and promoting opportunities for learning, leadership, and professional growth.
+
+    #### Guiding NORTH Pillars
+    - **Nurturing Student Success & Development:** Focusing on the academic, personal, and social success of our students.
+    - **Operational Excellence & Efficiency:** Improving processes, systems, and services to be more effective and streamlined.
+    - **Resource Stewardship & Sustainability:** Managing financial, environmental, and physical resources responsibly.
+    - **Transformative & Inclusive Environments:** Creating welcoming, safe, and equitable spaces for all members of our community.
+    - **Holistic Well-being & Safety:** Prioritizing the physical, mental, and emotional health and safety of our residents and staff.
+    """)
 
 # --- Main App Logic ---
 if 'user' not in st.session_state:
@@ -633,16 +701,6 @@ else:
                 st.session_state['role'] = profile.get('role')
                 st.session_state['title'] = profile.get('title')
                 st.session_state['full_name'] = profile.get('full_name')
-                
-                try:
-                    supabase.table('user_logs').insert({
-                        "user_id": user_id,
-                        "event_type": "USER_LOGIN",
-                        "description": "User logged in successfully (session resumed)."
-                    }).execute()
-                except Exception as log_error:
-                    print(f"NON-BLOCKING ERROR: Failed to write to user_logs: {log_error}")
-
             else:
                 st.error("Your account is valid, but your user profile is missing. Please contact an administrator to have it created.")
                 st.stop()
@@ -651,11 +709,14 @@ else:
             st.stop()
             
     st.sidebar.write(f"Welcome, **{st.session_state.get('full_name', st.session_state.get('title', st.session_state['user'].email))}**")
-    pages = { "My Profile": profile_page, "Submit / Edit Report": submit_and_edit_page }
+    pages = { 
+        "My Profile": profile_page, 
+        "Submit / Edit Report": submit_and_edit_page,
+        "User Manual": user_manual_page
+    }
     if st.session_state.get('role') == 'admin':
         pages["Admin Dashboard"] = dashboard_page
         pages["Annual Report Archive"] = view_summaries_page
-        pages["User Activity Log"] = view_logs_page
         pages["User Management"] = user_management_page
     st.sidebar.divider()
     selection = st.sidebar.radio("Go to", pages.keys())
