@@ -85,7 +85,6 @@ def logout():
     for key in keys_to_delete:
         if key in st.session_state: del st.session_state[key]
     clear_form_state()
-    # No st.rerun() needed here as it's a callback
 
 # --- Page Definitions ---
 def profile_page():
@@ -519,15 +518,24 @@ def dashboard_page():
                         ai_response = model.generate_content(prompt)
                         st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
                 except Exception as e: st.error(f"An error occurred while generating the summary: {e}")
+        
         if 'last_summary' in st.session_state:
             summary_data = st.session_state['last_summary']
             if 'date' in summary_data and summary_data['date'] == selected_date_for_summary:
-                st.markdown("---"); st.subheader(f"Newly Generated Summary for Week Ending {summary_data['date']}"); st.markdown(summary_data['text'])
-                if st.button("Save this Summary to Annual Report Archive"):
-                    try:
-                        supabase.table('weekly_summaries').upsert({'week_ending_date': summary_data['date'], 'summary_text': summary_data['text']}, on_conflict='week_ending_date').execute()
-                        st.success(f"Summary for {summary_data['date']} has been saved!"); st.cache_data.clear(); st.cache_resource.clear(); del st.session_state['last_summary']; st.rerun()
-                    except Exception as e: st.error(f"Failed to save summary: {e}")
+                st.markdown("---")
+                st.subheader("Generated Summary (Editable)")
+                with st.form("save_summary_form"):
+                    edited_summary = st.text_area("Edit Summary:", value=summary_data['text'], height=400)
+                    save_button = st.form_submit_button("Save Final Summary to Archive", type="primary")
+                    if save_button:
+                        try:
+                            supabase.table('weekly_summaries').upsert({'week_ending_date': summary_data['date'], 'summary_text': edited_summary}, on_conflict='week_ending_date').execute()
+                            st.success(f"Summary for {summary_data['date']} has been saved!")
+                            st.cache_data.clear()
+                            del st.session_state['last_summary']
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e: st.error(f"Failed to save summary: {e}")
         
         st.divider(); st.subheader("All Submitted Individual Reports")
         if all_reports:
@@ -701,6 +709,16 @@ else:
                 st.session_state['role'] = profile.get('role')
                 st.session_state['title'] = profile.get('title')
                 st.session_state['full_name'] = profile.get('full_name')
+                
+                try:
+                    # Non-blocking log attempt
+                    supabase.table('user_logs').insert({
+                        "user_id": user_id,
+                        "event_type": "USER_LOGIN",
+                        "description": "User logged in successfully (session resumed)."
+                    }).execute()
+                except Exception:
+                    pass # Fail silently if logging fails
             else:
                 st.error("Your account is valid, but your user profile is missing. Please contact an administrator to have it created.")
                 st.stop()
@@ -723,5 +741,3 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
-
