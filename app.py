@@ -1,5 +1,3 @@
-# app.py
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -117,25 +115,52 @@ def submit_and_edit_page():
     def show_report_list():
         st.subheader("Your Submitted Reports")
         user_id = st.session_state['user'].id
-        locked_weeks_response = supabase.table('weekly_summaries').select('week_ending_date').execute()
-        locked_weeks = {item['week_ending_date'] for item in locked_weeks_response.data} if locked_weeks_response.data else set()
         user_reports_response = supabase.table('reports').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
         user_reports = user_reports_response.data or []
         
-        today = datetime.today().date()
-        current_week_saturday = today + timedelta((5 - today.weekday() + 7) % 7)
-        current_week_end_date_str = current_week_saturday.strftime('%Y-%m-%d')
-        
-        has_finalized_for_current_week = any(report['week_ending_date'] == current_week_end_date_str and report.get('status') == 'finalized' for report in user_reports)
+        now = datetime.now()
+        today = now.date()
+        weekday = now.weekday()  # Monday is 0, Sunday is 6
 
-        if not has_finalized_for_current_week:
-            if st.button("📝 Create or Edit This Week's Report", use_container_width=True, type="primary"):
-                clear_form_state()
-                existing_draft = next((r for r in user_reports if r['week_ending_date'] == current_week_end_date_str), None)
-                st.session_state['report_to_edit'] = existing_draft if existing_draft else {}
-                st.rerun()
-        else:
-            st.info("You have already finalized your report for the current week.")
+        active_saturday = None
+        is_grace_period = False
+
+        if 1 <= weekday <= 5:  # Tuesday to Saturday
+            active_saturday = today + timedelta(days=5 - weekday)
+        elif weekday == 6:  # Sunday
+            active_saturday = today - timedelta(days=1)
+            is_grace_period = True
+        elif weekday == 0:  # Monday
+            active_saturday = today - timedelta(days=2)
+            is_grace_period = True
+
+        deadline_is_past = (weekday == 0 and now.hour >= 16)
+
+        if active_saturday:
+            active_report_date_str = active_saturday.strftime('%Y-%m-%d')
+            has_finalized_for_active_week = any(
+                report['week_ending_date'] == active_report_date_str and report.get('status') == 'finalized'
+                for report in user_reports
+            )
+
+            show_create_button = True
+            if has_finalized_for_active_week:
+                show_create_button = False
+            if is_grace_period and deadline_is_past:
+                show_create_button = False
+
+            if show_create_button:
+                button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                if st.button(button_label, use_container_width=True, type="primary"):
+                    clear_form_state()
+                    existing_report = next((r for r in user_reports if r['week_ending_date'] == active_report_date_str), None)
+                    st.session_state['report_to_edit'] = existing_report if existing_report else {'week_ending_date': active_report_date_str}
+                    st.rerun()
+            elif has_finalized_for_active_week:
+                 st.info(f"You have already finalized your report for the week ending {active_saturday.strftime('%m/%d/%Y')}.")
+            elif deadline_is_past:
+                 st.warning(f"The submission deadline for the report ending {active_saturday.strftime('%m/%d/%Y')} has passed.")
+
 
         st.divider()
         if not user_reports:
@@ -144,7 +169,6 @@ def submit_and_edit_page():
         
         st.markdown("##### All My Reports")
         for report in user_reports:
-            is_locked = report['week_ending_date'] in locked_weeks
             status = report.get('status', 'draft').capitalize()
             
             with st.expander(f"Report for week ending {report['week_ending_date']} (Status: {status})"):
@@ -174,7 +198,7 @@ def submit_and_edit_page():
                 if report.get('director_concerns'):
                     st.warning(f"**Concerns for Director:** {report.get('director_concerns')}")
 
-                if not is_locked and status != 'Finalized':
+                if status != 'Finalized':
                     if st.button("Edit This Report", key=f"edit_{report['id']}", use_container_width=True):
                         st.session_state['report_to_edit'] = report
                         st.rerun()
@@ -247,8 +271,7 @@ def submit_and_edit_page():
                 team_member_name = st.session_state.get('full_name') or st.session_state.get('title') or st.session_state['user'].email
                 st.text_input("Submitted By", value=team_member_name, disabled=True)
             with col2:
-                today = datetime.today()
-                default_date = pd.to_datetime(report_data['week_ending_date']).date() if not is_new_report else today + timedelta((5 - today.weekday() + 7) % 7)
+                default_date = pd.to_datetime(report_data.get('week_ending_date')).date()
                 week_ending_date = st.date_input("For the Week Ending", value=default_date, format="MM/DD/YYYY")
             st.divider()
             core_activities_tab, general_updates_tab = st.tabs(["📊 Core Activities", "📝 General Updates"])
@@ -448,7 +471,6 @@ def submit_and_edit_page():
         show_submission_form()
     else:
         show_report_list()
-
 def dashboard_page():
     st.title("Admin Dashboard")
     st.write("View reports, track submissions, and generate weekly summaries.")
@@ -576,7 +598,7 @@ def view_summaries_page():
     st.write("This page contains all the saved weekly AI-generated summaries.")
     try:
         summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
-        all_reports_response = supabase.table('reports').select('*').execute()
+        all_reports_response = supabase.table('reports').select('*').eq('status', 'finalized').execute()
         summaries = summaries_response.data or []
         all_reports = all_reports_response.data or []
         if not summaries:
@@ -610,10 +632,10 @@ def view_summaries_page():
                                         st.markdown(f"#### {sn}")
                                         if section_data.get('successes'):
                                             st.markdown("**Successes:**")
-                                            for s in section_data['successes']: st.markdown(f"- {s['text']} `(ASCEND: {s['ascend_category']}, NORTH: {s['north_category']})`")
+                                            for s in section_data['successes']: st.markdown(f"- {s.get('text', '')} `(ASCEND: {s.get('ascend_category', 'N/A')}, NORTH: {s.get('north_category', 'N/A')})`")
                                         if section_data.get('challenges'):
                                             st.markdown("**Challenges:**")
-                                            for c in section_data['challenges']: st.markdown(f"- {c['text']} `(ASCEND: {c['ascend_category']}, NORTH: {c['north_category']})`")
+                                            for c in section_data['challenges']: st.markdown(f"- {c.get('text', '')} `(ASCEND: {c.get('ascend_category', 'N/A')}, NORTH: {c.get('north_category', 'N/A')})`")
                                         st.markdown("---")
     except Exception as e:
         st.error(f"An error occurred while fetching summaries: {e}")
@@ -693,6 +715,100 @@ def user_manual_page():
     - **Holistic Well-being & Safety:** Prioritizing the physical, mental, and emotional health and safety of our residents and staff.
     """)
 
+def automated_reminders_page():
+    st.title("Automated Email Reminders Setup")
+
+    st.info("""
+    This guide will walk you through the one-time setup process to enable automated email reminders for your team. The system is designed to run every Friday at noon and send a reminder to any user who has not yet submitted a finalized report for the current week.
+    """)
+    
+    st.header("Step 0: Enable Required Database Extensions")
+    st.markdown("""
+    Before you can schedule tasks or send emails, you need to enable two extensions in your Supabase project.
+    1.  Go to your Supabase project dashboard.
+    2.  In the left-hand menu, click on **Database**.
+    3.  Select **Extensions**.
+    4.  In the search bar, type `cron` and enable the `pg_cron` extension.
+    5.  In the search bar, type `http` and enable the `http` extension.
+    """)
+
+    st.header("Step 1: Get a Resend API Key")
+    st.markdown("""
+    This system uses a service called **Resend** to send emails. They offer a generous free tier that is perfect for this purpose.
+    1.  Go to [resend.com](https://resend.com) and sign up for a free account.
+    2.  Navigate to the **API Keys** section in your Resend dashboard.
+    3.  Click **"Create API Key"**, give it a name (e.g., "Supabase Reporting Tool"), and copy the key. You will need this for the next step.
+    """)
+
+    st.header("Step 2: Add the API Key to Your Supabase Project")
+    st.markdown("""
+    To keep your API key secure, we will store it as a "Secret" in your Supabase project.
+    1.  Go to your Supabase project dashboard.
+    2.  Navigate to **Project Settings** > **Edge Functions**.
+    3.  Click **"Add a new secret"**.
+    4.  For the **Name**, enter `RESEND_API_KEY`.
+    5.  For the **Value**, paste the API key you copied from Resend.
+    6.  Click **Save**.
+    """)
+
+    st.header("Step 3: Create the Database Function")
+    st.markdown("""
+    This SQL function contains the logic to identify which users need a reminder. Go to the **SQL Editor** in your Supabase dashboard, click **"+ New query"**, and run the following two commands, one after the other.
+    """)
+    st.code("""
+    -- 1. DROP the old function to ensure a clean slate
+    DROP FUNCTION IF EXISTS public.send_weekly_reminders();
+    """, language="sql")
+    st.code("""
+    -- 2. CREATE the new, corrected function
+    CREATE OR REPLACE FUNCTION public.send_weekly_reminders()
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    AS $$
+    DECLARE
+        user_record RECORD;
+        week_end_date DATE;
+    BEGIN
+        SELECT (DATE_TRUNC('week', NOW()) + '5 days'::interval)::DATE INTO week_end_date;
+
+        FOR user_record IN
+            SELECT id, email FROM auth.users
+            WHERE id NOT IN (
+                SELECT user_id FROM public.reports
+                WHERE week_ending_date = week_end_date AND status = 'finalized'
+            )
+        LOOP
+            PERFORM extensions.http_post(
+                url:='YOUR_SUPABASE_PROJECT_URL/functions/v1/send-reminder-email'::text,
+                headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SUPABASE_ANON_KEY"}'::jsonb,
+                body:=json_build_object(
+                    'email', user_record.email,
+                    'week_ending_date', week_end_date
+                )::jsonb
+            );
+        END LOOP;
+    END;
+    $$;
+    """, language="sql")
+    st.warning("Remember to replace `YOUR_SUPABASE_PROJECT_URL` and `YOUR_SUPABASE_ANON_KEY` with your actual project details from your Supabase settings.")
+
+    st.header("Step 4: Schedule the Function to Run Weekly")
+    st.markdown("""
+    Finally, we will use a "Cron Job" to automatically run the function every Friday at noon. Go to the **SQL Editor**, start a new query, and run this code:
+    """)
+    st.code("""
+    SELECT cron.schedule(
+        'friday-noon-reminders',
+        '0 12 * * 5', -- This is a cron expression for every Friday at 12:00 noon
+        $$
+        SELECT send_weekly_reminders();
+        $$
+    );
+    """, language="sql")
+
+    st.success("Setup Complete! Your automated email reminders are now active.")
+
 # --- Main App Logic ---
 if 'user' not in st.session_state:
     st.sidebar.header("Login or Sign Up")
@@ -709,16 +825,6 @@ else:
                 st.session_state['role'] = profile.get('role')
                 st.session_state['title'] = profile.get('title')
                 st.session_state['full_name'] = profile.get('full_name')
-                
-                try:
-                    # Non-blocking log attempt
-                    supabase.table('user_logs').insert({
-                        "user_id": user_id,
-                        "event_type": "USER_LOGIN",
-                        "description": "User logged in successfully (session resumed)."
-                    }).execute()
-                except Exception:
-                    pass # Fail silently if logging fails
             else:
                 st.error("Your account is valid, but your user profile is missing. Please contact an administrator to have it created.")
                 st.stop()
@@ -736,8 +842,11 @@ else:
         pages["Admin Dashboard"] = dashboard_page
         pages["Annual Report Archive"] = view_summaries_page
         pages["User Management"] = user_management_page
+        pages["Automated Reminders"] = automated_reminders_page
     st.sidebar.divider()
     selection = st.sidebar.radio("Go to", pages.keys())
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
+
+
