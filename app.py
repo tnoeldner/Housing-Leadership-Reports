@@ -5,6 +5,7 @@ from supabase import create_client, Client
 import google.generativeai as genai
 import json
 import time
+from zoneinfo import ZoneInfo
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
@@ -118,7 +119,8 @@ def submit_and_edit_page():
         user_reports_response = supabase.table('reports').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
         user_reports = user_reports_response.data or []
         
-        now = datetime.now()
+        # --- THIS IS THE FIX: Use timezone-aware 'now' ---
+        now = datetime.now(ZoneInfo("America/Chicago"))
         today = now.date()
         weekday = now.weekday()  # Monday is 0, Sunday is 6
 
@@ -471,6 +473,7 @@ def submit_and_edit_page():
         show_submission_form()
     else:
         show_report_list()
+
 def dashboard_page():
     st.title("Admin Dashboard")
     st.write("View reports, track submissions, and generate weekly summaries.")
@@ -848,5 +851,4 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
 
