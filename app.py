@@ -475,7 +475,6 @@ def submit_and_edit_page():
         show_submission_form()
     else:
         show_report_list()
-
 def dashboard_page(supervisor_mode=False):
     if supervisor_mode:
         st.title("Supervisor Dashboard")
