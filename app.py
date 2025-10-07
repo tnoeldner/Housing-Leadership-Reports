@@ -895,17 +895,95 @@ def user_management_page():
 
 def user_manual_page():
     st.title("User Manual")
-    st.markdown(
-        """
-    Welcome to the Weekly Impact Reporting Tool. This guide will walk you through creating an account and submitting your weekly reports.
-    ### 1. Getting Started
-    - **Creating Your Account:** If you are a new user, select "Sign Up" from the sidebar. You will need to provide your email address, full name, position title, and create a password.
-    - **Confirming Your Email:** After signing up, you will receive a confirmation email from Supabase. You **must** click the link in this email to activate your account. If you don't see the email, please check your junk or spam folder.
-    - **Logging In:** Once your account is confirmed, you can log in using your email and password.
+    st.markdown("""
+    This manual describes how to use the Weekly Impact Reporting Tool and explains differences between regular users, supervisors, and admins.
 
-    ...
-    """
-    )
+    ## 1. Account & Access
+    - Sign Up: Use "Sign Up" in the sidebar. Provide email, full name, position title, and password.
+    - Email Confirmation: After sign up you must confirm your email (Supabase confirmation link).
+    - Login: Use "Login" in the sidebar. After logging in the sidebar shows pages available to your role.
+    - Roles:
+      - Regular staff: Submit and view your own reports.
+      - Supervisor: Submit/view own reports; view team reports for direct reports; generate and save team summaries (supervisor-scoped).
+      - Admin/Director: Full access to all finalized reports and archived weekly summaries.
+
+    ## 2. Report Workflow (Draft → Review → Finalize)
+    1. Go to "Submit / Edit Report".
+    2. Create or edit the report for the active week (app calculates the current week and grace period).
+    3. Fill Core Activities tabs and General Updates:
+       - Core Activities: Sections include Students/Stakeholders, Projects, Collaborations, General Job Responsibilities, Staffing, KPIs.
+       - For each section add Successes and Challenges; you can add multiple entries.
+       - General Updates: Personal check-in, Professional development, Lookahead, and optional Director concerns (see privacy rules below).
+    4. Save Draft: Saves your progress as a draft (you can come back later).
+    5. Proceed to Review: The app sends your entries to the AI to categorize each item using ASCEND and Guiding NORTH, and to generate a concise individual summary.
+    6. Review Screen: Edit categories, adjust the AI summary, confirm well-being score and general updates.
+    7. Lock and Submit: Finalizes the report and marks it "finalized". Finalized reports cannot be edited without supervisor/admin assistance.
+
+    ## 3. AI Processing
+    - The app categorizes each activity into ASCEND and Guiding NORTH and produces a 2–4 sentence individual summary.
+    - If AI fails to return consistent results, the UI shows an error and asks to simplify entries.
+    - The AI prompt enforces consistent headings and structure for team summaries.
+
+    ## 4. Privacy and Visibility Rules
+    - Row-Level Security (RLS) is enforced: users only see rows they are permitted to view.
+    - Regular staff can only view their own reports.
+    - Supervisors can view finalized reports for their direct reports only.
+    - Director concerns (the "Concerns for Director" field) are shown only to:
+      - The report owner, or
+      - Admin/Director accounts.
+      Supervisors and other staff will not see director concerns for another person's report.
+    - Admin/Director accounts have access to all reports and global weekly summaries.
+
+    ## 5. Weekly Team Summaries
+    - Admin/Director can generate global weekly summaries that include all finalized reports for a selected week.
+    - Supervisors can generate supervisor-scoped team summaries that only include their direct reports.
+    - Generated summaries can be edited and saved:
+      - Admin/Director summaries are saved to the global archive (weekly_summaries).
+      - Supervisor summaries are saved to a dedicated supervisor archive (supervisor_summaries).
+    - Saving summaries uses RPC functions (SECURITY DEFINER) so supervisors can save without directly bypassing RLS.
+
+    ## 6. Supervisor Dashboard and Team History
+    - Supervisors see:
+      - A list of direct reports and who has submitted finalized reports for a selected week.
+      - The ability to generate/regenerate a team summary for weeks where direct reports submitted finalized reports.
+      - "My Team Summaries": an archive of summaries the supervisor saved.
+    - Supervisors will NOT see global admin summaries for weeks outside their team's activity.
+
+    ## 7. Admin Dashboard
+    - Admins can:
+      - View all finalized reports.
+      - Generate/regenerate global weekly summaries.
+      - Save global summaries to the archive.
+      - Manage users and assign supervisors.
+
+    ## 8. Automated Reminders (setup guide)
+    - The system supports scheduled email reminders (example using pg_cron + http extension + Resend).
+    - Setup requires enabling extensions in Supabase, adding a Resend API key as a project secret, and creating the DB function and cron schedule as documented in the "Automated Reminders" page within the app.
+
+    ## 9. Troubleshooting & Tips
+    - Missing finalized reports in the supervisor view:
+      - Confirm the report is finalized in the DB.
+      - Confirm the profile.supervisor_id is set to the supervisor's user id (Supabase SQL check).
+      - RLS may prevent direct queries; the app uses RPCs to fetch team reports.
+    - AI errors:
+      - Simplify long or ambiguous entries and retry "Proceed to Review".
+    - Save failures for summaries:
+      - Ensure RPC functions (save_weekly_summary, save_supervisor_summary) are deployed and granted to anon/authenticated.
+      - If you see "column ... is of type date but expression is of type text" error, ensure the RPC casts week text to date or pass proper date values.
+    - If the app shows unexpected behavior, restart the app and check Streamlit logs for exceptions.
+
+    ## 10. Developer Notes (for maintainers)
+    - Important DB objects used by the app:
+      - public.reports (individual reports)
+      - public.profiles (user profiles, supervisor_id)
+      - public.weekly_summaries (global saved summaries) — created_by uuid column required
+      - public.supervisor_summaries (supervisor-scoped saved summaries)
+      - RPCs: get_finalized_reports_for_supervisor, save_weekly_summary, save_supervisor_summary, get_supervisor_summaries
+    - Security: use RLS and SECURITY DEFINER RPCs for operations that require elevated access.
+    - Caching: Streamlit caching is used for some calls; clear cache if you change DB structure or RPCs.
+
+    If any part of this manual needs additional detail or screenshots, indicate which page or flow to expand and an updated snippet will be provided.
+    """, unsafe_allow_html=False)
 
 
 def automated_reminders_page():
