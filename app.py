@@ -8,6 +8,7 @@ import google.generativeai as genai
 import json
 import time
 from zoneinfo import ZoneInfo
+from collections import Counter
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
@@ -542,15 +543,17 @@ def dashboard_page():
                         prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
 
 The report must contain the following sections, in this order, using markdown headings:
-1.  A summary of work aligned with the ASCEND framework.
-2.  A summary of work aligned with the Guiding NORTH pillars.
-3.  A summary of work aligned with the UND LEADS strategic pillars.
-4.  A summary of overall staff well-being.
-5.  A section for items needing the Director's attention.
-6.  A summary of key challenges.
-7.  A summary of upcoming projects.
+1.  **Executive Summary**: A 2-3 sentence high-level overview of the week's key takeaways.
+2.  A summary of work aligned with the ASCEND framework.
+3.  A summary of work aligned with the Guiding NORTH pillars.
+4.  A summary of work aligned with the UND LEADS strategic pillars.
+5.  A summary of overall staff well-being.
+6.  A section for items needing the Director's attention.
+7.  A summary of key challenges.
+8.  A summary of upcoming projects.
 
 **Instructions for each section:**
+- **### Executive Summary:** Write a 2-3 sentence paragraph that provides the most critical, high-level overview of the team's accomplishments, challenges, and overall status for the week. This should be suitable for a leader who may only have time to read this one section.
 - **### ASCEND Framework Summary:** Start with the following purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." Then, create a markdown heading for each relevant ASCEND category (Accountability, Service, Community, Excellence, Nurture, Development), followed by bullet points summarizing key staff activities. When summarizing an activity, refer to the staff member by name (e.g., "John Doe demonstrated Accountability by...").
 - **### Guiding NORTH Pillars Summary:** Start with the following purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." Then, create a markdown heading for each relevant Guiding NORTH pillar, followed by bullet points summarizing key staff activities. When summarizing an activity, refer to the staff member by name.
 - **### UND LEADS Summary:** Start with the following purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Then, create a markdown heading for each relevant UND LEADS pillar (Learning, Equity, Affinity, Discovery, Service), followed by bullet points of key staff activities that fall under it. When summarizing an activity, refer to the staff member by name.
@@ -758,10 +761,23 @@ def automated_reminders_page():
     """)
 
     st.header("Step 1: Get a Resend API Key")
-    # ... (content omitted for brevity)
+    st.markdown("""
+    This system uses a service called **Resend** to send emails. They offer a generous free tier that is perfect for this purpose.
+    1.  Go to [resend.com](https://resend.com) and sign up for a free account.
+    2.  Navigate to the **API Keys** section in your Resend dashboard.
+    3.  Click **"Create API Key"**, give it a name (e.g., "Supabase Reporting Tool"), and copy the key. You will need this for the next step.
+    """)
 
     st.header("Step 2: Add the API Key to Your Supabase Project")
-    # ... (content omitted for brevity)
+    st.markdown("""
+    To keep your API key secure, we will store it as a "Secret" in your Supabase project.
+    1.  Go to your Supabase project dashboard.
+    2.  Navigate to **Project Settings** > **Edge Functions**.
+    3.  Click **"Add a new secret"**.
+    4.  For the **Name**, enter `RESEND_API_KEY`.
+    5.  For the **Value**, paste the API key you copied from Resend.
+    6.  Click **Save**.
+    """)
 
     st.header("Step 3: Create the Database Function")
     st.markdown("""
@@ -860,5 +876,3 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
-
