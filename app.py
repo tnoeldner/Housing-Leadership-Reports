@@ -591,8 +591,8 @@ Here is the raw report data from all reports for the week, which includes the na
                     model = genai.GenerativeModel('models/gemini-2.5-pro')
                     ai_response = model.generate_content(prompt)
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
-                except Exception as e:
-                    st.error(f"An error occurred while generating the summary: {e}")
+            except Exception as e:
+                st.error(f"An error occurred while generating the summary: {e}")
         
         if 'last_summary' in st.session_state:
             summary_data = st.session_state['last_summary']
