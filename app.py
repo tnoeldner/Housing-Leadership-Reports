@@ -605,8 +605,7 @@ def user_management_page():
                 try:
                     supabase.table('profiles').update({'supervisor_id': new_supervisor_id}).eq('id', user['id']).execute()
                     st.success(f"Updated supervisor for {user_name} to {new_supervisor_name}.")
-                    time.sleep(1)
-                    st.rerun()
+                    # No rerun needed here, Streamlit's natural rerun on widget change is sufficient
                 except Exception as e:
                     st.error(f"Failed to update supervisor: {e}")
 
