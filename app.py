@@ -556,13 +556,10 @@ def submit_and_edit_page():
 def dashboard_page(supervisor_mode=False):
     # Ensure we always have the current user's id available (used for RPC/save logic)
     current_user_id = st.session_state['user'].id
+
     if supervisor_mode:
         st.title("Supervisor Dashboard")
         st.write("View your team's reports, track submissions, and generate weekly summaries.")
-        current_user_id = st.session_state['user'].id
-        st.title("Supervisor Dashboard")
-        st.write("View your team's reports, track submissions, and generate weekly summaries.")
-        current_user_id = st.session_state["user"].id
 
         # Get the direct reports (defensive)
         direct_reports_response = supabase.table("profiles").select("id, full_name, title").eq("supervisor_id", current_user_id).execute()
@@ -577,14 +574,17 @@ def dashboard_page(supervisor_mode=False):
         if not direct_report_ids:
             st.info("You do not have any direct reports assigned in the system.")
             return
-                
+
         # Use RPC to fetch finalized reports for this supervisor (works with RLS)
         rpc_resp = supabase.rpc('get_finalized_reports_for_supervisor', {'sup_id': current_user_id}).execute()
         all_reports = rpc_resp.data or []
+
         st.caption(f"Found {len(all_reports)} finalized report(s) for your direct reports.")
-        
+
+        # Get staff records for display (only the supervisor's direct reports)
         all_staff_response = supabase.table('profiles').select('*').in_('id', direct_report_ids).execute()
         all_staff = getattr(all_staff_response, "data", None) or []
+
     else:
         st.title("Admin Dashboard")
         st.write("View reports, track submissions, and generate weekly summaries.")
@@ -594,7 +594,8 @@ def dashboard_page(supervisor_mode=False):
         all_staff = getattr(all_staff_response, "data", None) or []
 
     if not all_reports:
-        st.info("No finalized reports have been submitted yet."); return
+        st.info("No finalized reports have been submitted yet.")
+        return
 
     # Normalize week_ending_date values to ISO 'YYYY-MM-DD' so comparisons are consistent
     normalized_reports = []
@@ -722,7 +723,6 @@ The report MUST contain the following sections, in this order, using markdown he
  - Use markdown headings and subheadings exactly as listed above.
  - When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...").
  - Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets.
-
 Here is the raw report data from all reports for the week, which includes the names of each team member and their categorized activities: {reports_text}
 """
                     model = genai.GenerativeModel("models/gemini-2.5-pro")
@@ -763,7 +763,6 @@ Here is the raw report data from all reports for the week, which includes the na
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed to save summary: {e}")
-
 
 def supervisor_dashboard_page():
     dashboard_page(supervisor_mode=True)
@@ -886,6 +885,7 @@ def user_management_page():
                 try:
                     supabase.table("profiles").update({"supervisor_id": new_supervisor_id}).eq("id", user.get("id")).execute()
                     st.success(f"Updated supervisor for {user_name} to {new_supervisor_name}.")
+                    # No rerun needed here, Streamlit's natural rerun on widget change is sufficient
                 except Exception as e:
                     st.error(f"Failed to update supervisor: {e}")
 
