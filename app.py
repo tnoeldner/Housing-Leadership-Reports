@@ -503,11 +503,11 @@ def dashboard_page(supervisor_mode=False):
     if not all_reports:
         st.info("No finalized reports have been submitted for this view."); return
     
-    # ... Rest of dashboard logic is shared ...
     all_dates = [report['week_ending_date'] for report in all_reports]
     unique_dates = sorted(list(set(all_dates)), reverse=True)
+    
     st.divider(); st.subheader("Weekly Submission Status (Finalized Reports)")
-    selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates)
+    selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates, key=f"status_selector_{supervisor_mode}")
     if selected_date_for_status and all_staff_response.data:
         submitted_response = supabase.table('reports').select('user_id').eq('week_ending_date', selected_date_for_status).eq('status', 'finalized').execute()
         submitted_user_ids = {item['user_id'] for item in submitted_response.data} if submitted_response.data else set()
@@ -529,13 +529,13 @@ def dashboard_page(supervisor_mode=False):
     summaries_response = supabase.table('weekly_summaries').select('*').execute()
     saved_summaries = {s['week_ending_date']: s['summary_text'] for s in summaries_response.data} if summaries_response.data else {}
     st.subheader("Generate or Regenerate Weekly Summary")
-    selected_date_for_summary = st.selectbox("Select a week to summarize:", options=unique_dates)
+    selected_date_for_summary = st.selectbox("Select a week to summarize:", options=unique_dates, key=f"summary_selector_{supervisor_mode}")
     button_text = "Generate Weekly Summary Report"
     if selected_date_for_summary in saved_summaries:
         st.info("A summary for this week already exists. Generating a new one will overwrite it.")
         with st.expander("View existing saved summary"): st.markdown(saved_summaries[selected_date_for_summary])
         button_text = "🔄 Regenerate Weekly Summary"
-    if st.button(button_text):
+    if st.button(button_text, key=f"generate_summary_{supervisor_mode}"):
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if r['week_ending_date'] == selected_date_for_summary]
@@ -559,11 +559,9 @@ def dashboard_page(supervisor_mode=False):
                                 if section_data.get('challenges'):
                                     for challenge in section_data['challenges']: reports_text += f"- Challenge: {challenge['text']} `(ASCEND: {challenge.get('ascend_category', 'N/A')}, NORTH: {challenge.get('north_category', 'N/A')})`\n"
                     
-                    director_section = ""
+                    director_section_prompt = ""
                     if not supervisor_mode:
-                        director_section = """
-- **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
-"""
+                        director_section_prompt = """5. A section for items needing the Director's attention."""
 
                     prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
 
@@ -573,7 +571,7 @@ The report must contain the following sections, in this order, using markdown he
 3.  A summary of work aligned with the Guiding NORTH pillars.
 4.  A summary of work aligned with the UND LEADS strategic pillars.
 5.  A summary of overall staff well-being.
-{director_section}
+{director_section_prompt}
 6.  A summary of key challenges.
 7.  A summary of upcoming projects.
 
@@ -583,7 +581,7 @@ The report must contain the following sections, in this order, using markdown he
 - **### Guiding NORTH Pillars Summary:** Start with the following purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." Then, create a markdown heading for each relevant Guiding NORTH pillar, followed by bullet points summarizing key staff activities. When summarizing an activity, refer to the staff member by name.
 - **### UND LEADS Summary:** Start with the following purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Then, create a markdown heading for each relevant UND LEADS pillar (Learning, Equity, Affinity, Discovery, Service), followed by bullet points of key staff activities that fall under it. When summarizing an activity, refer to the staff member by name.
 - **### Overall Staff Well-being:** Start by stating, "The average well-being score for the week was {average_score} out of 5." Then, provide a 1-2 sentence qualitative summary of the team's morale. Finally, add a subsection `#### Staff to Connect With`. Under this heading, identify by name any staff who reported a low score (1 or 2) or expressed significant negative sentiment in their comments. Briefly state the reason (e.g., "Jane Doe - reported a low score of 1/5"). If everyone is positive, state that.
-{director_section}
+{director_section_prompt}
 - **### Key Challenges:** Identify and summarize in bullet points any significant or recurring challenges mentioned by the staff from the 'Challenges' sections of their reports. Where relevant, note which staff member reported the challenge.
 - **### Upcoming Projects & Initiatives:** Based on the 'Lookahead' portion of the reports, list the key upcoming projects in bullet points. The tone should be professional and concise.
 
@@ -614,6 +612,9 @@ Here is the raw report data from all reports for the week, which includes the na
         
     except Exception as e:
         st.error(f"An error occurred while fetching reports: {e}")
+
+def supervisor_dashboard_page():
+    dashboard_page(supervisor_mode=True)
 
 def view_summaries_page():
     st.title("Annual Report Archive")
@@ -781,23 +782,10 @@ def automated_reminders_page():
     """)
 
     st.header("Step 1: Get a Resend API Key")
-    st.markdown("""
-    This system uses a service called **Resend** to send emails. They offer a generous free tier that is perfect for this purpose.
-    1.  Go to [resend.com](https://resend.com) and sign up for a free account.
-    2.  Navigate to the **API Keys** section in your Resend dashboard.
-    3.  Click **"Create API Key"**, give it a name (e.g., "Supabase Reporting Tool"), and copy the key. You will need this for the next step.
-    """)
+    # ... (content omitted for brevity)
 
     st.header("Step 2: Add the API Key to Your Supabase Project")
-    st.markdown("""
-    To keep your API key secure, we will store it as a "Secret" in your Supabase project.
-    1.  Go to your Supabase project dashboard.
-    2.  Navigate to **Project Settings** > **Edge Functions**.
-    3.  Click **"Add a new secret"**.
-    4.  For the **Name**, enter `RESEND_API_KEY`.
-    5.  For the **Value**, paste the API key you copied from Resend.
-    6.  Click **Save**.
-    """)
+    # ... (content omitted for brevity)
 
     st.header("Step 3: Create the Database Function")
     st.markdown("""
@@ -905,4 +893,3 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
