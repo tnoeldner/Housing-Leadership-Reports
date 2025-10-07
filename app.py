@@ -531,7 +531,7 @@ def dashboard_page(supervisor_mode=False):
     st.subheader("Generate or Regenerate Weekly Summary")
     selected_date_for_summary = st.selectbox("Select a week to summarize:", options=unique_dates, key=f"summary_selector_{supervisor_mode}")
     button_text = "Generate Weekly Summary Report"
-    if selected_date_for_summary in saved_summaries:
+    if selected_date_for_summary in saved_summaries and not supervisor_mode:
         st.info("A summary for this week already exists. Generating a new one will overwrite it.")
         with st.expander("View existing saved summary"): st.markdown(saved_summaries[selected_date_for_summary])
         button_text = "🔄 Regenerate Weekly Summary"
@@ -561,7 +561,8 @@ def dashboard_page(supervisor_mode=False):
                     
                     director_section_prompt = ""
                     if not supervisor_mode:
-                        director_section_prompt = """5. A section for items needing the Director's attention."""
+                        director_section_prompt = """- **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
+"""
 
                     prompt = f"""You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
 
@@ -571,9 +572,9 @@ The report must contain the following sections, in this order, using markdown he
 3.  A summary of work aligned with the Guiding NORTH pillars.
 4.  A summary of work aligned with the UND LEADS strategic pillars.
 5.  A summary of overall staff well-being.
-{director_section_prompt}
-6.  A summary of key challenges.
-7.  A summary of upcoming projects.
+6.  A section for items needing the Director's attention.
+7.  A summary of key challenges.
+8.  A summary of upcoming projects.
 
 **Instructions for each section:**
 - **### Executive Summary:** Write a 2-3 sentence paragraph that provides the most critical, high-level overview of the team's accomplishments, challenges, and overall status for the week. This should be suitable for a leader who may only have time to read this one section.
@@ -782,10 +783,23 @@ def automated_reminders_page():
     """)
 
     st.header("Step 1: Get a Resend API Key")
-    # ... (content omitted for brevity)
+    st.markdown("""
+    This system uses a service called **Resend** to send emails. They offer a generous free tier that is perfect for this purpose.
+    1.  Go to [resend.com](https://resend.com) and sign up for a free account.
+    2.  Navigate to the **API Keys** section in your Resend dashboard.
+    3.  Click **"Create API Key"**, give it a name (e.g., "Supabase Reporting Tool"), and copy the key. You will need this for the next step.
+    """)
 
     st.header("Step 2: Add the API Key to Your Supabase Project")
-    # ... (content omitted for brevity)
+    st.markdown("""
+    To keep your API key secure, we will store it as a "Secret" in your Supabase project.
+    1.  Go to your Supabase project dashboard.
+    2.  Navigate to **Project Settings** > **Edge Functions**.
+    3.  Click **"Add a new secret"**.
+    4.  For the **Name**, enter `RESEND_API_KEY`.
+    5.  For the **Value**, paste the API key you copied from Resend.
+    6.  Click **Save**.
+    """)
 
     st.header("Step 3: Create the Database Function")
     st.markdown("""
