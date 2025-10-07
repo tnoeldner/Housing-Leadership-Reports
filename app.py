@@ -783,10 +783,23 @@ def automated_reminders_page():
     """)
 
     st.header("Step 1: Get a Resend API Key")
-    # ... (content omitted for brevity)
+    st.markdown("""
+    This system uses a service called **Resend** to send emails. They offer a generous free tier that is perfect for this purpose.
+    1.  Go to [resend.com](https://resend.com) and sign up for a free account.
+    2.  Navigate to the **API Keys** section in your Resend dashboard.
+    3.  Click **"Create API Key"**, give it a name (e.g., "Supabase Reporting Tool"), and copy the key. You will need this for the next step.
+    """)
 
     st.header("Step 2: Add the API Key to Your Supabase Project")
-    # ... (content omitted for brevity)
+    st.markdown("""
+    To keep your API key secure, we will store it as a "Secret" in your Supabase project.
+    1.  Go to your Supabase project dashboard.
+    2.  Navigate to **Project Settings** > **Edge Functions**.
+    3.  Click **"Add a new secret"**.
+    4.  For the **Name**, enter `RESEND_API_KEY`.
+    5.  For the **Value**, paste the API key you copied from Resend.
+    6.  Click **Save**.
+    """)
 
     st.header("Step 3: Create the Database Function")
     st.markdown("""
