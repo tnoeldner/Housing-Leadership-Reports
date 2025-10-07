@@ -503,7 +503,6 @@ def dashboard_page(supervisor_mode=False):
     if not all_reports:
         st.info("No finalized reports have been submitted for this view."); return
     
-    # ... The rest of the dashboard logic is now shared ...
     all_dates = [report['week_ending_date'] for report in all_reports]
     unique_dates = sorted(list(set(all_dates)), reverse=True)
     
@@ -592,7 +591,8 @@ Here is the raw report data from all reports for the week, which includes the na
                     model = genai.GenerativeModel('models/gemini-2.5-pro')
                     ai_response = model.generate_content(prompt)
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
-                except Exception as e: st.error(f"An error occurred while generating the summary: {e}")
+                except Exception as e:
+                    st.error(f"An error occurred while generating the summary: {e}")
         
         if 'last_summary' in st.session_state:
             summary_data = st.session_state['last_summary']
@@ -907,5 +907,3 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
-
-
