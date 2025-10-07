@@ -1,7 +1,5 @@
 # app.py
 
-# app.py
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -539,8 +537,8 @@ def dashboard_page(supervisor_mode=False):
         with st.expander("View existing saved summary"): st.markdown(saved_summaries[selected_date_for_summary])
         button_text = "🔄 Regenerate Weekly Summary"
     if st.button(button_text, key=f"generate_summary_{supervisor_mode}"):
-        try:
-            with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+        with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+            try:
                 weekly_reports = [r for r in all_reports if r['week_ending_date'] == selected_date_for_summary]
                 if not weekly_reports: st.warning("No reports found for the selected week.")
                 else:
@@ -594,8 +592,7 @@ Here is the raw report data from all reports for the week, which includes the na
                     model = genai.GenerativeModel('models/gemini-2.5-pro')
                     ai_response = model.generate_content(prompt)
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
-        except Exception as e:
-            st.error(f"An error occurred while generating the summary: {e}")
+                except Exception as e: st.error(f"An error occurred while generating the summary: {e}")
         
         if 'last_summary' in st.session_state:
             summary_data = st.session_state['last_summary']
@@ -806,7 +803,7 @@ def automated_reminders_page():
 
     st.header("Step 3: Create the Database Function")
     st.markdown("""
-    This SQL function contains the logic to identify which users need a reminder. Go to the **SQL Editor** in your Supabase dashboard, click on **"+ New query"**, and run the following two commands, one after the other.
+    This SQL function contains the logic to identify which users need a reminder. Go to the **SQL Editor** in your Supabase dashboard, click **"+ New query"**, and run the following two commands, one after the other.
     """)
     st.code("""
     -- 1. DROP the old function to ensure a clean slate
@@ -834,7 +831,7 @@ def automated_reminders_page():
         LOOP
             PERFORM extensions.http_post(
                 url:='YOUR_SUPABASE_PROJECT_URL/functions/v1/send-reminder-email'::text,
-                headers:='{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer YOUR_SUPABASE_ANON_KEY\"}'::jsonb,
+                headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SUPABASE_ANON_KEY"}'::jsonb,
                 body:=json_build_object(
                     'email', user_record.email,
                     'week_ending_date', week_end_date
@@ -910,3 +907,5 @@ else:
     pages[selection]()
     st.sidebar.divider()
     st.sidebar.button("Logout", on_click=logout)
+
+
