@@ -539,7 +539,8 @@ def dashboard_page(supervisor_mode=False):
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if r['week_ending_date'] == selected_date_for_summary]
-                if not weekly_reports: st.warning("No reports found for the selected week.")
+                if not weekly_reports:
+                    st.warning("No reports found for the selected week.")
                 else:
                     well_being_scores = [r.get('well_being_rating') for r in weekly_reports if r.get('well_being_rating') is not None]
                     average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
@@ -572,9 +573,9 @@ The report must contain the following sections, in this order, using markdown he
 3.  A summary of work aligned with the Guiding NORTH pillars.
 4.  A summary of work aligned with the UND LEADS strategic pillars.
 5.  A summary of overall staff well-being.
-6.  A section for items needing the Director's attention.
-7.  A summary of key challenges.
-8.  A summary of upcoming projects.
+{director_section_prompt}
+6.  A summary of key challenges.
+7.  A summary of upcoming projects.
 
 **Instructions for each section:**
 - **### Executive Summary:** Write a 2-3 sentence paragraph that provides the most critical, high-level overview of the team's accomplishments, challenges, and overall status for the week. This should be suitable for a leader who may only have time to read this one section.
