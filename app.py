@@ -481,7 +481,7 @@ def dashboard_page(supervisor_mode=False):
         st.title("Supervisor Dashboard")
         st.write("View your team's reports, track submissions, and generate weekly summaries.")
         current_user_id = st.session_state['user'].id
-        
+
         direct_reports_response = supabase.table('profiles').select('id').eq('supervisor_id', current_user_id).execute()
         direct_report_ids = [user['id'] for user in direct_reports_response.data]
 
@@ -492,17 +492,74 @@ def dashboard_page(supervisor_mode=False):
         reports_response = supabase.table('reports').select('*').in_('user_id', direct_report_ids).eq('status', 'finalized').order('created_at', desc=True).execute()
         all_reports = reports_response.data
         all_staff_response = supabase.table('profiles').select('*').in_('id', direct_report_ids).execute()
-        
-    else: # Admin view
+
+    else:  # Admin view
         st.title("Admin Dashboard")
         st.write("View reports, track submissions, and generate weekly summaries.")
         reports_response = supabase.table('reports').select('*').eq('status', 'finalized').order('created_at', desc=True).execute()
         all_reports = reports_response.data
         all_staff_response = supabase.rpc('get_all_staff_profiles').execute()
-        
+
     if not all_reports:
-        st.info("No finalized reports have been submitted for this view."); return
-    
+        st.info("No finalized reports have been submitted for this view.")
+        return
+
+    all_dates = [report['week_ending_date'] for report in all_reports]
+    unique_dates = sorted(list(set(all_dates)), reverse=True)
+
+    st.divider()
+    st.subheader("Weekly Submission Status (Finalized Reports)")
+    selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates, key=f"status_selector_{supervisor_mode}")
+
+    if selected_date_for_status and all_staff_response.data:
+        submitted_response = supabase.table('reports').select('user_id').eq('week_ending_date', selected_date_for_status).eq('status', 'finalized').execute()
+        submitted_user_ids = {item['user_id'] for item in submitted_response.data} if submitted_response.data else set()
+        all_staff = all_staff_response.data
+        submitted_staff, missing_staff = [], []
+
+        for staff_member in all_staff:
+            email = staff_member.get('email', 'Email not found')
+            title = staff_member.get('title', 'No title set')
+            display_info = f"**{title}** ({email})" if title else email
+            if staff_member['id'] in submitted_user_ids:
+                submitted_staff.append(display_info)
+            else:
+                missing_staff.append(display_info)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"#### ✅ Submitted ({len(submitted_staff)})")
+            for person in sorted(submitted_staff):
+                st.markdown(f"- {person}")
+        with col2:
+            st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
+            for person in sorted(missing_staff):
+                st.markdown(f"- {person}")
+
+    st.divider()
+    summaries_response = supabase.table('weekly_summaries').select('*').execute()
+    saved_summaries = {s['week_ending_date']: s['summary_text'] for s in summaries_response.data} if summaries_response.data else {}
+
+    st.subheader("Generate or Regenerate Weekly Summary")
+    selected_date_for_summary = st.selectbox("Select a week to summarize:", options=unique_dates, key=f"summary_selector_{supervisor_mode}")
+    button_text = "Generate Weekly Summary Report"
+
+    if selected_date_for_summary in saved_summaries and not supervisor_mode:
+        st.info("A summary for this week already exists. Generating a new one will overwrite it.")
+        with st.expander("View existing saved summary"):
+            st.markdown(saved_summaries[selected_date_for_summary])
+        button_text = "🔄 Regenerate Weekly Summary"
+
+    if st.button(button_text, key=f"generate_summary_{supervisor_mode}"):
+        try:
+            with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+                weekly_reports = [r for r in all_reports if r['week_ending_date'] == selected_date_for_summary]
+                if not weekly_reports:
+                    st.warning("No reports found for the selected week.")
+                else:
+                    st.info("Summary generation logic executes here (omitted for brevity).")
+        except Exception as e:
+            st.error(f"An error occurred while generating the summary: {e}")    
     # ... The rest of the dashboard logic is now shared ...
     all_dates = [report['week_ending_date'] for report in all_reports]
     unique_dates = sorted(list(set(all_dates)), reverse=True)
