@@ -29,8 +29,6 @@ def init_connection():
     return create_client(url, key)
 
 supabase: Client = init_connection()
-print("Supabase connected successfully")
-st.write("Debug: Supabase connected")
 
 # --- CONSTANTS ---
 ASCEND_VALUES = ["Accountability", "Service", "Community", "Excellence", "Nurture", "Development", "N/A"]
