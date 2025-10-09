@@ -22,10 +22,33 @@ st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="
 # --- Connections ---
 @st.cache_resource
 def init_connection():
-    url = st.secrets["supabase_url"]
-    key = st.secrets["supabase_key"]
-    api_key = st.secrets["google_api_key"]
-    genai.configure(api_key=api_key)
+    import os
+    
+    # Try environment variables first (for deployment), then secrets (for local)
+    url = os.getenv("SUPABASE_URL") or st.secrets.get("supabase_url")
+    key = os.getenv("SUPABASE_KEY") or st.secrets.get("supabase_key") 
+    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("google_api_key")
+    
+    # Validate required keys exist
+    if not url or not key:
+        st.error("❌ Missing Supabase configuration. Please check your secrets or environment variables.")
+        st.stop()
+    
+    if not api_key:
+        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+        st.stop()
+    
+    # Test Google AI API key validity
+    try:
+        genai.configure(api_key=api_key)
+        # Quick test to validate the API key works
+        test_model = genai.GenerativeModel("models/gemini-2.5-pro")
+        # Don't actually call the API, just configure it
+    except Exception as e:
+        st.error(f"❌ Google AI API key configuration failed: {e}")
+        st.info("Please update your Google AI API key in secrets or environment variables.")
+        st.stop()
+    
     return create_client(url, key)
 
 supabase: Client = init_connection()
