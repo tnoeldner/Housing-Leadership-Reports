@@ -1,0 +1,42 @@
+{
+    "ascend_threshold": 4.5,
+    "north_threshold": 4.5,
+    "evaluation_criteria": {
+        "ascend": {
+            "metrics": [
+                "Accountability",
+                "Service",
+                "Community",
+                "Excellence",
+                "Nurture",
+                "Development"
+            ],
+            "weighting": {
+                "Accountability": 0.2,
+                "Service": 0.2,
+                "Community": 0.2,
+                "Excellence": 0.2,
+                "Nurture": 0.1,
+                "Development": 0.1
+            }
+        },
+        "north": {
+            "metrics": [
+                "Nurturing Student Success & Development",
+                "Operational Excellence & Efficiency",
+                "Resource Stewardship & Sustainability",
+                "Transformative & Inclusive Environments",
+                "Holistic Well-being & Safety"
+            ],
+            "weighting": {
+                "Nurturing Student Success & Development": 0.25,
+                "Operational Excellence & Efficiency": 0.25,
+                "Resource Stewardship & Sustainability": 0.2,
+                "Transformative & Inclusive Environments": 0.15,
+                "Holistic Well-being & Safety": 0.15
+            }
+        }
+    },
+    "evaluation_period": "weekly",
+    "reporting_format": "summary"
+}

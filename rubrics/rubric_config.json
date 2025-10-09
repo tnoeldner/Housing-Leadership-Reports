@@ -1,0 +1,47 @@
+{
+  "ascend_rubric": {
+    "file_path": "rubrics/ascend_rubric.md",
+    "description": "Detailed rubric for evaluating staff performance based on ASCEND criteria."
+  },
+  "north_rubric": {
+    "file_path": "rubrics/north_rubric.md",
+    "description": "Detailed rubric for evaluating staff performance based on NORTH criteria."
+  },
+  "evaluation_parameters": {
+    "criteria": [
+      {
+        "name": "ASCEND",
+        "weight": 0.5,
+        "metrics": [
+          "Accountability",
+          "Service",
+          "Community",
+          "Excellence",
+          "Nurture",
+          "Development"
+        ]
+      },
+      {
+        "name": "NORTH",
+        "weight": 0.5,
+        "metrics": [
+          "Nurturing Student Success & Development",
+          "Operational Excellence & Efficiency",
+          "Resource Stewardship & Sustainability",
+          "Transformative & Inclusive Environments",
+          "Holistic Well-being & Safety"
+        ]
+      }
+    ],
+    "evaluation_thresholds": {
+      "ascend": {
+        "min_score": 3,
+        "max_score": 5
+      },
+      "north": {
+        "min_score": 3,
+        "max_score": 5
+      }
+    }
+  }
+}

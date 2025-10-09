@@ -1,13 +1,19 @@
 # app.py
-
 import streamlit as st
 import pandas as pd
+import json
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 import google.generativeai as genai
-import json
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+except ImportError:
+    try:
+        from backports.zoneinfo import ZoneInfo
+    except ImportError:
+        from datetime import timezone
+        ZoneInfo = lambda tz: timezone.utc
 import time
-from zoneinfo import ZoneInfo
 from collections import Counter
 
 # --- Page Configuration ---
@@ -18,21 +24,17 @@ st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="
 def init_connection():
     url = st.secrets["supabase_url"]
     key = st.secrets["supabase_key"]
-    genai.configure(api_key=st.secrets["google_api_key"])
+    api_key = st.secrets["google_api_key"]
+    genai.configure(api_key=api_key)
     return create_client(url, key)
 
 supabase: Client = init_connection()
+print("Supabase connected successfully")
+st.write("Debug: Supabase connected")
 
 # --- CONSTANTS ---
 ASCEND_VALUES = ["Accountability", "Service", "Community", "Excellence", "Nurture", "Development", "N/A"]
-GUIDING_NORTH_PILLARS = [
-    "Nurturing Student Success & Development",
-    "Operational Excellence & Efficiency",
-    "Resource Stewardship & Sustainability",
-    "Transformative & Inclusive Environments",
-    "Holistic Well-being & Safety",
-    "N/A",
-]
+NORTH_VALUES = ["Nurturing", "Operational", "Resource", "Transformative", "Holistic", "N/A"]
 CORE_SECTIONS = {
     "students": "Students/Stakeholders",
     "projects": "Projects",
@@ -236,7 +238,7 @@ def submit_and_edit_page():
             return None
         model = genai.GenerativeModel("models/gemini-2.5-pro")
         ascend_list = ", ".join(ASCEND_VALUES)
-        north_list = ", ".join(GUIDING_NORTH_PILLARS)
+        north_list = ", ".join(NORTH_VALUES)
         items_json = json.dumps(items_to_categorize)
         prompt = f"""
         You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities:
@@ -477,9 +479,9 @@ def submit_and_edit_page():
                                 st.markdown(f"> {item.get('text','')}")
                                 col1, col2 = st.columns(2)
                                 ascend_index = ASCEND_VALUES.index(item.get("ascend_category")) if item.get("ascend_category") in ASCEND_VALUES else len(ASCEND_VALUES) - 1
-                                north_index = GUIDING_NORTH_PILLARS.index(item.get("north_category")) if item.get("north_category") in GUIDING_NORTH_PILLARS else len(GUIDING_NORTH_PILLARS) - 1
+                                north_index = NORTH_VALUES.index(item.get("north_category")) if item.get("north_category") in NORTH_VALUES else len(NORTH_VALUES) - 1
                                 col1.selectbox("ASCEND Category", options=ASCEND_VALUES, index=ascend_index, key=f"review_{section_key}_{item_type}_{i}_ascend")
-                                col2.selectbox("Guiding NORTH Category", options=GUIDING_NORTH_PILLARS, index=north_index, key=f"review_{section_key}_{item_type}_{i}_north")
+                                col2.selectbox("Guiding NORTH Category", options=NORTH_VALUES, index=north_index, key=f"review_{section_key}_{item_type}_{i}_north")
             st.divider()
             st.subheader("Editable Individual Summary")
             st.text_area("AI-Generated Summary", value=draft.get("individual_summary", ""), key="review_summary", height=150)
@@ -764,8 +766,131 @@ Here is the raw report data from all reports for the week, which includes the na
                     except Exception as e:
                         st.error(f"Failed to save summary: {e}")
 
-def supervisor_dashboard_page():
-    dashboard_page(supervisor_mode=True)
+    if not supervisor_mode:  # Only for admin dashboard
+        st.divider()
+        st.subheader("🏆 Weekly Staff Recognition")
+        
+        if st.button("Generate Staff Recognition"):
+            with st.spinner("🤖 Evaluating staff performance against ASCEND and NORTH criteria..."):
+                weekly_reports = [r for r in all_reports if r.get("week_ending_date") == selected_date_for_summary]
+                if weekly_reports:
+                    rubrics = load_rubrics()
+                    if rubrics:
+                        recognition = evaluate_staff_performance(weekly_reports, rubrics)
+                        if recognition:
+                            st.session_state['staff_recognition'] = {
+                                "date": selected_date_for_summary,
+                                "data": recognition
+                            }
+                            st.rerun()
+
+        # Display recognition results
+        if "staff_recognition" in st.session_state:
+            recognition_data = st.session_state["staff_recognition"]
+            if recognition_data.get("date") == selected_date_for_summary:
+                st.markdown("### Staff Recognition Results")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    ascend_rec = recognition_data["data"].get("ascend_recognition", {})
+                    if ascend_rec:
+                        st.markdown("#### 🌟 ASCEND Recognition")
+                        st.success(f"**{ascend_rec.get('staff_member')}** - {ascend_rec.get('category')}")
+                        st.write(f"**Reasoning:** {ascend_rec.get('reasoning')}")
+                        st.metric("Performance Score", f"{ascend_rec.get('score', 0)}/10")
+                
+                with col2:
+                    north_rec = recognition_data["data"].get("north_recognition", {})
+                    if north_rec:
+                        st.markdown("#### 🧭 NORTH Recognition")
+                        st.success(f"**{north_rec.get('staff_member')}** - {north_rec.get('category')}")
+                        st.write(f"**Reasoning:** {north_rec.get('reasoning')}")
+                        st.metric("Performance Score", f"{north_rec.get('score', 0)}/10")
+
+@st.cache_data
+def load_rubrics():
+    """Load ASCEND and NORTH rubrics from files"""
+    rubrics = {}
+    try:
+        with open('rubrics-integration/rubrics/ascend_rubric.md', 'r', encoding='utf-8') as f:
+            rubrics['ascend'] = f.read()
+        with open('rubrics-integration/rubrics/north_rubric.md', 'r', encoding='utf-8') as f:
+            rubrics['north'] = f.read()
+        with open('rubrics-integration/rubrics/staff_evaluation_prompt.txt', 'r', encoding='utf-8') as f:
+            rubrics['evaluation_prompt'] = f.read()
+    except FileNotFoundError as e:
+        st.error(f"Rubric file not found: {e}")
+        return None
+    return rubrics
+
+@st.cache_data
+def evaluate_staff_performance(weekly_reports, rubrics):
+    """Use AI to evaluate staff performance against ASCEND and NORTH criteria"""
+    if not weekly_reports or not rubrics:
+        return None
+    
+    model = genai.GenerativeModel("models/gemini-2.5-pro")
+    
+    # Build staff performance data
+    staff_data = []
+    for report in weekly_reports:
+        staff_info = {
+            "name": report.get('team_member', 'Unknown'),
+            "well_being_score": report.get('well_being_rating', 0),
+            "activities": []
+        }
+        
+        report_body = report.get("report_body", {})
+        for section_key, section_data in report_body.items():
+            if section_data:
+                for success in section_data.get("successes", []):
+                    staff_info["activities"].append({
+                        "type": "success",
+                        "text": success.get("text", ""),
+                        "ascend_category": success.get("ascend_category", "N/A"),
+                        "north_category": success.get("north_category", "N/A")
+                    })
+        staff_data.append(staff_info)
+    
+    staff_json = json.dumps(staff_data, indent=2)
+    
+    prompt = f"""
+{rubrics['evaluation_prompt']}
+
+ASCEND Rubric:
+{rubrics['ascend']}
+
+NORTH Rubric:
+{rubrics['north']}
+
+Staff Performance Data:
+{staff_json}
+
+Return JSON with:
+{{
+  "ascend_recognition": {{
+    "staff_member": "Name",
+    "category": "ASCEND Category", 
+    "reasoning": "Why they exemplify this category",
+    "score": 1-10
+  }},
+  "north_recognition": {{
+    "staff_member": "Name", 
+    "category": "NORTH Pillar",
+    "reasoning": "Why they exemplify this pillar",
+    "score": 1-10
+  }}
+}}
+"""
+    
+    try:
+        response = model.generate_content(prompt)
+        clean_response = response.text.strip().replace("```json", "").replace("```", "")
+        return json.loads(clean_response)
+    except Exception as e:
+        st.error(f"AI evaluation error: {e}")
+        return None
 
 def supervisor_summaries_page():
     st.title("My Saved Team Summaries")
@@ -781,117 +906,6 @@ def supervisor_summaries_page():
                 st.markdown(s['summary_text'])
     except Exception as e:
         st.error(f"Failed to fetch supervisor summaries: {e}")
-
-
-def view_summaries_page():
-    st.title("Annual Report Archive")
-    st.write("This page contains all the saved weekly AI-generated summaries.")
-    try:
-        summaries_response = supabase.table("weekly_summaries").select("*").order("week_ending_date", desc=True).execute()
-        all_reports_response = supabase.table("reports").select("*").eq("status", "finalized").execute()
-        summaries = getattr(summaries_response, "data", None) or []
-        all_reports = getattr(all_reports_response, "data", None) or []
-        if not summaries:
-            st.info("No summaries have been saved yet.")
-        else:
-            reports_by_week = {}
-            for report in all_reports:
-                week = report.get("week_ending_date")
-                if not week:
-                    continue
-                if week not in reports_by_week:
-                    reports_by_week[week] = []
-                reports_by_week[week].append(report)
-            for summary in summaries:
-                with st.expander(f"Summary for Week Ending {summary.get('week_ending_date')}"):
-                    st.markdown("### Consolidated Team Summary")
-                    st.markdown(summary.get("summary_text", ""))
-                    st.divider()
-                    st.markdown("### Individual Reports for this Week")
-                    weekly_reports = reports_by_week.get(summary.get("week_ending_date"), [])
-                    if not weekly_reports:
-                        st.warning("No individual reports were found for this summary week.")
-                    else:
-                        for report in weekly_reports:
-                            with st.expander(f"Report from **{report.get('team_member','Unknown')}**"):
-                                rating = report.get("well_being_rating")
-                                if rating:
-                                    st.metric("Well-being Score", f"{rating}/5")
-                                if report.get("individual_summary"):
-                                    st.info(f"**Individual AI Summary:**\n\n{report.get('individual_summary')}")
-                                report_body = report.get("report_body") or {}
-                                for sk, sn in CORE_SECTIONS.items():
-                                    section_data = report_body.get(sk)
-                                    if section_data and (section_data.get("successes") or section_data.get("challenges")):
-                                        st.markdown(f"#### {sn}")
-                                        if section_data.get("successes"):
-                                            st.markdown("**Successes:**")
-                                            for s in section_data["successes"]:
-                                                st.markdown(f"- {s.get('text','')} `(ASCEND: {s.get('ascend_category','N/A')}, NORTH: {s.get('north_category','N/A')})`")
-                                        if section_data.get("challenges"):
-                                            st.markdown("**Challenges:**")
-                                            for c in section_data["challenges"]:
-                                                st.markdown(f"- {c.get('text','')} `(ASCEND: {c.get('ascend_category','N/A')}, NORTH: {c.get('north_category','N/A')})`")
-                                        st.markdown("---")
-    except Exception as e:
-        st.error(f"An error occurred while fetching summaries: {e}")
-
-
-def user_management_page():
-    st.title("User Management")
-    if st.session_state.get("role") != "admin":
-        st.error("You do not have permission to view this page.")
-        return
-
-    try:
-        response = supabase.table("profiles").select("id, full_name, supervisor_id").execute()
-        users = getattr(response, "data", None) or []
-        if not users:
-            st.info("No users found.")
-            return
-
-        supervisor_options = {user.get("id"): user.get("full_name") for user in users if user.get("full_name")}
-        supervisor_options_list = ["None"] + [name for name in supervisor_options.values()]
-
-        st.subheader("Assign Supervisors")
-        for user in sorted(users, key=lambda u: u.get("full_name") or ""):
-            user_name = user.get("full_name") or f"User with ID: {user.get('id')}"
-            current_supervisor_id = user.get("supervisor_id")
-            current_supervisor_name = supervisor_options.get(current_supervisor_id, "None")
-
-            try:
-                current_supervisor_index = supervisor_options_list.index(current_supervisor_name)
-            except ValueError:
-                current_supervisor_index = 0
-
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                st.markdown(f"**{user_name}**")
-            with col2:
-                new_supervisor_name = st.selectbox(
-                    f"Supervisor for {user_name}",
-                    options=supervisor_options_list,
-                    index=current_supervisor_index,
-                    key=f"supervisor_{user.get('id')}",
-                    label_visibility="collapsed",
-                )
-
-            if new_supervisor_name != current_supervisor_name:
-                if new_supervisor_name == "None":
-                    new_supervisor_id = None
-                else:
-                    new_supervisor_id = [id for id, name in supervisor_options.items() if name == new_supervisor_name][0]
-
-                try:
-                    supabase.table("profiles").update({"supervisor_id": new_supervisor_id}).eq("id", user.get("id")).execute()
-                    st.success(f"Updated supervisor for {user_name} to {new_supervisor_name}.")
-                    # No rerun needed here, Streamlit's natural rerun on widget change is sufficient
-                except Exception as e:
-                    st.error(f"Failed to update supervisor: {e}")
-
-    except Exception as e:
-        st.error(f"An error occurred while fetching users: {e}")
-
 
 def user_manual_page():
     st.title("User Manual")
@@ -919,12 +933,7 @@ def user_manual_page():
     6. Review Screen: Edit categories, adjust the AI summary, confirm well-being score and general updates.
     7. Lock and Submit: Finalizes the report and marks it "finalized". Finalized reports cannot be edited without supervisor/admin assistance.
 
-    ## 3. AI Processing
-    - The app categorizes each activity into ASCEND and Guiding NORTH and produces a 2–4 sentence individual summary.
-    - If AI fails to return consistent results, the UI shows an error and asks to simplify entries.
-    - The AI prompt enforces consistent headings and structure for team summaries.
-
-    ## 4. Privacy and Visibility Rules
+    ## 3. Privacy and Visibility Rules
     - Row-Level Security (RLS) is enforced: users only see rows they are permitted to view.
     - Regular staff can only view their own reports.
     - Supervisors can view finalized reports for their direct reports only.
@@ -934,115 +943,87 @@ def user_manual_page():
       Supervisors and other staff will not see director concerns for another person's report.
     - Admin/Director accounts have access to all reports and global weekly summaries.
 
-    ## 5. Weekly Team Summaries
-    - Admin/Director can generate global weekly summaries that include all finalized reports for a selected week.
-    - Supervisors can generate supervisor-scoped team summaries that only include their direct reports.
-    - Generated summaries can be edited and saved:
-      - Admin/Director summaries are saved to the global archive (weekly_summaries).
-      - Supervisor summaries are saved to a dedicated supervisor archive (supervisor_summaries).
-    - Saving summaries uses RPC functions (SECURITY DEFINER) so supervisors can save without directly bypassing RLS.
-
-    ## 6. Supervisor Dashboard and Team History
-    - Supervisors see:
-      - A list of direct reports and who has submitted finalized reports for a selected week.
-      - The ability to generate/regenerate a team summary for weeks where direct reports submitted finalized reports.
-      - "My Team Summaries": an archive of summaries the supervisor saved.
-    - Supervisors will NOT see global admin summaries for weeks outside their team's activity.
-
-    ## 7. Admin Dashboard
-    - Admins can:
-      - View all finalized reports.
-      - Generate/regenerate global weekly summaries.
-      - Save global summaries to the archive.
-      - Manage users and assign supervisors.
-
-    ## 8. Automated Reminders (setup guide)
-    - The system supports scheduled email reminders (example using pg_cron + http extension + Resend).
-    - Setup requires enabling extensions in Supabase, adding a Resend API key as a project secret, and creating the DB function and cron schedule as documented in the "Automated Reminders" page within the app.
-
-    ## 9. Troubleshooting & Tips
-    - Missing finalized reports in the supervisor view:
-      - Confirm the report is finalized in the DB.
-      - Confirm the profile.supervisor_id is set to the supervisor's user id (Supabase SQL check).
-      - RLS may prevent direct queries; the app uses RPCs to fetch team reports.
-    - AI errors:
-      - Simplify long or ambiguous entries and retry "Proceed to Review".
-    - Save failures for summaries:
-      - Ensure RPC functions (save_weekly_summary, save_supervisor_summary) are deployed and granted to anon/authenticated.
-      - If you see "column ... is of type date but expression is of type text" error, ensure the RPC casts week text to date or pass proper date values.
+    ## 4. Troubleshooting & Tips
     - If the app shows unexpected behavior, restart the app and check Streamlit logs for exceptions.
-
-    ## 10. Developer Notes (for maintainers)
-    - Important DB objects used by the app:
-      - public.reports (individual reports)
-      - public.profiles (user profiles, supervisor_id)
-      - public.weekly_summaries (global saved summaries) — created_by uuid column required
-      - public.supervisor_summaries (supervisor-scoped saved summaries)
-      - RPCs: get_finalized_reports_for_supervisor, save_weekly_summary, save_supervisor_summary, get_supervisor_summaries
-    - Security: use RLS and SECURITY DEFINER RPCs for operations that require elevated access.
-    - Caching: Streamlit caching is used for some calls; clear cache if you change DB structure or RPCs.
-
-    If any part of this manual needs additional detail or screenshots, indicate which page or flow to expand and an updated snippet will be provided.
+    - Missing finalized reports in the supervisor view: Confirm the report is finalized and profile.supervisor_id is set correctly.
+    - AI errors: Simplify long or ambiguous entries and retry "Proceed to Review".
     """, unsafe_allow_html=False)
 
-
-def automated_reminders_page():
-    st.title("Automated Email Reminders Setup")
-    st.info("This guide will walk you through the one-time setup process to enable automated email reminders for your team.")
-    # (instructions omitted for brevity)
-
-
-# --- Main App Logic ---
-if "user" not in st.session_state:
-    st.sidebar.header("Login or Sign Up")
-    choice = st.sidebar.radio("Choose an option", ["Login", "Sign Up"])
-    if choice == "Login":
-        login_form()
-    else:
-        signup_form()
-else:
-    if "role" not in st.session_state:
-        try:
-            user_id = st.session_state["user"].id
-            profile_response = supabase.table("profiles").select("role, title, full_name").eq("id", user_id).execute()
-            profile_data = getattr(profile_response, "data", None) or []
-            if profile_data:
-                profile = profile_data[0]
-                st.session_state["role"] = profile.get("role")
-                st.session_state["title"] = profile.get("title")
-                st.session_state["full_name"] = profile.get("full_name")
-                supervisor_check = supabase.table('profiles').select('id', count='exact').eq('supervisor_id', user_id).execute()
-                # postgrest response may provide a .count attribute or return rows in .data
-                sup_count = getattr(supervisor_check, "count", None)
-                if sup_count is None:
-                    sup_count = len(getattr(supervisor_check, "data", []) or [])                
-                st.session_state['is_supervisor'] = (sup_count or 0) > 0
-            else:
-                st.error("Your account is valid, but your user profile is missing. Please contact an administrator to have it created.")
-                st.stop()
-        except Exception as e:
-            st.error(f"Could not fetch user profile: {e}")
-            st.stop()
-
-    st.sidebar.write(f"Welcome, **{st.session_state.get('full_name', st.session_state.get('title', st.session_state['user'].email))}**")
+# --- MAIN APPLICATION LOGIC ---
+def main():
+    # Remove debug messages for production
+    # st.write("Debug: App is loading...")
+    # st.write("Debug: Supabase connected")
+    
+    # Check if user is logged in
+    if "user" not in st.session_state:
+        # Show login/signup forms
+        st.sidebar.title("Welcome")
+        tab1, tab2 = st.sidebar.tabs(["Login", "Sign Up"])
+        
+        with tab1:
+            login_form()
+        
+        with tab2:
+            signup_form()
+        
+        # Show welcome message on main page
+        st.title("Weekly Impact Reporting Tool")
+        st.write("Please login or create an account using the sidebar.")
+        return
+    
+    # User is logged in - fetch profile info
+    try:
+        user_id = st.session_state["user"].id
+        profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
+        profile_data = getattr(profile_response, "data", None)
+        
+        if profile_data:
+            profile = profile_data[0]
+            st.session_state["role"] = profile.get("role", "staff")
+            st.session_state["full_name"] = profile.get("full_name", "")
+            st.session_state["title"] = profile.get("title", "")
+            st.session_state["is_supervisor"] = bool(profile.get("supervisor_id"))
+            
+            # Check if user is a supervisor
+            supervisor_check = supabase.table("profiles").select("id").eq("supervisor_id", user_id).execute()
+            if getattr(supervisor_check, "data", []):
+                st.session_state["is_supervisor"] = True
+    except Exception as e:
+        st.error(f"Error fetching profile: {e}")
+        return
+    
+    # Show sidebar with user info and logout
+    st.sidebar.title("Navigation")
+    st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
+    st.sidebar.write(f"Role: {st.session_state.get('role', 'staff').title()}")
+    
+    if st.sidebar.button("Logout"):
+        logout()
+        st.rerun()
+    
+    # Build pages based on user role
     pages = {
         "My Profile": profile_page,
         "Submit / Edit Report": submit_and_edit_page,
-        "User Manual": user_manual_page,
+        "User Manual": user_manual_page
     }
-
+    
+    # Add role-specific pages
+    if st.session_state.get("role") == "admin":
+        pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
+    
     if st.session_state.get("is_supervisor"):
-        pages["Supervisor Dashboard"] = supervisor_dashboard_page
+        pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
         pages["My Team Summaries"] = supervisor_summaries_page
     
-    if st.session_state.get("role") == "admin":
-        pages["Admin Dashboard"] = dashboard_page
-        pages["Annual Report Archive"] = view_summaries_page
-        pages["User Management"] = user_management_page
-        pages["Automated Reminders"] = automated_reminders_page
+    # Page selection
+    selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
+    
+    # Run selected page
+    if selected_page in pages:
+        pages[selected_page]()
 
-    st.sidebar.divider()
-    selection = st.sidebar.radio("Go to", list(pages.keys()))
-    pages[selection]()
-    st.sidebar.divider()
-    st.sidebar.button("Logout", on_click=logout)
+# Run the main application
+if __name__ == "__main__":
+    main()
