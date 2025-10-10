@@ -63,11 +63,12 @@ CORE_SECTIONS = {
     "responsibilities": "General Job Responsibilities",
     "staffing": "Staffing/Personnel",
     "kpis": "KPIs",
+    "events": "Campus Events/Committees",
 }
 
 # --- Helper function to clear form state ---
 def clear_form_state():
-    keys_to_clear = ["draft_report", "report_to_edit", "last_summary"]
+    keys_to_clear = ["draft_report", "report_to_edit", "last_summary", "events_count"]
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
@@ -76,6 +77,11 @@ def clear_form_state():
             del st.session_state[f"{section_key}_success_count"]
         if f"{section_key}_challenge_count" in st.session_state:
             del st.session_state[f"{section_key}_challenge_count"]
+    
+    # Clear event-related session state
+    events_to_clear = [key for key in st.session_state.keys() if key.startswith("event_name_") or key.startswith("event_date_")]
+    for key in events_to_clear:
+        del st.session_state[key]
 
 # --- User Authentication & Profile Functions ---
 def login_form():
@@ -160,6 +166,11 @@ def submit_and_edit_page():
         user_id = st.session_state["user"].id
         user_reports_response = supabase.table("reports").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         user_reports = getattr(user_reports_response, "data", None) or []
+        
+        # Check for any draft reports that were previously finalized (unlocked by admin)
+        unlocked_reports = [r for r in user_reports if r.get("status") == "draft" and r.get("individual_summary")]
+        if unlocked_reports:
+            st.info(f"📢 **Notice:** {len(unlocked_reports)} of your previously submitted reports have been unlocked by an administrator for editing. You can now make changes and resubmit them.")
 
         now = datetime.now(ZoneInfo("America/Chicago"))
         today = now.date()
@@ -262,18 +273,32 @@ def submit_and_edit_page():
         north_list = ", ".join(NORTH_VALUES)
         items_json = json.dumps(items_to_categorize)
         prompt = f"""
-        You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities:
+        You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities including campus events and committee participation:
         1. Categorize each activity with one ASCEND and one Guiding NORTH category.
-        2. Generate a concise 2-4 sentence individual summary.
-        ASCEND: {ascend_list}
-        NORTH: {north_list}
+        2. Generate a concise 2-4 sentence individual summary that includes mention of campus engagement and its alignment with frameworks.
+        
+        ASCEND Categories: {ascend_list}
+        Guiding NORTH Categories: {north_list}
+
+        For campus events/committee participation, consider how attendance demonstrates:
+        - Community engagement and service (Community, Service)
+        - Professional development and learning (Development, Excellence)
+        - Supporting university initiatives (Accountability, Nurturing)
+        - Building relationships with stakeholders (Service, Transformative)
+
+        Also consider UND LEADS alignment in your summary:
+        - Learning: Training, workshops, skill development, educational activities
+        - Equity: Diversity events, inclusion initiatives, accessibility work
+        - Affinity: Networking, relationship building, team activities, community engagement
+        - Discovery: Innovation projects, research, exploring new methods, creative solutions
+        - Service: Volunteer work, helping others, community service, supporting university goals
 
         Input JSON: {items_json}
 
         Return valid JSON like:
         {{
           "categorized_items":[{{"id":0,"ascend_category":"Community","north_category":"Nurturing Student Success & Development"}}],
-          "individual_summary":"..."
+          "individual_summary":"This week showed strong alignment with both ASCEND and NORTH frameworks through various activities and campus engagement. The work also demonstrates UND LEADS values through learning opportunities and service to the community..."
         }}
         """
         try:
@@ -286,31 +311,67 @@ def submit_and_edit_page():
 
     def dynamic_entry_section(section_key, section_label, report_data):
         st.subheader(section_label)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("##### Successes")
-            s_key = f"{section_key}_success_count"
-            if s_key not in st.session_state:
-                st.session_state[s_key] = len(report_data.get(section_key, {}).get("successes", [])) or 1
-            for i in range(st.session_state[s_key]):
-                default = (
-                    report_data.get(section_key, {}).get("successes", [{}])[i].get("text", "")
-                    if i < len(report_data.get(section_key, {}).get("successes", []))
-                    else ""
-                )
-                st.text_area("Success", value=default, key=f"{section_key}_success_{i}", label_visibility="collapsed", placeholder=f"Success #{i+1}")
-        with col2:
-            st.markdown("##### Challenges")
-            c_key = f"{section_key}_challenge_count"
-            if c_key not in st.session_state:
-                st.session_state[c_key] = len(report_data.get(section_key, {}).get("challenges", [])) or 1
-            for i in range(st.session_state[c_key]):
-                default = (
-                    report_data.get(section_key, {}).get("challenges", [{}])[i].get("text", "")
-                    if i < len(report_data.get(section_key, {}).get("challenges", []))
-                    else ""
-                )
-                st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
+        
+        # Special handling for events section
+        if section_key == "events":
+            # Initialize events count if not exists
+            if "events_count" not in st.session_state:
+                existing_events = report_data.get("events", {}).get("successes", [])
+                st.session_state["events_count"] = len(existing_events) if existing_events else 1
+            
+            # Display event entry fields
+            for i in range(st.session_state["events_count"]):
+                col1, col2 = st.columns([2, 1])
+                default_event_name = ""
+                default_event_date = datetime.now().date()
+                
+                # Load existing event data if editing - parse from text format
+                existing_events = report_data.get("events", {}).get("successes", [])
+                if i < len(existing_events):
+                    event_text = existing_events[i].get("text", "")
+                    # Try to parse "EventName on YYYY-MM-DD" format
+                    if " on " in event_text:
+                        parts = event_text.rsplit(" on ", 1)
+                        if len(parts) == 2:
+                            default_event_name = parts[0]
+                            try:
+                                default_event_date = pd.to_datetime(parts[1]).date()
+                            except:
+                                default_event_date = datetime.now().date()
+                    else:
+                        default_event_name = event_text
+                
+                with col1:
+                    st.text_input(f"Event/Committee Name", value=default_event_name, key=f"event_name_{i}", placeholder="Enter event or committee name")
+                with col2:
+                    st.date_input(f"Event Date", value=default_event_date, key=f"event_date_{i}")
+        else:
+            # Regular successes/challenges format for other sections
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("##### Successes")
+                s_key = f"{section_key}_success_count"
+                if s_key not in st.session_state:
+                    st.session_state[s_key] = len(report_data.get(section_key, {}).get("successes", [])) or 1
+                for i in range(st.session_state[s_key]):
+                    default = (
+                        report_data.get(section_key, {}).get("successes", [{}])[i].get("text", "")
+                        if i < len(report_data.get(section_key, {}).get("successes", []))
+                        else ""
+                    )
+                    st.text_area("Success", value=default, key=f"{section_key}_success_{i}", label_visibility="collapsed", placeholder=f"Success #{i+1}")
+            with col2:
+                st.markdown("##### Challenges")
+                c_key = f"{section_key}_challenge_count"
+                if c_key not in st.session_state:
+                    st.session_state[c_key] = len(report_data.get(section_key, {}).get("challenges", [])) or 1
+                for i in range(st.session_state[c_key]):
+                    default = (
+                        report_data.get(section_key, {}).get("challenges", [{}])[i].get("text", "")
+                        if i < len(report_data.get(section_key, {}).get("challenges", []))
+                        else ""
+                    )
+                    st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
 
     def show_submission_form():
         report_data = st.session_state["report_to_edit"]
@@ -332,9 +393,14 @@ def submit_and_edit_page():
                 for i, (section_key, section_name) in enumerate(CORE_SECTIONS.items()):
                     with core_tab_list[i]:
                         dynamic_entry_section(section_key, section_name, report_data.get("report_body", {}))
-                        b1, b2 = st.columns(2)
-                        add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ➕", key=f"add_s_{section_key}")
-                        add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ➕", key=f"add_c_{section_key}")
+                        if section_key == "events":
+                            # Special handling for events - just one add button
+                            add_buttons[f"add_event"] = st.form_submit_button("Add Event/Committee ➕", key=f"add_event")
+                        else:
+                            # Regular success/challenge buttons for other sections
+                            b1, b2 = st.columns(2)
+                            add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ➕", key=f"add_s_{section_key}")
+                            add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ➕", key=f"add_c_{section_key}")
             with general_updates_tab:
                 st.subheader("General Updates & Well-being")
                 st.markdown("**Personal Well-being Check-in**")
@@ -367,13 +433,21 @@ def submit_and_edit_page():
                 clicked_button = key
                 break
         if clicked_button:
-            parts = clicked_button.split("_")
-            section, category = parts[2], parts[1]
-            counter_key = f"{section}_{category}_count"
-            if counter_key not in st.session_state:
-                st.session_state[counter_key] = 1
-            st.session_state[counter_key] += 1
-            st.rerun()
+            if clicked_button == "add_event":
+                # Handle add event button
+                if "events_count" not in st.session_state:
+                    st.session_state["events_count"] = 1
+                st.session_state["events_count"] += 1
+                st.rerun()
+            else:
+                # Handle regular success/challenge buttons
+                parts = clicked_button.split("_")
+                section, category = parts[2], parts[1]
+                counter_key = f"{section}_{category}_count"
+                if counter_key not in st.session_state:
+                    st.session_state[counter_key] = 1
+                st.session_state[counter_key] += 1
+                st.rerun()
 
         elif save_draft_button:
             with st.spinner("Saving draft..."):
@@ -387,8 +461,21 @@ def submit_and_edit_page():
                         st.session_state.get(f"{section_key}_challenge_{i}") for i in range(st.session_state.get(f"{section_key}_challenge_count", 1))
                         if st.session_state.get(f"{section_key}_challenge_{i}")
                     ]
-                    report_body[section_key]["successes"] = [{"text": t} for t in success_texts]
-                    report_body[section_key]["challenges"] = [{"text": t} for t in challenge_texts]
+                    if section_key == "events":
+                        # Handle events section differently
+                        event_entries = []
+                        events_count = st.session_state.get("events_count", 1)
+                        for i in range(events_count):
+                            event_name = st.session_state.get(f"event_name_{i}", "")
+                            event_date = st.session_state.get(f"event_date_{i}")
+                            if event_name and event_date:
+                                event_entries.append({"text": f"{event_name} on {event_date}"})
+                        report_body[section_key]["successes"] = event_entries
+                        report_body[section_key]["challenges"] = []
+                    else:
+                        # Handle regular sections
+                        report_body[section_key]["successes"] = [{"text": t} for t in success_texts]
+                        report_body[section_key]["challenges"] = [{"text": t} for t in challenge_texts]
 
                 draft_data = {
                     "user_id": st.session_state["user"].id,
@@ -416,16 +503,34 @@ def submit_and_edit_page():
                 items_to_process = []
                 item_id_counter = 0
                 for section_key in CORE_SECTIONS.keys():
-                    for i in range(st.session_state.get(f"{section_key}_success_count", 1)):
-                        text = st.session_state.get(f"{section_key}_success_{i}")
-                        if text:
-                            items_to_process.append({"id": item_id_counter, "text": text, "section": section_key, "type": "successes"})
-                            item_id_counter += 1
-                    for i in range(st.session_state.get(f"{section_key}_challenge_count", 1)):
-                        text = st.session_state.get(f"{section_key}_challenge_{i}")
-                        if text:
-                            items_to_process.append({"id": item_id_counter, "text": text, "section": section_key, "type": "challenges"})
-                            item_id_counter += 1
+                    if section_key == "events":
+                        # Handle events section
+                        events_count = st.session_state.get("events_count", 1)
+                        for i in range(events_count):
+                            event_name = st.session_state.get(f"event_name_{i}", "")
+                            event_date = st.session_state.get(f"event_date_{i}")
+                            if event_name and event_date:
+                                items_to_process.append({
+                                    "id": item_id_counter, 
+                                    "text": f"Attended campus event/committee: {event_name} on {event_date}", 
+                                    "section": section_key, 
+                                    "type": "successes"
+                                })
+                                item_id_counter += 1
+                    else:
+                        # Handle regular sections
+                        for i in range(st.session_state.get(f"{section_key}_success_count", 1)):
+                            text = st.session_state.get(f"{section_key}_success_{i}")
+                            if text:
+                                items_to_process.append({"id": item_id_counter, "text": text, "section": section_key, "type": "successes"})
+                                item_id_counter += 1
+                        for i in range(st.session_state.get(f"{section_key}_challenge_count", 1)):
+                            text = st.session_state.get(f"{section_key}_challenge_{i}")
+                            if text:
+                                items_to_process.append({"id": item_id_counter, "text": text, "section": section_key, "type": "challenges"})
+                                item_id_counter += 1
+                
+
 
                 ai_results = process_report_with_ai(items_to_process)
 
@@ -434,6 +539,7 @@ def submit_and_edit_page():
                 ) == len(items_to_process):
                     categorized_lookup = {item["id"]: item for item in ai_results["categorized_items"]}
                     report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
+                    
                     for item in items_to_process:
                         item_id = item["id"]
                         categories = categorized_lookup.get(item_id, {})
@@ -547,7 +653,7 @@ def submit_and_edit_page():
                     "week_ending_date": draft.get("week_ending_date"),
                     "report_body": final_report_body,
                     "professional_development": st.session_state.get("review_prof_dev", ""),
-                    "key_topics_lookahead": st.session_state.get("review_lookahead", ""),
+                    "key_topics_lookahead": st.session_state.get("lookahead", ""),
                     "personal_check_in": st.session_state.get("review_personal_check_in", ""),
                     "well_being_rating": st.session_state.get("review_well_being", 3),
                     "individual_summary": st.session_state.get("review_summary", ""),
@@ -686,6 +792,61 @@ def dashboard_page(supervisor_mode=False):
             if any(r.get('_normalized_week') == week for r in normalized_reports)
         }
 
+    st.divider()
+    st.subheader("Unlock Submitted Reports")
+    
+    # Only show for admin, not supervisor
+    if not supervisor_mode:
+        st.write("Unlock finalized reports to allow staff to make edits before the deadline.")
+        
+        # Get all finalized reports for the selected week
+        unlock_week = st.selectbox("Select week to unlock reports:", options=unique_dates, key="unlock_week_select")
+        
+        if unlock_week:
+            # Get finalized reports for this week
+            finalized_reports = [r for r in all_reports if r.get("week_ending_date") == unlock_week and r.get("status") == "finalized"]
+            
+            if finalized_reports:
+                st.write(f"Found {len(finalized_reports)} finalized report(s) for week ending {unlock_week}:")
+                
+                # Display reports with unlock buttons
+                for report in finalized_reports:
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.write(f"**{report.get('team_member', 'Unknown')}**")
+                    
+                    with col2:
+                        st.write(f"Submitted: {report.get('created_at', '')[:10] if report.get('created_at') else 'Unknown'}")
+                    
+                    with col3:
+                        if st.button("🔓 Unlock", key=f"unlock_{report.get('id')}", help="Change status to draft so staff can edit"):
+                            try:
+                                # Change status from finalized back to draft
+                                supabase.table("reports").update({"status": "draft"}).eq("id", report.get('id')).execute()
+                                st.success(f"Report unlocked for {report.get('team_member')}!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Failed to unlock report: {e}")
+                
+                # Bulk unlock option
+                st.divider()
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("🔓 Unlock All Reports for This Week", type="secondary"):
+                        try:
+                            # Unlock all finalized reports for this week
+                            supabase.table("reports").update({"status": "draft"}).eq("week_ending_date", unlock_week).eq("status", "finalized").execute()
+                            st.success(f"All reports for week ending {unlock_week} have been unlocked!")
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to unlock reports: {e}")
+            else:
+                st.info("No finalized reports found for this week.")
+
+    st.divider()
     st.subheader("Generate or Regenerate Weekly Summary")
     selected_date_for_summary = st.selectbox("Select a week to summarize:", options=unique_dates)
     button_text = "Generate Weekly Summary Report"
@@ -703,6 +864,8 @@ def dashboard_page(supervisor_mode=False):
                     well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
                     average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
                     reports_text = ""
+                    all_events_summary = []  # Collect all events for admin summary
+                    
                     for r in weekly_reports:
                         reports_text += f"\n---\n**Report from: {r.get('team_member','Unknown')}**\n"
                         reports_text += f"Well-being Score: {r.get('well_being_rating')}/5\n"
@@ -710,6 +873,9 @@ def dashboard_page(supervisor_mode=False):
                         reports_text += f"Lookahead: {r.get('key_topics_lookahead')}\n"
                         if not supervisor_mode:
                             reports_text += f"Concerns for Director: {r.get('director_concerns')}\n"
+                        
+
+                        
                         report_body = r.get("report_body") or {}
                         for sk, sn in CORE_SECTIONS.items():
                             section_data = report_body.get(sk)
@@ -718,6 +884,27 @@ def dashboard_page(supervisor_mode=False):
                                 if section_data.get("successes"):
                                     for success in section_data["successes"]:
                                         reports_text += f"- Success: {success.get('text')} `(ASCEND: {success.get('ascend_category','N/A')}, NORTH: {success.get('north_category','N/A')})`\n"
+                                        # If this is the events section, also collect for summary
+                                        if sk == "events":
+                                            # Parse event text to extract name and date
+                                            event_text = success.get('text', '')
+                                            event_name = event_text
+                                            event_date = ""
+                                            
+                                            if " on " in event_text:
+                                                parts = event_text.rsplit(" on ", 1)
+                                                if len(parts) == 2:
+                                                    event_name = parts[0]
+                                                    event_date = parts[1]
+                                            
+                                            all_events_summary.append({
+                                                "event_name": event_name,
+                                                "event_date": event_date,
+                                                "attendee": r.get('team_member', 'Unknown'),
+                                                "ascend_category": success.get('ascend_category', 'N/A'),
+                                                "north_category": success.get('north_category', 'N/A'),
+                                                "alignment": f"ASCEND: {success.get('ascend_category', 'N/A')}, NORTH: {success.get('north_category', 'N/A')}"
+                                            })
                                 if section_data.get("challenges"):
                                     for challenge in section_data["challenges"]:
                                         reports_text += f"- Challenge: {challenge.get('text')} `(ASCEND: {challenge.get('ascend_category','N/A')}, NORTH: {challenge.get('north_category','N/A')})`\n"
@@ -736,16 +923,30 @@ The report MUST contain the following sections, in this order, using markdown he
  1.  **Executive Summary**: A 2-3 sentence high-level overview of the week's key takeaways.
  2.  **ASCEND Framework Summary**: Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name.
  3.  **Guiding NORTH Pillars Summary**: Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name.
- 4.  **UND LEADS Summary**: Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Then include headings for Learning, Equity, Affinity, Discovery, Service with bullet points that reference staff by name.
+ 4.  **UND LEADS Summary**: Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names:
+   - **Learning**: Professional development, training, skill building, educational initiatives, mentoring
+   - **Equity**: Diversity initiatives, inclusive practices, accessibility improvements, fair treatment efforts
+   - **Affinity**: Community building, relationship development, team cohesion, campus connections
+   - **Discovery**: Research, innovation, new approaches, creative problem-solving, exploration of best practices
+   - **Service**: Community service, helping others, volunteer work, supporting university initiatives
  5.  **Overall Staff Well-being**: Start by stating, "The average well-being score for the week was {average_score} out of 5." Provide a 1-2 sentence qualitative summary and a subsection `#### Staff to Connect With` listing staff who reported low scores or concerning comments, with a brief reason.
- 6.  **For the Director's Attention**: A clear list of items that require director-level attention; mention the staff member who raised each item. If none, state "No specific concerns were raised for the Director this week."
- 7.  **Key Challenges**: Bullet-point summary of significant or recurring challenges reported by staff, noting who reported them where relevant.
- 8.  **Upcoming Projects & Initiatives**: Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
+ 6.  **Campus Events Summary**: Create a markdown table with the exact format below:
+   
+   | Event/Committee | Date | Attendees | Alignment |
+   |-----------------|------|-----------|-----------|
+   | Event Name | YYYY-MM-DD | Staff Member Name | ASCEND: Category, NORTH: Category |
+   
+   Include all campus events and committee meetings attended by staff this week. Group multiple attendees for the same event in one row.
+ 7.  **For the Director's Attention**: A clear list of items that require director-level attention; mention the staff member who raised each item. If none, state "No specific concerns were raised for the Director this week."
+ 8.  **Key Challenges**: Bullet-point summary of significant or recurring challenges reported by staff, noting who reported them where relevant.
+ 9.  **Upcoming Projects & Initiatives**: Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
  
  Additional instructions:
  - Use markdown headings and subheadings exactly as listed above.
  - When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...").
+ - For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement).
  - Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets.
+ - Ensure every staff member's activities are analyzed for UND LEADS alignment - do not leave this section empty.
 Here is the raw report data from all reports for the week, which includes the names of each team member and their categorized activities: {reports_text}
 """
                     model = genai.GenerativeModel("models/gemini-2.5-pro")
@@ -928,6 +1129,69 @@ def supervisor_summaries_page():
     except Exception as e:
         st.error(f"Failed to fetch supervisor summaries: {e}")
 
+def admin_summaries_page():
+    st.title("All Saved Weekly Summaries")
+    st.write("View all saved weekly summaries from the entire department.")
+    
+    try:
+        # Get all saved summaries
+        summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
+        summaries = summaries_response.data or []
+        
+        if not summaries:
+            st.info("No weekly summaries have been saved yet.")
+            return
+        
+        # Group summaries by year for better organization
+        summaries_by_year = {}
+        for summary in summaries:
+            try:
+                year = pd.to_datetime(summary['week_ending_date']).year
+                if year not in summaries_by_year:
+                    summaries_by_year[year] = []
+                summaries_by_year[year].append(summary)
+            except:
+                # If date parsing fails, group under "Unknown"
+                if "Unknown" not in summaries_by_year:
+                    summaries_by_year["Unknown"] = []
+                summaries_by_year["Unknown"].append(summary)
+        
+        # Display summaries by year
+        for year in sorted(summaries_by_year.keys(), reverse=True):
+            st.subheader(f"📅 {year}")
+            year_summaries = summaries_by_year[year]
+            
+            for summary in year_summaries:
+                week_date = summary.get('week_ending_date', 'Unknown')
+                created_date = summary.get('created_at', '')[:10] if summary.get('created_at') else 'Unknown'
+                created_by = summary.get('created_by', 'Unknown')
+                
+                # Get creator name if possible
+                creator_name = "Unknown"
+                if created_by and created_by != 'Unknown':
+                    try:
+                        profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
+                        if profile_resp.data:
+                            profile = profile_resp.data[0]
+                            creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
+                    except:
+                        creator_name = "Unknown"
+                
+                with st.expander(f"Week Ending {week_date} — Created {created_date} by {creator_name}"):
+                    st.markdown(summary.get('summary_text', ''))
+                    
+                    # Add download button for each summary
+                    if st.button(f"📄 Download as Text", key=f"download_{summary.get('id', week_date)}"):
+                        st.download_button(
+                            label="Download Summary",
+                            data=summary.get('summary_text', ''),
+                            file_name=f"weekly_summary_{week_date}.txt",
+                            mime="text/plain"
+                        )
+        
+    except Exception as e:
+        st.error(f"Failed to fetch summaries: {e}")
+
 def user_manual_page():
     st.title("User Manual")
     st.markdown("""
@@ -1033,6 +1297,7 @@ def main():
     # Add role-specific pages
     if st.session_state.get("role") == "admin":
         pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
+        pages["All Weekly Summaries"] = admin_summaries_page
     
     if st.session_state.get("is_supervisor"):
         pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
