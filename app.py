@@ -66,7 +66,98 @@ CORE_SECTIONS = {
     "events": "Campus Events/Committees",
 }
 
-# --- Helper function to clear form state ---
+# --- Helper Functions ---
+def get_deadline_settings():
+    """Get the current deadline configuration from admin settings"""
+    try:
+        # Try to get from database first (when table exists)
+        settings_response = supabase.table("admin_settings").select("*").eq("setting_name", "report_deadline").execute()
+        if settings_response.data:
+            # JSONB is already parsed as dict, no need for json.loads
+            return settings_response.data[0]["setting_value"]
+    except Exception as e:
+        # If there's an error, we'll use fallback
+        print(f"Database settings error: {e}")  # For debugging
+    
+    # Check session state for temporary storage
+    if "admin_deadline_settings" in st.session_state:
+        return st.session_state["admin_deadline_settings"]
+    
+    # Default settings if nothing is configured
+    return {"day_of_week": 0, "hour": 16, "minute": 0, "grace_hours": 16}
+
+def calculate_deadline_info(now):
+    """Calculate deadline information based on current time and settings"""
+    deadline_config = get_deadline_settings()
+    
+    deadline_day = deadline_config["day_of_week"]  # 0 = Monday
+    deadline_hour = deadline_config["hour"]
+    deadline_minute = deadline_config["minute"]
+    grace_hours = deadline_config["grace_hours"]
+    
+    # Handle both datetime objects and string dates
+    if isinstance(now, str):
+        # If it's a string date, convert to datetime and use current time as reference
+        try:
+            week_ending_date = datetime.strptime(now, "%Y-%m-%d").date()
+            # Use current time for comparison
+            current_time = datetime.now(ZoneInfo("America/Chicago"))
+            current_weekday = current_time.weekday()
+            
+            # Calculate deadline for the specific week
+            deadline_date = week_ending_date + timedelta(days=(deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0))
+            deadline_datetime = datetime.combine(deadline_date, datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute)).replace(tzinfo=ZoneInfo("America/Chicago"))
+            grace_end_datetime = deadline_datetime + timedelta(hours=grace_hours)
+            
+            # Check if deadline has passed
+            deadline_passed = current_time > deadline_datetime
+            in_grace_period = current_time <= grace_end_datetime and current_time > deadline_datetime
+            
+            return {
+                "active_saturday": week_ending_date,
+                "deadline": deadline_datetime,
+                "grace_end": grace_end_datetime,
+                "deadline_passed": deadline_passed,
+                "in_grace_period": in_grace_period
+            }
+        except ValueError:
+            # If string parsing fails, fall back to current time
+            now = datetime.now(ZoneInfo("America/Chicago"))
+    
+    # Calculate the active week ending Saturday and deadline
+    current_weekday = now.weekday()  # Monday is 0, Sunday is 6
+    
+    # Find the active Saturday (end of reporting week)
+    if current_weekday < deadline_day or (current_weekday == deadline_day and now.hour < deadline_hour + grace_hours):
+        # Still in current reporting week
+        days_to_saturday = 5 - current_weekday
+        active_saturday = now.date() + timedelta(days=days_to_saturday)
+    else:
+        # Move to next reporting week
+        days_to_next_saturday = (5 - current_weekday) + 7
+        active_saturday = now.date() + timedelta(days=days_to_next_saturday)
+    
+    # Calculate actual deadline (day after Saturday at specified time)
+    deadline_date = active_saturday + timedelta(days=(deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0))
+    deadline_datetime = datetime.combine(deadline_date, datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute))
+    deadline_datetime = deadline_datetime.replace(tzinfo=ZoneInfo("America/Chicago"))
+    
+    # Grace period end
+    grace_end = deadline_datetime + timedelta(hours=grace_hours)
+    
+    # Check status
+    is_grace_period = deadline_datetime <= now <= grace_end
+    deadline_passed = now > grace_end
+    
+    return {
+        "active_saturday": active_saturday,
+        "deadline_datetime": deadline_datetime,
+        "grace_end": grace_end,
+        "is_grace_period": is_grace_period,
+        "deadline_passed": deadline_passed,
+        "config": deadline_config
+    }
+
 def clear_form_state():
     keys_to_clear = ["draft_report", "report_to_edit", "last_summary", "events_count"]
     for key in keys_to_clear:
@@ -169,41 +260,53 @@ def submit_and_edit_page():
         
         # Check for any draft reports that were previously finalized (unlocked by admin)
         unlocked_reports = [r for r in user_reports if r.get("status") == "draft" and r.get("individual_summary")]
+        admin_created_reports = [r for r in user_reports if r.get("status") == "admin_created"]
+        
         if unlocked_reports:
             st.info(f"📢 **Notice:** {len(unlocked_reports)} of your previously submitted reports have been unlocked by an administrator for editing. You can now make changes and resubmit them.")
+        
+        if admin_created_reports:
+            st.warning(f"⏰ **Missed Deadline:** {len(admin_created_reports)} report(s) were created by an administrator because you missed the deadline. Please complete and submit them as soon as possible.")
 
         now = datetime.now(ZoneInfo("America/Chicago"))
-        today = now.date()
-        weekday = now.weekday()  # Monday is 0, Sunday is 6
-
-        active_saturday = None
-        is_grace_period = False
-
-        if 1 <= weekday <= 5:  # Tuesday to Saturday
-            active_saturday = today + timedelta(days=5 - weekday)
-        elif weekday == 6:  # Sunday
-            active_saturday = today - timedelta(days=1)
-            is_grace_period = True
-        elif weekday == 0:  # Monday
-            active_saturday = today - timedelta(days=2)
-            is_grace_period = True
-
-        deadline_is_past = (weekday == 0 and now.hour >= 16)
+        deadline_info = calculate_deadline_info(now)
+        
+        active_saturday = deadline_info["active_saturday"]
+        is_grace_period = deadline_info["is_grace_period"]
+        deadline_is_past = deadline_info["deadline_passed"]
+        deadline_config = deadline_info["config"]
 
         if active_saturday:
             active_report_date_str = active_saturday.strftime("%Y-%m-%d")
             has_finalized_for_active_week = any(
                 report.get("week_ending_date") == active_report_date_str and report.get("status") == "finalized" for report in user_reports
             )
+            
+            # Check if user has an unlocked report for this week (admin-enabled submission)
+            has_unlocked_for_active_week = any(
+                report.get("week_ending_date") == active_report_date_str and report.get("status") == "unlocked" for report in user_reports
+            )
 
             show_create_button = True
             if has_finalized_for_active_week:
                 show_create_button = False
-            if is_grace_period and deadline_is_past:
+            elif is_grace_period and deadline_is_past:
+                show_create_button = False
+            elif deadline_is_past and not has_unlocked_for_active_week:
                 show_create_button = False
 
             if show_create_button:
-                button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                # Show deadline information
+                deadline_day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][deadline_config["day_of_week"]]
+                if has_unlocked_for_active_week:
+                    st.success(f"✅ Your report has been unlocked by an administrator. You can now edit and submit despite the missed deadline.")
+                    button_label = f"📝 Edit Unlocked Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                elif is_grace_period:
+                    st.info(f"⏰ You are in the grace period. Original deadline was {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}. Grace period ends {deadline_info['grace_end'].strftime('%A at %H:%M')}.")
+                    button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                else:
+                    st.info(f"📅 Reports for week ending {active_saturday.strftime('%m/%d/%Y')} are due {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}")
+                    button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 if st.button(button_label, use_container_width=True, type="primary"):
                     clear_form_state()
                     existing_report = next((r for r in user_reports if r.get("week_ending_date") == active_report_date_str), None)
@@ -212,7 +315,8 @@ def submit_and_edit_page():
             elif has_finalized_for_active_week:
                 st.info(f"You have already finalized your report for the week ending {active_saturday.strftime('%m/%d/%Y')}.")
             elif deadline_is_past:
-                st.warning(f"The submission deadline for the report ending {active_saturday.strftime('%m/%d/%Y')} has passed.")
+                deadline_day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][deadline_config["day_of_week"]]
+                st.warning(f"The submission deadline ({deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}) for the report ending {active_saturday.strftime('%m/%d/%Y')} has passed. Contact your administrator if you need to submit a report.")
 
         st.divider()
         if not user_reports:
@@ -659,6 +763,7 @@ def submit_and_edit_page():
                     "individual_summary": st.session_state.get("review_summary", ""),
                     "director_concerns": st.session_state.get("review_director_concerns", ""),
                     "status": "finalized",
+                    "submitted_at": datetime.now(ZoneInfo("America/Chicago")).isoformat(),
                 }
 
                 try:
@@ -800,11 +905,18 @@ def dashboard_page(supervisor_mode=False):
         st.write("Unlock finalized reports to allow staff to make edits before the deadline.")
         
         # Get all finalized reports for the selected week
-        unlock_week = st.selectbox("Select week to unlock reports:", options=unique_dates, key="unlock_week_select")
+        # Fetch ALL reports to get comprehensive date list
+        all_reports_response = supabase.table("reports").select("*").order("created_at", desc=True).execute()
+        all_reports_comprehensive = getattr(all_reports_response, "data", None) or []
+        
+        # Use all report dates, not just those visible in current view
+        all_report_dates = [r.get("week_ending_date") for r in all_reports_comprehensive if r.get("week_ending_date")]
+        all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
+        unlock_week = st.selectbox("Select week to unlock reports:", options=all_unique_dates, key="unlock_week_select")
         
         if unlock_week:
             # Get finalized reports for this week
-            finalized_reports = [r for r in all_reports if r.get("week_ending_date") == unlock_week and r.get("status") == "finalized"]
+            finalized_reports = [r for r in all_reports_comprehensive if r.get("week_ending_date") == unlock_week and r.get("status") == "finalized"]
             
             if finalized_reports:
                 st.write(f"Found {len(finalized_reports)} finalized report(s) for week ending {unlock_week}:")
@@ -845,6 +957,235 @@ def dashboard_page(supervisor_mode=False):
                             st.error(f"Failed to unlock reports: {e}")
             else:
                 st.info("No finalized reports found for this week.")
+
+    st.divider()
+    st.subheader("Enable Submission for Draft Reports")
+    
+    # Only show for admin, not supervisor
+    if not supervisor_mode:
+        st.write("Allow staff to submit draft reports that were blocked due to missed deadlines.")
+        
+        # Fetch ALL reports (including drafts) for admin functions
+        all_reports_response = supabase.table("reports").select("*").order("created_at", desc=True).execute()
+        all_reports_including_drafts = getattr(all_reports_response, "data", None) or []
+        
+        st.caption(f"Debug: Found {len(all_reports_including_drafts)} total reports (all statuses)")
+        
+        # Get all unique dates from ALL reports (not just finalized ones)
+        all_report_dates = [r.get("week_ending_date") for r in all_reports_including_drafts if r.get("week_ending_date")]
+        all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
+        
+        # Show summary of draft reports
+        draft_reports_total = [r for r in all_reports_including_drafts if r.get("status") == "draft"]
+        if draft_reports_total:
+            draft_weeks = {}
+            for report in draft_reports_total:
+                week = report.get("week_ending_date")
+                if week not in draft_weeks:
+                    draft_weeks[week] = 0
+                draft_weeks[week] += 1
+            
+            st.info(f"📝 Found {len(draft_reports_total)} total draft reports across {len(draft_weeks)} weeks: " + 
+                   ", ".join([f"{week} ({count} reports)" for week, count in sorted(draft_weeks.items(), reverse=True)]))
+        
+        # Get all draft reports for the selected week
+        draft_unlock_week = st.selectbox("Select week to enable draft submissions:", options=all_unique_dates, key="draft_unlock_week_select")
+        
+        if draft_unlock_week:
+            # Get deadline info for this week
+            deadline_info = calculate_deadline_info(draft_unlock_week)
+            deadline_passed = deadline_info["deadline_passed"]
+            
+            # Get draft reports for this week
+            draft_reports = [r for r in all_reports_including_drafts if r.get("week_ending_date") == draft_unlock_week and r.get("status") == "draft"]
+            
+            if draft_reports:
+                st.write(f"Found {len(draft_reports)} draft report(s) for week ending {draft_unlock_week}:")
+                if deadline_passed:
+                    st.warning("⏰ The deadline for this week has passed. These reports are currently blocked from submission.")
+                else:
+                    st.info("✅ The deadline for this week has not passed yet. These reports can already be submitted normally.")
+                
+                # Display reports with enable submission buttons
+                for report in draft_reports:
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.write(f"**{report.get('team_member', 'Unknown')}**")
+                    
+                    with col2:
+                        created_date = report.get('created_at', '')[:10] if report.get('created_at') else 'Unknown'
+                        st.write(f"Started: {created_date}")
+                    
+                    with col3:
+                        if deadline_passed:
+                            if st.button("⏰ Enable Submission", key=f"enable_{report.get('id')}", help="Allow this draft report to be submitted despite missed deadline"):
+                                try:
+                                    # Change status to "unlocked" which bypasses deadline check
+                                    supabase.table("reports").update({
+                                        "status": "unlocked",
+                                        "admin_note": f"Submission enabled by administrator after deadline. Enabled on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                    }).eq("id", report.get('id')).execute()
+                                    st.success(f"Submission enabled for {report.get('team_member')}! They can now finalize their report.")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Failed to enable submission: {e}")
+                        else:
+                            st.write("✅ Can submit")
+                
+                # Bulk enable option for past deadline reports
+                if deadline_passed and draft_reports:
+                    st.divider()
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        if st.button("⏰ Enable All Draft Submissions for This Week", type="secondary"):
+                            try:
+                                # Enable submission for all draft reports for this week
+                                supabase.table("reports").update({
+                                    "status": "unlocked",
+                                    "admin_note": f"Submission enabled by administrator after deadline. Bulk enabled on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                }).eq("week_ending_date", draft_unlock_week).eq("status", "draft").execute()
+                                st.success(f"Submission enabled for all {len(draft_reports)} draft reports for week ending {draft_unlock_week}!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Failed to enable submissions: {e}")
+            else:
+                st.info("No draft reports found for this week.")
+
+    st.divider()
+    st.subheader("Missed Deadline Management")
+    
+    # Only show for admin, not supervisor
+    if not supervisor_mode:
+        st.write("Create reports for staff who missed the deadline.")
+        
+        # Get deadline settings using the helper function
+        deadline_config = get_deadline_settings()
+        
+        # Get all unique dates from all reports for missed deadline management
+        all_report_dates = [r.get("week_ending_date") for r in all_reports if r.get("week_ending_date")]
+        all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
+        missed_week = st.selectbox("Select week with missed deadlines:", options=all_unique_dates, key="missed_deadline_week")
+        
+        if missed_week:
+            # Get all staff and check who hasn't submitted or has non-finalized reports
+            all_staff_ids = [staff.get("id") for staff in all_staff]
+            # Check for any existing reports (not just finalized ones)
+            existing_reports_response = supabase.table("reports").select("user_id, status").eq("week_ending_date", missed_week).execute()
+            existing_user_ids = {r['user_id'] for r in existing_reports_response.data}
+            finalized_user_ids = {r['user_id'] for r in existing_reports_response.data if r.get('status') == 'finalized'}
+            
+            # Staff who need attention: no report at all OR have non-finalized reports
+            missing_staff = [staff for staff in all_staff if staff.get("id") not in finalized_user_ids]
+            
+            if missing_staff:
+                finalized_count = len(finalized_user_ids)
+                total_staff = len(all_staff)
+                st.write(f"**{len(missing_staff)} staff member(s) need attention for week ending {missed_week}** ({finalized_count}/{total_staff} finalized):")
+                
+                for staff in missing_staff:
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    
+                    with col1:
+                        staff_name = staff.get("full_name") or staff.get("title") or staff.get("email", "Unknown")
+                        st.write(f"**{staff_name}**")
+                    
+                    with col2:
+                        st.write(staff.get("title", "No title"))
+                    
+                    with col3:
+                        # Check if report already exists for this user and week
+                        existing_report_response = supabase.table("reports").select("*").eq("user_id", staff.get("id")).eq("week_ending_date", missed_week).execute()
+                        existing_report = existing_report_response.data[0] if existing_report_response.data else None
+                        
+                        if existing_report:
+                            # Report exists - offer to unlock or update it
+                            current_status = existing_report.get("status", "draft")
+                            if current_status == "finalized":
+                                if st.button("� Unlock Report", key=f"unlock_{staff.get('id')}_{missed_week}", help="Unlock this finalized report for editing"):
+                                    try:
+                                        supabase.table("reports").update({
+                                            "status": "unlocked",
+                                            "admin_note": f"Report unlocked by administrator for editing. Unlocked on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                        }).eq("id", existing_report["id"]).execute()
+                                        st.success(f"Report unlocked for {staff_name}. They can now edit and resubmit it.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Failed to unlock report: {e}")
+                            else:
+                                st.write(f"📝 Report exists ({current_status})")
+                        else:
+                            # No report exists - offer to create one
+                            if st.button("�📝 Create Report", key=f"create_{staff.get('id')}_{missed_week}", help="Create empty report for this staff member"):
+                                try:
+                                    # Create a basic report template for the staff member
+                                    empty_report = {
+                                        "user_id": staff.get("id"),
+                                        "team_member": staff_name,
+                                        "week_ending_date": missed_week,
+                                        "report_body": {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()},
+                                        "professional_development": "",
+                                        "key_topics_lookahead": "",
+                                        "personal_check_in": "",
+                                        "well_being_rating": 3,
+                                        "director_concerns": "",
+                                        "status": "admin_created",
+                                        "created_by_admin": st.session_state["user"].id,
+                                        "admin_note": f"Report created by administrator due to missed deadline. Created on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                    }
+                                    
+                                    supabase.table("reports").insert(empty_report).execute()
+                                    st.success(f"Empty report created for {staff_name}. They can now edit and submit it.")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Failed to create report: {e}")
+                
+                # Bulk create option
+                truly_missing_staff = []
+                for staff in missing_staff:
+                    existing_check = supabase.table("reports").select("id").eq("user_id", staff.get("id")).eq("week_ending_date", missed_week).execute()
+                    if not existing_check.data:
+                        truly_missing_staff.append(staff)
+                
+                if len(truly_missing_staff) > 1:
+                    st.divider()
+                    if st.button(f"📝 Create Empty Reports for All {len(truly_missing_staff)} Staff (No Existing Reports)", type="secondary"):
+                        try:
+                            bulk_reports = []
+                            created_count = 0
+                            for staff in truly_missing_staff:
+                                staff_name = staff.get("full_name") or staff.get("title") or staff.get("email", "Unknown")
+                                empty_report = {
+                                    "user_id": staff.get("id"),
+                                    "team_member": staff_name,
+                                    "week_ending_date": missed_week,
+                                    "report_body": {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()},
+                                    "professional_development": "",
+                                    "key_topics_lookahead": "",
+                                    "personal_check_in": "",
+                                    "well_being_rating": 3,
+                                    "director_concerns": "",
+                                    "status": "admin_created",
+                                    "created_by_admin": st.session_state["user"].id,
+                                    "admin_note": f"Report created by administrator due to missed deadline. Created on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                }
+                                bulk_reports.append(empty_report)
+                            
+                            if bulk_reports:
+                                supabase.table("reports").insert(bulk_reports).execute()
+                                st.success(f"Empty reports created for {len(bulk_reports)} staff members!")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.info("No reports to create - all staff already have reports for this week.")
+                        except Exception as e:
+                            st.error(f"Failed to create bulk reports: {e}")
+            else:
+                st.success("✅ All staff have submitted reports for this week!")
 
     st.divider()
     st.subheader("Generate or Regenerate Weekly Summary")
@@ -1129,6 +1470,176 @@ def supervisor_summaries_page():
     except Exception as e:
         st.error(f"Failed to fetch supervisor summaries: {e}")
 
+def admin_settings_page():
+    st.title("Administrator Settings")
+    st.write("Configure system settings and deadlines.")
+    
+    tab1, tab2 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking"])
+    
+    with tab1:
+        st.subheader("Weekly Report Deadline Configuration")
+        
+        # Get current deadline settings using the proper function
+        deadline_config = get_deadline_settings()
+        current_day = deadline_config.get("day_of_week", 0)  # 0 = Monday
+        current_hour = deadline_config.get("hour", 16)  # 4 PM
+        current_minute = deadline_config.get("minute", 0)
+        current_grace = deadline_config.get("grace_hours", 16)
+        
+        st.info(f"**Current Settings:** Reports due every **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][current_day]}** at **{current_hour:02d}:{current_minute:02d}** with **{current_grace}** hour grace period")
+        
+        with st.form("deadline_settings"):
+            st.write("Set when weekly reports are due:")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                deadline_day = st.selectbox(
+                    "Day of Week",
+                    options=[0, 1, 2, 3, 4, 5, 6],
+                    format_func=lambda x: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][x],
+                    index=current_day
+                )
+            
+            with col2:
+                deadline_hour = st.selectbox(
+                    "Hour (24-hour format)",
+                    options=list(range(24)),
+                    format_func=lambda x: f"{x:02d}:00",
+                    index=current_hour
+                )
+            
+            with col3:
+                deadline_minute = st.selectbox(
+                    "Minute",
+                    options=[0, 15, 30, 45],
+                    format_func=lambda x: f"{x:02d}",
+                    index=[0, 15, 30, 45].index(current_minute) if current_minute in [0, 15, 30, 45] else 0
+                )
+            
+            grace_period = st.number_input(
+                "Grace Period (hours after deadline for editing)",
+                min_value=0,
+                max_value=72,
+                value=current_grace,
+                help="How many hours after the deadline staff can still edit their reports"
+            )
+            
+            st.info(f"Current setting: Reports due every **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][deadline_day]}** at **{deadline_hour:02d}:{deadline_minute:02d}** with **{grace_period}** hour grace period")
+            
+            if st.form_submit_button("Save Deadline Settings", type="primary"):
+                try:
+                    new_settings = {
+                        "day_of_week": deadline_day,
+                        "hour": deadline_hour,
+                        "minute": deadline_minute,
+                        "grace_hours": grace_period
+                    }
+                    
+                    admin_user_id = st.session_state["user"].id
+                    
+                    with st.spinner("Saving settings to database..."):
+                        # Save to admin_settings table in database
+                        result = supabase.table("admin_settings").upsert({
+                            "setting_name": "report_deadline",
+                            "setting_value": new_settings,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        
+                        st.write(f"Debug: Database response: {result}")  # Debug info
+                    
+                    # Also update session state for immediate use
+                    st.session_state["admin_deadline_settings"] = new_settings
+                    
+                    st.success("✅ Deadline settings saved successfully to database!")
+                    st.info(f"Saved: Reports due **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][deadline_day]}** at **{deadline_hour:02d}:{deadline_minute:02d}** with **{grace_period}** hour grace period")
+                    time.sleep(2)
+                    st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"Failed to save settings: {e}")
+    
+    with tab2:
+        st.subheader("Submission Tracking Dashboard")
+        st.write("Track when reports are submitted and identify late submissions.")
+        
+        # Get recent submissions with timing data
+        try:
+            recent_reports = supabase.table("reports").select("*").eq("status", "finalized").order("submitted_at", desc=True).limit(50).execute()
+            if recent_reports.data:
+                
+                # Get current deadline settings for analysis using helper function
+                deadline_config = get_deadline_settings()
+                
+                # Create submission analysis
+                submission_data = []
+                for report in recent_reports.data:
+                    submitted_at = report.get("submitted_at")
+                    if submitted_at:
+                        submission_time = pd.to_datetime(submitted_at)
+                        
+                        # Calculate if submission was on time based on deadline settings
+                        week_ending = pd.to_datetime(report.get("week_ending_date"))
+                        # Calculate deadline for that week
+                        deadline_day = deadline_config["day_of_week"]
+                        deadline_hour = deadline_config["hour"] 
+                        deadline_minute = deadline_config["minute"]
+                        
+                        # Deadline is typically the Monday after the Saturday week ending
+                        days_after_saturday = (deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0)
+                        deadline_date = week_ending + timedelta(days=days_after_saturday)
+                        deadline_datetime = datetime.combine(deadline_date.date(), 
+                                                           datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute))
+                        deadline_datetime = deadline_datetime.replace(tzinfo=ZoneInfo("America/Chicago"))
+                        
+                        # Compare submission time to deadline
+                        was_on_time = submission_time <= deadline_datetime
+                        was_in_grace = submission_time <= (deadline_datetime + timedelta(hours=deadline_config["grace_hours"]))
+                        
+                        if was_on_time:
+                            status = "✅ On Time"
+                        elif was_in_grace:
+                            status = "⚠️ Grace Period"
+                        else:
+                            status = "❌ Late"
+                        
+                        submission_data.append({
+                            "Staff Member": report.get("team_member", "Unknown"),
+                            "Week Ending": report.get("week_ending_date", "Unknown"), 
+                            "Submitted": submission_time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "Day of Week": submission_time.strftime("%A"),
+                            "Time": submission_time.strftime("%H:%M"),
+                            "Deadline": deadline_datetime.strftime("%Y-%m-%d %H:%M"),
+                            "Status": status,
+                            "Admin Created": "Yes" if report.get("status") == "admin_created" or report.get("created_by_admin") else "No"
+                        })
+                
+                if submission_data:
+                    df = pd.DataFrame(submission_data)
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Summary stats
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        on_time = len([s for s in submission_data if s["Status"] == "✅ On Time"])
+                        st.metric("On Time", on_time)
+                    with col2:
+                        grace = len([s for s in submission_data if s["Status"] == "⚠️ Grace Period"])
+                        st.metric("Grace Period", grace)
+                    with col3:
+                        late = len([s for s in submission_data if s["Status"] == "❌ Late"])
+                        st.metric("Late", late)
+                    with col4:
+                        if submission_data:
+                            rate = (on_time / len(submission_data)) * 100
+                            st.metric("On-Time Rate", f"{rate:.1f}%")
+                else:
+                    st.info("No submission data available yet.")
+            else:
+                st.info("No reports found.")
+        except Exception as e:
+            st.error(f"Error loading submission data: {e}")
+
 def admin_summaries_page():
     st.title("All Saved Weekly Summaries")
     st.write("View all saved weekly summaries from the entire department.")
@@ -1297,6 +1808,7 @@ def main():
     # Add role-specific pages
     if st.session_state.get("role") == "admin":
         pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
+        pages["Admin Settings"] = admin_settings_page
         pages["All Weekly Summaries"] = admin_summaries_page
     
     if st.session_state.get("is_supervisor"):
