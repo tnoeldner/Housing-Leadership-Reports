@@ -8,13 +8,21 @@ import google.generativeai as genai
 try:
     from zoneinfo import ZoneInfo  # Python 3.9+
 except ImportError:
-    try:
-        from backports.zoneinfo import ZoneInfo
-    except ImportError:
-        from datetime import timezone
-        ZoneInfo = lambda tz: timezone.utc
+    # Fallback for older Python versions
+    from datetime import timezone
+    def ZoneInfo(tz):
+        if tz == "US/Central":
+            return timezone.utc  # Simplified fallback
+        return timezone.utc
 import time
 from collections import Counter
+import smtplib
+import re
+import email.message
+from io import BytesIO
+import base64
+import os
+import requests
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
@@ -174,6 +182,1967 @@ def clear_form_state():
     for key in events_to_clear:
         del st.session_state[key]
 
+# --- Email Functions ---
+def extract_und_leads_section(summary_text):
+    """Extract the UND LEADS Summary section from a weekly summary"""
+    if not summary_text:
+        return None
+    
+    # Use multiple approaches to extract the complete UND LEADS section
+    
+    # Method 1: Look for the exact numbered section pattern from the prompt
+    # Pattern looks for "4. **UND LEADS Summary**" until "5. **Overall Staff Well-being**"
+    pattern1 = r'(4\.\s*\*\*UND LEADS Summary\*\*.*?)(?=5\.\s*\*\*Overall Staff Well-being|$)'
+    match = re.search(pattern1, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    
+    # Method 2: Look for "**UND LEADS Summary**" until "**Overall Staff Well-being**"
+    pattern2 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\*\*Overall Staff Well-being|$)'
+    match = re.search(pattern2, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    
+    # Method 3: Look for numbered section 4 until numbered section 5
+    pattern3 = r'(4\.\s*\*\*UND LEADS.*?)(?=5\.\s*\*\*|$)'
+    match = re.search(pattern3, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    
+    # Method 4: Find UND LEADS section and capture everything until next major section
+    # This looks for common section patterns that follow UND LEADS
+    pattern4 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\n\s*\*\*(?:Overall|Campus Events|For the Director|Key Challenges|Upcoming Projects)|$)'
+    match = re.search(pattern4, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    
+    # Method 5: Simple extraction - get UND LEADS until any major section marker
+    pattern5 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\n\s*[5-9]\.\s*\*\*|\n\s*##\s+[A-Z]|\n\s*\*\*[A-Z][^*]*\*\*(?!\s*:)|$)'
+    match = re.search(pattern5, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    
+    # Method 6: Last resort - find the section header and extract a reasonable amount
+    header_pattern = r'\*\*UND LEADS Summary\*\*'
+    header_match = re.search(header_pattern, summary_text, re.IGNORECASE)
+    if header_match:
+        # Find the start position and try to extract content manually
+        start_pos = header_match.start()
+        remaining_text = summary_text[start_pos:]
+        
+        # Look for section breaks in the remaining text
+        section_breaks = [
+            r'\n\s*[5-9]\.\s*\*\*',  # Numbered sections 5-9
+            r'\n\s*##\s+',           # Markdown h2 headers
+            r'\n\s*\*\*(?:Overall|Campus|For the|Key|Upcoming)',  # Common next section names
+        ]
+        
+        end_pos = len(remaining_text)
+        for break_pattern in section_breaks:
+            break_match = re.search(break_pattern, remaining_text)
+            if break_match:
+                end_pos = min(end_pos, break_match.start())
+        
+        extracted = remaining_text[:end_pos].strip()
+        if len(extracted) > 50:  # Make sure we got substantial content
+            return extracted
+        else:
+            return f"**UND LEADS Summary**\n\nUND LEADS section found but content appears incomplete. Full section may not be available in this summary."
+    
+    # No UND LEADS section found at all
+    return None
+
+def get_logo_base64():
+    """Convert logo image to base64 for embedding in HTML"""
+    try:
+        # Get the directory where this script is located
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Look for logo in various possible locations
+        possible_paths = [
+            os.path.join(script_dir, "assets", "und_housing_logo.jpg"),
+            os.path.join(script_dir, "assets", "und_housing_logo.png"),
+            os.path.join(script_dir, "und_housing_logo.jpg"),
+            os.path.join(script_dir, "und_housing_logo.png"),
+            "assets/und_housing_logo.jpg",
+            "assets/und_housing_logo.png", 
+            "und_housing_logo.jpg",
+            "und_housing_logo.png"
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                with open(path, "rb") as img_file:
+                    img_data = base64.b64encode(img_file.read()).decode()
+                    ext = path.split('.')[-1].lower()
+                    # Debug: Show which path was used (for testing)
+                    print(f"DEBUG: Logo loaded from: {path}")
+                    return f"data:image/{ext};base64,{img_data}"
+        
+        # If no logo found, return a placeholder SVG logo
+        return create_text_logo_svg()
+    except Exception as e:
+        return create_text_logo_svg()
+
+def create_text_logo_svg():
+    """Create a professional SVG logo for UND Housing"""
+    svg_content = """<svg width="240" height="90" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" style="stop-color:#009A44;stop-opacity:1" />
+<stop offset="100%" style="stop-color:#007a36;stop-opacity:1" />
+</linearGradient>
+</defs>
+<rect width="240" height="90" fill="url(#bgGradient)" rx="8"/>
+<rect x="0" y="0" width="240" height="4" fill="#ffffff" opacity="0.8" rx="8"/>
+<g transform="translate(15, 20)">
+<polygon points="15,25 25,15 35,25 35,40 15,40" fill="white" opacity="0.9"/>
+<rect x="20" y="30" width="5" height="10" fill="#009A44"/>
+<rect x="27" y="25" width="4" height="4" fill="#009A44"/>
+</g>
+<text x="70" y="30" font-family="Arial, sans-serif" font-size="22" font-weight="900" text-anchor="start" fill="white">UND</text>
+<text x="70" y="48" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="white">HOUSING &amp; RESIDENCE LIFE</text>
+<text x="70" y="65" font-family="Arial, sans-serif" font-size="9" font-weight="normal" text-anchor="start" fill="white" opacity="0.9">University of North Dakota</text>
+<rect x="180" y="25" width="55" height="20" fill="#ffffff" rx="10" opacity="0.15"/>
+<text x="207" y="37" font-family="Arial, sans-serif" font-size="8" font-weight="bold" text-anchor="middle" fill="white">LEADERSHIP</text>
+</svg>"""
+    svg_base64 = base64.b64encode(svg_content.encode()).decode()
+    return f"data:image/svg+xml;base64,{svg_base64}"
+
+def clean_summary_response(text):
+    """Remove unwanted introductory text from AI-generated summaries"""
+    if not text:
+        return text
+        
+    cleaned_text = text.strip()
+    
+    # Apply multiple cleanup passes for thorough cleaning
+    for _ in range(3):  # Multiple passes to catch nested patterns
+        original_length = len(cleaned_text)
+        
+        # Remove comprehensive intro patterns (must handle multi-line)
+        intro_patterns = [
+            # Remove "Here is the comprehensive..." patterns
+            r"^Here is the comprehensive summary report.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z]|\n\s*\d+\.|$)",
+            r"^Here is a comprehensive summary.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z]|\n\s*\d+\.|$)",
+            r"^Based on the.*?reports.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z]|\n\s*\d+\.|$)",
+            
+            # Remove complete memo format (very comprehensive)
+            r"^Weekly Summary Report:.*?\n.*?To\n.*?\n.*?From\n.*?\n.*?Date\n.*?\n.*?Subject\n.*?\n\n",
+            r"^Weekly Summary Report: Housing & Residence Life.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z])",
+            
+            # Remove any remaining intro text before executive summary
+            r"^.*?(?=## Executive Summary|\*\*Executive Summary\*\*)",
+            
+            # Remove other intro variations
+            r"^Here is the.*?summary.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z]|\n\s*\d+\.|$)",
+            r"^Below is the.*?summary.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z]|\n\s*\d+\.|$)",
+            r"^This comprehensive.*?(?=\*\*Executive Summary\*\*|\*\*[A-Z]|\n\s*\d+\.|$)",
+        ]
+        
+        # Apply each pattern with DOTALL flag
+        for pattern in intro_patterns:
+            cleaned_text = re.sub(pattern, "", cleaned_text, flags=re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        
+        # Aggressive line-by-line cleanup for memo components
+        lines = cleaned_text.split('\n')
+        filtered_lines = []
+        skip_until_content = True
+        
+        for line in lines:
+            line_stripped = line.strip()
+            
+            # Skip memo header components
+            if skip_until_content:
+                if any(keyword in line_stripped.lower() for keyword in [
+                    'weekly summary report', 'housing & residence life', 
+                    'director of housing', 'executive assistant',
+                    'weekly synthesis', 'memorandum'
+                ]):
+                    continue
+                if line_stripped in ['To', 'From', 'Date', 'Subject', ''] or re.match(r'^\d{4}-\d{2}-\d{2}$', line_stripped):
+                    continue
+                # Start including content when we hit actual content
+                if line_stripped.startswith('##') or line_stripped.startswith('**') or line_stripped.startswith('#') or len(line_stripped) > 50:
+                    skip_until_content = False
+            
+            if not skip_until_content:
+                filtered_lines.append(line)
+        
+        cleaned_text = '\n'.join(filtered_lines).strip()
+        
+        # Additional cleanup patterns
+        cleanup_patterns = [
+            r'^\s*\n+',  # Remove leading newlines
+            r'^---+\s*\n*',  # Remove separator lines
+            r'^\s*$\n',  # Remove empty lines at start
+        ]
+        
+        for pattern in cleanup_patterns:
+            cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.MULTILINE)
+        
+        cleaned_text = cleaned_text.strip()
+        
+        # If no changes were made, break out of the loop
+        if len(cleaned_text) == original_length:
+            break
+    
+    return cleaned_text
+
+def convert_markdown_to_html(text):
+    """Convert markdown-formatted text to proper HTML with professional styling"""
+    if not text:
+        return ""
+    
+    # Split into lines for processing
+    lines = text.split('\n')
+    html_lines = []
+    in_list = False
+    in_table = False
+    table_rows = []
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        # Skip empty lines but preserve spacing
+        if not line:
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+            # Skip adding breaks to reduce spacing between sections
+            i += 1
+            continue
+        
+        # Handle subsection headers with ** first (### **text** or #### **text**) 
+        if re.match(r'^#{3,4}\s+\*\*.*?\*\*', line):
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+                
+            # Count hashes to determine if it's a main section or subsection
+            hash_count = len(line) - len(line.lstrip('#'))
+            match = re.match(r'^#{3,4}\s+\*\*(.*?)\*\*:?\s*(.*)', line)
+            if match:
+                title, rest = match.groups()
+                if hash_count >= 4:
+                    # #### headers are subsections (like "Nurturing") - use h4 with underlines
+                    html_lines.append(f'<h4>{title}</h4>')
+                else:
+                    # ### headers are main sections - use h3
+                    html_lines.append(f'<h3>{title}</h3>')
+                if rest.strip():
+                    html_lines.append(f'<p>{format_inline_text(rest)}</p>')
+        
+        # Handle regular markdown headers (##, ###, #### without asterisks)
+        elif re.match(r'^#{2,4}\s+', line) and '**' not in line:
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+            
+            # Count the number of hashes to determine header level
+            hash_count = len(line) - len(line.lstrip('#'))
+            header_text = line.lstrip('#').strip()
+            
+            if hash_count == 2:
+                html_lines.append(f'<h2>{header_text}</h2>')
+            elif hash_count == 3:
+                html_lines.append(f'<h3>{header_text}</h3>')
+            elif hash_count >= 4:
+                html_lines.append(f'<h4>{header_text}</h4>')
+
+        # Handle numbered sections (1. 2. 3. etc.)
+        elif re.match(r'^\d+\.\s*\*\*.*?\*\*', line):
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+            
+            match = re.match(r'^(\d+)\.\s*\*\*(.*?)\*\*:?\s*(.*)', line)
+            if match:
+                num, title, rest = match.groups()
+                html_lines.append(f'<div class="section">')
+                html_lines.append(f'<h2>{num}. {title}</h2>')
+                if rest.strip():
+                    html_lines.append(f'<p>{format_inline_text(rest)}</p>')
+        
+
+        
+        # Handle bold headers (**Header**) - these should be subsection headers with underlines
+        elif re.match(r'^\*\*.*?\*\*:?\s*', line):
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+            
+            # Extract title by removing ** markers
+            match = re.match(r'^\*\*(.*?)\*\*:?\s*(.*)', line)
+            if match:
+                title, rest = match.groups()
+                # Use h4 for subsections like "Nurturing" to get underline styling
+                html_lines.append(f'<h4>{title}</h4>')
+                if rest.strip():
+                    html_lines.append(f'<p>{format_inline_text(rest)}</p>')
+            else:
+                # Fallback: just remove ** markers
+                clean_title = re.sub(r'^\*\*(.*?)\*\*:?\s*', r'\1', line)
+                html_lines.append(f'<h4>{clean_title}</h4>')
+        
+        # Handle table rows
+        elif '|' in line and line.count('|') >= 2:
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if not in_table:
+                in_table = True
+                table_rows = []
+            table_rows.append(line)
+        
+        # Handle former bullet points as individual paragraphs with bold first word
+        elif line.startswith('- '):
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            
+            # Extract content and clean it thoroughly
+            content = line[2:].strip()
+            
+            # Clean up any remaining asterisks before processing
+            content = re.sub(r'^\*+\s*', '', content)  # Remove leading asterisks
+            content = re.sub(r'\s*\*+$', '', content)  # Remove trailing asterisks
+            
+            # Process markdown formatting
+            formatted_content = format_inline_text(content)
+            
+            # Make the first word bold if it's not already formatted
+            words = formatted_content.split(' ', 1)
+            if len(words) >= 2 and not words[0].startswith('<strong>') and not words[0].startswith('<b>'):
+                formatted_content = f"<strong>{words[0]}</strong> {words[1]}"
+            elif len(words) == 1 and not words[0].startswith('<strong>') and not words[0].startswith('<b>'):
+                formatted_content = f"<strong>{words[0]}</strong>"
+                
+            html_lines.append(f'<p class="item-paragraph">{formatted_content}</p>')
+        
+        # Handle regular paragraphs
+        else:
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+            if in_table:
+                html_lines.append(process_table(table_rows))
+                table_rows = []
+                in_table = False
+            
+            # Clean up any leading asterisks that might appear in regular paragraphs
+            clean_line = re.sub(r'^\*+\s*', '', line)
+            html_lines.append(f'<p>{format_inline_text(clean_line)}</p>')
+        
+        i += 1
+    
+    # Close any remaining open tags
+    if in_list:
+        html_lines.append('</ul>')
+    if in_table:
+        html_lines.append(process_table(table_rows))
+    
+    return '\n'.join(html_lines)
+
+def format_inline_text(text):
+    """Format inline markdown elements like bold, etc."""
+    # Convert **bold** to <strong>
+    text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
+    # Convert *italic* to <em> (but be careful with leftover asterisks)
+    text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<em>\1</em>', text)
+    # Remove any remaining single asterisks that might be leftover
+    text = re.sub(r'(?<!\*)\*(?!\*)', '', text)
+    return text
+
+def process_table(table_rows):
+    """Convert markdown table rows to HTML table with professional styling"""
+    if not table_rows:
+        return ""
+    
+    html = ['<div class="table-container"><table class="professional-table">']
+    header_processed = False
+    
+    for row in table_rows:
+        # Clean up the row and split into cells
+        cells = [cell.strip() for cell in row.split('|') if cell.strip()]
+        
+        # Skip empty rows or separator rows (those with dashes)
+        if not cells or all(re.match(r'^[-\s]*$', cell) for cell in cells):
+            continue
+        
+        # First valid row is the header
+        if not header_processed:
+            html.append('<thead><tr>')
+            for cell in cells:
+                html.append(f'<th>{format_inline_text(cell)}</th>')
+            html.append('</tr></thead><tbody>')
+            header_processed = True
+        else:  # Data rows
+            html.append('<tr>')
+            for cell in cells:
+                formatted_cell = format_inline_text(cell)
+                # Add special styling for numeric values
+                if re.match(r'^[\d.,]+%?$', cell.strip()):
+                    html.append(f'<td class="numeric">{formatted_cell}</td>')
+                else:
+                    html.append(f'<td>{formatted_cell}</td>')
+            html.append('</tr>')
+    
+    if header_processed:
+        html.append('</tbody>')
+    html.append('</table></div>')
+    return '\n'.join(html)
+
+def format_summary_as_html(summary_text, week_date, creator_name="Unknown", print_optimized=False):
+    """Convert markdown summary to formatted HTML for better document export"""
+    
+    # Clean the summary text before processing
+    summary_text = clean_summary_response(summary_text)
+    
+    # Get the logo as base64 encoded image
+    logo_data = get_logo_base64()
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Weekly Summary - {week_date}</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', 'Arial', 'Helvetica', sans-serif;
+                line-height: 1.7;
+                max-width: 8.5in;
+                margin: 0 auto;
+                padding: 0.75in;
+                color: #2c3e50;
+                background-color: #ffffff;
+                font-size: 11pt;
+            }}
+            .header {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-bottom: 4px solid #009A44;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                padding: 20px;
+                border-radius: 8px 8px 0 0;
+            }}
+            .header-content {{
+                flex: 1;
+            }}
+            .logo-section {{
+                flex: 0 0 auto;
+                text-align: right;
+            }}
+            .logo {{
+                max-height: 80px;
+                max-width: 200px;
+                height: auto;
+            }}
+            .header h1 {{
+                color: #009A44;
+                margin: 0 0 10px 0;
+                font-size: 28px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+            .header .subtitle {{
+                color: #333;
+                font-size: 16px;
+                margin: 5px 0;
+                font-weight: 500;
+            }}
+            .header .report-type {{
+                color: #009A44;
+                font-size: 18px;
+                font-weight: 600;
+                margin: 10px 0 5px 0;
+            }}
+            h2 {{
+                color: #009A44;
+                border-left: 6px solid #009A44;
+                padding: 12px 16px 12px 20px;
+                margin: 20px 0 15px 0;
+                font-size: 18pt;
+                font-weight: 700;
+                background: linear-gradient(135deg, #f8f9fa 0%, #e8f5e8 100%);
+                border-radius: 0 8px 8px 0;
+                box-shadow: 0 2px 6px rgba(0,154,68,0.15);
+                page-break-after: avoid;
+            }}
+            h3 {{
+                color: #006633;
+                font-size: 14pt;
+                margin: 15px 0 10px 0;
+                font-weight: 600;
+                border-bottom: 3px solid #009A44;
+                padding-bottom: 6px;
+                padding-left: 12px;
+                background-color: #f8f9fa;
+                padding-top: 6px;
+                border-radius: 4px 4px 0 0;
+            }}
+            h4 {{
+                color: #2c3e50;
+                font-size: 12pt;
+                margin: 12px 0 8px 0;
+                font-weight: 600;
+                padding-left: 8px;
+                border-left: 3px solid #AEAEAE;
+            }}
+            ul, ol {{
+                padding-left: 35px;
+                margin: 15px 0 20px 0;
+                background-color: #fdfdfd;
+                border-left: 3px solid #e8f5e8;
+                padding-top: 15px;
+                padding-bottom: 15px;
+                padding-right: 20px;
+                border-radius: 0 8px 8px 0;
+                box-shadow: 0 1px 3px rgba(0,154,68,0.1);
+            }}
+            .item-paragraph {{
+                margin: 4px 0 6px 15px;
+                line-height: 1.5;
+                color: #2c3e50;
+                text-indent: 0;
+            }}
+            .item-paragraph strong {{
+                color: #009A44;
+                font-weight: bold;
+            }}
+            ul {{
+                list-style-type: none;
+            }}
+            ul li {{
+                position: relative;
+                margin-bottom: 12px;
+                line-height: 1.6;
+                padding-left: 25px;
+            }}
+            ul li::before {{
+                content: "●";
+                color: #009A44;
+                font-weight: bold;
+                font-size: 16px;
+                position: absolute;
+                left: 8px;
+                top: 0px;
+                line-height: 1.6;
+            }}
+            ol li {{
+                margin-bottom: 12px;
+                line-height: 1.6;
+                padding-left: 5px;
+            }}
+            ol li::marker {{
+                color: #009A44;
+                font-weight: bold;
+                font-size: 13px;
+            }}
+            p {{
+                margin: 12px 0;
+                text-align: justify;
+                hyphens: auto;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                background-color: #fff;
+                border: 2px solid #009A44;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            th {{
+                background: linear-gradient(135deg, #009A44 0%, #006633 100%);
+                color: white;
+                padding: 15px 12px;
+                text-align: left;
+                font-weight: 600;
+                text-transform: uppercase;
+                font-size: 12px;
+                letter-spacing: 0.5px;
+            }}
+            td {{
+                padding: 12px;
+                border-bottom: 1px solid #e9ecef;
+                vertical-align: top;
+            }}
+            tr:nth-child(even) {{
+                background-color: #f8f9fa;
+            }}
+            tr:hover {{
+                background-color: #e8f5e8;
+            }}
+            .section {{
+                margin-bottom: 35px;
+                page-break-inside: avoid;
+                background-color: #fff;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                overflow: hidden;
+            }}
+            .section:last-child {{
+                margin-bottom: 20px;
+            }}
+            .content-block {{
+                padding: 20px;
+                margin: 15px 0;
+                background-color: #fafafa;
+                border-radius: 6px;
+                border: 1px solid #e9ecef;
+            }}
+            .footer {{
+                margin-top: 50px;
+                padding-top: 20px;
+                border-top: 2px solid #AEAEAE;
+                text-align: center;
+                color: #666;
+                font-size: 12px;
+                background-color: #f8f9fa;
+                padding: 20px;
+                border-radius: 5px;
+            }}
+            .footer .und-info {{
+                color: #009A44;
+                font-weight: 600;
+                margin-bottom: 5px;
+            }}
+            strong {{
+                color: #009A44;
+                font-weight: 600;
+            }}
+            em {{
+                color: #006633;
+                font-style: italic;
+            }}
+            .well-being-score {{
+                background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%);
+                padding: 20px;
+                border-left: 5px solid #009A44;
+                margin: 20px 0;
+                border-radius: 0 8px 8px 0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }}
+            .executive-summary {{
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                padding: 25px;
+                border: 2px solid #009A44;
+                border-radius: 10px;
+                margin: 25px 0;
+                font-size: 12pt;
+                line-height: 1.8;
+                box-shadow: 0 4px 8px rgba(0,154,68,0.1);
+            }}
+            .metric-highlight {{
+                background-color: #e8f5e8;
+                padding: 8px 12px;
+                border-radius: 4px;
+                color: #006633;
+                font-weight: 600;
+                display: inline-block;
+                margin: 4px 8px 4px 0;
+            }}
+            .page-break {{
+                page-break-before: always;
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 2px solid #009A44;
+            }}
+            .section {{
+                margin: 30px 0;
+                padding: 20px;
+                background-color: #fafafa;
+                border-radius: 8px;
+                border-left: 4px solid #009A44;
+            }}
+            @media print {{
+                .page-break {{
+                    page-break-before: always;
+                }}
+                body {{
+                    font-size: 12pt;
+                    line-height: 1.4;
+                }}
+                .header-section {{
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 80px;
+                    background: white;
+                    border-bottom: 2px solid #009A44;
+                    z-index: 1000;
+                }}
+            }}
+            .table-container {{
+                margin: 20px 0;
+                overflow-x: auto;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                border-radius: 8px;
+            }}
+            .professional-table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 11pt;
+                background-color: white;
+                border-radius: 8px;
+                overflow: hidden;
+            }}
+            .professional-table thead th {{
+                background: linear-gradient(135deg, #009A44 0%, #007a36 100%);
+                color: white;
+                font-weight: 600;
+                padding: 12px 15px;
+                text-align: left;
+                border: none;
+                font-size: 10pt;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+            .professional-table tbody td {{
+                padding: 10px 15px;
+                border-bottom: 1px solid #e0e0e0;
+                color: #333;
+                font-size: 10pt;
+            }}
+            .professional-table tbody tr:nth-child(even) {{
+                background-color: #f8f9fa;
+            }}
+            .professional-table tbody tr:hover {{
+                background-color: #e8f5e8;
+            }}
+            .professional-table td.numeric {{
+                text-align: right;
+                font-weight: 600;
+                color: #009A44;
+            }}
+            .accent-green {{
+                color: #009A44;
+            }}
+            .accent-gray {{
+                color: #AEAEAE;
+            }}
+            .highlight-box {{
+                background-color: #f8f9fa;
+                border: 1px solid #e9ecef;
+                border-left: 4px solid #009A44;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 0 5px 5px 0;
+            }}
+            @media print {{
+                body {{ 
+                    margin: 0.5in; 
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }}
+                .header {{ 
+                    page-break-after: avoid; 
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+                }}
+                .section {{ page-break-inside: avoid; }}
+                .logo {{ max-height: 60px; }}
+                h2 {{
+                    background-color: #f8f9fa !important;
+                    border-left: 5px solid #009A44 !important;
+                }}
+                th {{
+                    background: #009A44 !important;
+                    color: white !important;
+                }}
+                .footer {{
+                    background-color: #f8f9fa !important;
+                }}
+            }}
+            @page {{
+                margin: 0.75in;
+                size: letter;
+            }}
+            .print-instructions {{
+                background-color: #fff3cd;
+                border: 1px solid #ffeaa7;
+                color: #856404;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: 600;
+            }}
+            .print-tip {{
+                background-color: #d1ecf1;
+                border: 1px solid #bee5eb;
+                color: #0c5460;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+                font-size: 14px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="header-content">
+                <h1>UND Housing & Residence Life</h1>
+                <div class="report-type">Weekly Leadership Report Summary</div>
+                <div class="subtitle">Week Ending: {week_date}</div>
+                <div class="subtitle">Generated by: {creator_name}</div>
+                <div class="subtitle">Report Date: {datetime.now().strftime('%B %d, %Y')}</div>
+            </div>
+            <div class="logo-section">
+                <img src="{logo_data}" alt="UND Housing & Residence Life Logo" class="logo" 
+                     style="max-height: 80px; max-width: 200px; height: auto; border-radius: 5px; 
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            </div>
+        </div>
+    """
+    
+    # Add print instructions if this is print-optimized
+    if print_optimized:
+        html_content += """
+        <div class="print-instructions">
+            🖨️ <strong>PRINT TO PDF INSTRUCTIONS</strong><br>
+            Press <kbd>Ctrl+P</kbd> (or <kbd>Cmd+P</kbd> on Mac) → Choose "Save as PDF" → Click "More settings" → Check "Background graphics" → Save
+        </div>
+        <div class="print-tip">
+            💡 <strong>Tip:</strong> This file is optimized for printing to PDF. All UND colors and formatting will be preserved when you print to PDF from your browser.
+        </div>
+        """
+    
+    # Convert markdown summary to professional HTML
+    formatted_text = convert_markdown_to_html(summary_text)
+    
+    html_content += formatted_text
+    
+    html_content += f"""
+        <div class="footer">
+            <p>Generated by UND Housing & Residence Life Weekly Reporting Tool</p>
+            <p>University of North Dakota Housing & Residence Life Department</p>
+        </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html_content
+
+def create_formatted_document_download(summary_text, week_date, creator_name="Unknown", file_format="html"):
+    """Create a formatted document for download"""
+    if file_format.lower() == "html":
+        html_content = format_summary_as_html(summary_text, week_date, creator_name)
+        return html_content.encode('utf-8'), f"weekly_summary_{week_date}.html", "text/html"
+
+    else:
+        # Fallback to plain text with better formatting
+        formatted_text = f"""
+UND HOUSING & RESIDENCE LIFE
+WEEKLY LEADERSHIP REPORT SUMMARY
+
+Week Ending: {week_date}
+Generated by: {creator_name}
+Report Date: {datetime.now().strftime('%B %d, %Y')}
+
+{'='*60}
+
+{summary_text}
+
+{'='*60}
+Generated by UND Housing & Residence Life Weekly Reporting Tool
+University of North Dakota Housing & Residence Life Department
+        """.strip()
+        
+        return formatted_text.encode('utf-8'), f"weekly_summary_{week_date}.txt", "text/plain"
+
+def send_email(to_email, subject, body, from_email=None, smtp_server=None, smtp_port=587, email_password=None):
+    """Send an email with the UND LEADS section"""
+    try:
+        # Use environment variables or Streamlit secrets for email configuration
+        if not from_email:
+            try:
+                from_email = st.secrets["EMAIL_ADDRESS"]
+            except KeyError:
+                st.error("EMAIL_ADDRESS not found in secrets configuration.")
+                return False
+            except Exception as e:
+                st.error(f"Error accessing EMAIL_ADDRESS from secrets: {e}")
+                return False
+                
+        if not email_password:
+            try:
+                email_password = st.secrets["EMAIL_PASSWORD"]
+            except KeyError:
+                st.error("EMAIL_PASSWORD not found in secrets configuration.")
+                return False
+            except Exception as e:
+                st.error(f"Error accessing EMAIL_PASSWORD from secrets: {e}")
+                return False
+                
+        if not smtp_server:
+            try:
+                smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
+            except Exception as e:
+                st.error(f"Error accessing SMTP_SERVER from secrets: {e}")
+                smtp_server = "smtp.gmail.com"  # Default fallback
+        
+        # Debug information
+        st.write(f"🔧 Debug - Using SMTP server: {smtp_server}")
+        st.write(f"🔧 Debug - From email: {from_email}")
+        
+        if not from_email or not email_password:
+            st.error("Email configuration incomplete. Missing email address or password.")
+            return False
+        
+        # Create message using email.message
+        msg = email.message.EmailMessage()
+        msg['From'] = from_email
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.set_content(body)
+        
+        # Create SMTP session
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()  # Enable TLS security
+        server.login(from_email, email_password)
+        server.send_message(msg)
+        server.quit()
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+        return False
+
+# --- Roompact API Functions ---
+def get_roompact_config():
+    """Get Roompact API configuration from environment variables or secrets"""
+    try:
+        # Try environment variables first (for deployment), then secrets (for local)
+        api_token = os.getenv("ROOMPACT_API_TOKEN") or st.secrets.get("roompact_api_token")
+        base_url = "https://api.roompact.com/v1"
+        
+        if not api_token:
+            return None, "❌ Missing Roompact API token. Please add 'roompact_api_token' to your secrets or environment variables."
+        
+        return {"api_token": api_token, "base_url": base_url}, None
+        
+    except Exception as e:
+        return None, f"❌ Error accessing Roompact API configuration: {e}"
+
+def make_roompact_request(endpoint, params=None):
+    """Make authenticated request to Roompact API"""
+    config, error = get_roompact_config()
+    if error:
+        return None, error
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {config['api_token']}",
+            "Content-Type": "application/json"
+        }
+        
+        url = f"{config['base_url']}/{endpoint.lstrip('/')}"
+        
+        response = requests.get(url, headers=headers, params=params or {})
+        response.raise_for_status()
+        
+        return response.json(), None
+        
+    except requests.exceptions.RequestException as e:
+        if hasattr(e, 'response') and e.response is not None:
+            if e.response.status_code == 401:
+                return None, "❌ Unauthorized: Invalid API token or token has been deactivated"
+            elif e.response.status_code == 403:
+                return None, "❌ Forbidden: Insufficient permissions for this resource"
+            else:
+                return None, f"❌ API Error {e.response.status_code}: {e.response.text}"
+        return None, f"❌ Connection error: {str(e)}"
+    except Exception as e:
+        return None, f"❌ Unexpected error: {str(e)}"
+
+def fetch_roompact_forms(cursor=None, max_pages=600, target_start_date=None, progress_callback=None):
+    """Fetch forms data from Roompact API with pagination and optional date-based stopping"""
+    forms = []
+    page_count = 0
+    next_cursor = cursor
+    reached_target_date = False
+    
+    try:
+        # Convert target_start_date to datetime for comparison if provided
+        target_datetime = None
+        if target_start_date:
+            target_datetime = datetime.combine(target_start_date, datetime.min.time())
+        
+        while page_count < max_pages and not reached_target_date:
+            params = {}
+            if next_cursor:
+                params['cursor'] = next_cursor
+                
+            data, error = make_roompact_request("forms", params)
+            if error:
+                return None, error
+            
+            # Add forms from this page
+            page_forms = data.get('data', [])
+            
+            # If we have a target date, check if we've reached forms older than our target
+            if target_datetime and page_forms:
+                for form in page_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_datetime = form_datetime.replace(tzinfo=None)
+                            
+                            # If this form is older than our target, we've gone far enough
+                            if form_datetime < target_datetime:
+                                reached_target_date = True
+                                break
+                        except:
+                            pass  # Skip forms with invalid dates
+            
+            forms.extend(page_forms)
+            
+            # Update progress if callback provided
+            if progress_callback:
+                oldest_date = "Unknown"
+                if page_forms:
+                    dates = []
+                    for form in page_forms:
+                        current_revision = form.get('current_revision', {})
+                        date_str = current_revision.get('date', '')
+                        if date_str:
+                            try:
+                                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                dates.append(form_datetime)
+                            except:
+                                pass
+                    if dates:
+                        oldest_date = min(dates).strftime('%Y-%m-%d')
+                
+                progress_callback(page_count + 1, len(forms), oldest_date, reached_target_date)
+            
+            # Check for pagination
+            links = data.get('links', [])
+            next_cursor = None
+            
+            for link in links:
+                if link.get('rel') == 'next':
+                    # Extract cursor from URI
+                    next_uri = link.get('uri', '')
+                    if 'cursor=' in next_uri:
+                        next_cursor = next_uri.split('cursor=')[1].split('&')[0]
+                    break
+            
+            page_count += 1
+            
+            # If no next page, break
+            if not next_cursor:
+                break
+                
+        return forms, None
+        
+    except Exception as e:
+        return None, f"Error fetching forms: {str(e)}"
+
+def discover_form_types(max_pages=600, target_start_date=None, progress_callback=None):
+    """Fetch forms and discover all available form types"""
+    try:
+        def progress_update(page_num, total_forms, oldest_date, reached_target):
+            status_text = f"📄 Page {page_num}: {total_forms} forms found"
+            if oldest_date != "Unknown":
+                status_text += f" | Oldest: {oldest_date}"
+            if reached_target:
+                status_text += " | ✅ Target date reached"
+            return status_text
+        
+        progress_placeholder = st.empty()
+        
+        def show_progress(page_num, total_forms, oldest_date, reached_target):
+            progress_placeholder.info(progress_update(page_num, total_forms, oldest_date, reached_target))
+        
+        with st.spinner("Discovering available form types..."):
+            forms, error = fetch_roompact_forms(
+                max_pages=max_pages, 
+                target_start_date=target_start_date,
+                progress_callback=show_progress
+            )
+            
+            if error:
+                return None, error
+            
+            if not forms:
+                return [], "No forms found"
+            
+            # Extract unique form template names with counts and date ranges
+            form_type_info = {}
+            for form in forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name and template_name != 'Unknown Form':
+                    if template_name not in form_type_info:
+                        form_type_info[template_name] = {
+                            'count': 0,
+                            'dates': []
+                        }
+                    
+                    form_type_info[template_name]['count'] += 1
+                    
+                    # Get submission date for date range info
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_type_info[template_name]['dates'].append(form_datetime)
+                        except:
+                            pass
+            
+            # Create form type options with metadata
+            form_type_options = []
+            for template_name, info in form_type_info.items():
+                count = info['count']
+                dates = info['dates']
+                
+                if dates:
+                    dates.sort()
+                    oldest = dates[0].strftime('%Y-%m-%d')
+                    newest = dates[-1].strftime('%Y-%m-%d')
+                    date_info = f"({oldest} to {newest})"
+                else:
+                    date_info = "(dates unknown)"
+                
+                display_name = f"{template_name} - {count} submissions {date_info}"
+                form_type_options.append({
+                    'display_name': display_name,
+                    'template_name': template_name,
+                    'count': count
+                })
+            
+            # Sort by count (most common first) then alphabetically
+            form_type_options.sort(key=lambda x: (-x['count'], x['template_name']))
+            
+            return form_type_options, None
+            
+    except Exception as e:
+        return None, f"Error discovering form types: {str(e)}"
+
+def summarize_form_submissions(selected_forms, max_forms=10):
+    """Use AI to summarize selected form submissions"""
+    if not selected_forms:
+        return "No forms selected for summarization."
+    
+    try:
+        # Limit to prevent token overflow
+        forms_to_process = selected_forms[:max_forms]
+        
+        # Prepare form data for AI analysis
+        forms_text = ""
+        for i, form in enumerate(forms_to_process, 1):
+            current_revision = form.get('current_revision', {})
+            form_name = form.get('form_template_name', 'Unknown Form')
+            author = current_revision.get('author', 'Unknown')
+            date = current_revision.get('date', 'Unknown date')
+            
+            forms_text += f"\n=== FORM {i}: {form_name} ===\n"
+            forms_text += f"Submitted by: {author}\n"
+            forms_text += f"Date: {date}\n\n"
+            
+            # Process responses
+            responses = current_revision.get('responses', [])
+            for response in responses:
+                field_label = response.get('field_label', 'Unknown Field')
+                field_response = response.get('response', '')
+                
+                if field_response and str(field_response).strip():
+                    forms_text += f"**{field_label}:** {field_response}\n"
+            
+            forms_text += "\n" + "="*50 + "\n"
+        
+        # Create AI prompt for summarization
+        prompt = f"""
+You are analyzing form submissions from residence life staff for supervisory review. Please create a comprehensive summary that helps supervisors understand key themes, concerns, and insights from the submitted forms.
+
+FORM DATA:
+{forms_text}
+
+Please provide a summary that includes:
+
+1. **Executive Overview**: Brief summary of the number and types of forms analyzed
+2. **Key Themes**: Major patterns, recurring topics, or common themes across submissions  
+3. **Notable Items**: Specific incidents, achievements, or concerns that require supervisory attention
+4. **Staff Insights**: Observations about staff performance, challenges, or successes mentioned in the forms
+5. **Action Items**: Recommendations for follow-up actions or areas requiring supervisory intervention
+6. **Trending Issues**: Any patterns that might indicate systemic issues or positive developments
+
+Format the response in clear markdown with headers and bullet points. Focus on actionable insights that help supervisors make informed decisions about their teams and operations.
+"""
+
+        # Use the same AI configuration as the rest of the app
+        model = genai.GenerativeModel("models/gemini-2.5-pro")
+        
+        with st.spinner("AI is analyzing form submissions..."):
+            result = model.generate_content(prompt)
+            return result.text
+            
+    except Exception as e:
+        return f"Error generating AI summary: {str(e)}"
+
+def filter_forms_by_date_and_type(forms, start_date, end_date, selected_form_types):
+    """Filter forms by date range and selected form types"""
+    if not forms:
+        return [], "No forms to filter"
+    
+    filtered_forms = []
+    
+    try:
+        # Convert dates to datetime objects for comparison
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        
+        for form in forms:
+            # Get the form submission date
+            current_revision = form.get('current_revision', {})
+            date_str = current_revision.get('date', '')
+            
+            if not date_str:
+                continue  # Skip forms without dates
+            
+            try:
+                # Parse the ISO format date from Roompact API
+                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                # Convert to local time for comparison
+                form_datetime = form_datetime.replace(tzinfo=None)
+                
+                # Check if form is within date range
+                if not (start_datetime <= form_datetime <= end_datetime):
+                    continue
+                
+            except (ValueError, TypeError):
+                continue  # Skip forms with invalid dates
+            
+            # Filter by selected form types
+            form_template_name = form.get('form_template_name', '')
+            
+            # If no specific form types selected, include all forms
+            if not selected_form_types or "All Form Types" in selected_form_types:
+                filtered_forms.append(form)
+            elif form_template_name in selected_form_types:
+                filtered_forms.append(form)
+        
+        return filtered_forms, None
+        
+    except Exception as e:
+        return [], f"Error filtering forms: {str(e)}"
+
+def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
+    """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
+    if not selected_forms:
+        return "No duty reports selected for analysis."
+    
+    try:
+        # Group reports by hall and week for analysis
+        from collections import defaultdict
+        
+        # Extract quantitative data
+        halls_data = defaultdict(lambda: {
+            'total_reports': 0,
+            'incidents': [],
+            'lockouts': 0,
+            'maintenance': 0,
+            'policy_violations': 0,
+            'safety_concerns': 0,
+            'staff_responses': 0
+        })
+        
+        weekly_data = defaultdict(lambda: {
+            'total_reports': 0,
+            'incident_count': 0,
+            'halls_active': set()
+        })
+        
+        # Process each form to extract quantitative data
+        for form in selected_forms:
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            
+            # Extract hall/building info from responses
+            hall_name = "Unknown Hall"
+            responses = current_revision.get('responses', [])
+            
+            for response in responses:
+                field_label = response.get('field_label', '').lower()
+                field_response = str(response.get('response', '')).strip()
+                
+                # Try to identify hall/building
+                if any(word in field_label for word in ['building', 'hall', 'location', 'area']):
+                    if field_response and field_response != 'None':
+                        hall_name = field_response
+                        break
+            
+            # Extract week from date
+            if date_str:
+                try:
+                    form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    week_key = form_date.strftime('Week of %Y-%m-%d')
+                    weekly_data[week_key]['total_reports'] += 1
+                    weekly_data[week_key]['halls_active'].add(hall_name)
+                except:
+                    week_key = "Unknown Week"
+            else:
+                week_key = "Unknown Week"
+            
+            # Count incidents by type in this report
+            report_text = ""
+            for response in responses:
+                field_response = str(response.get('response', '')).strip().lower()
+                report_text += field_response + " "
+            
+            # Increment hall counters
+            halls_data[hall_name]['total_reports'] += 1
+            
+            # Count specific incident types
+            if any(word in report_text for word in ['lockout', 'locked out', 'key']):
+                halls_data[hall_name]['lockouts'] += 1
+            
+            if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
+                halls_data[hall_name]['maintenance'] += 1
+            
+            if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
+                halls_data[hall_name]['policy_violations'] += 1
+                weekly_data[week_key]['incident_count'] += 1
+            
+            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
+                halls_data[hall_name]['safety_concerns'] += 1
+                weekly_data[week_key]['incident_count'] += 1
+            
+            if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
+                halls_data[hall_name]['staff_responses'] += 1
+        
+        # Prepare comprehensive report data for AI analysis
+        reports_text = f"\n=== WEEKLY DUTY REPORTS ANALYSIS ===\n"
+        reports_text += f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
+        reports_text += f"Total Reports: {len(selected_forms)}\n\n"
+        
+        # Add quantitative breakdown by hall (formatted for table creation)
+        reports_text += "=== HALL-BY-HALL INCIDENT BREAKDOWN (FOR TABLE) ===\n"
+        
+        # Calculate totals for summary
+        total_lockouts = sum(data['lockouts'] for data in halls_data.values())
+        total_maintenance = sum(data['maintenance'] for data in halls_data.values())
+        total_violations = sum(data['policy_violations'] for data in halls_data.values())
+        total_safety = sum(data['safety_concerns'] for data in halls_data.values())
+        total_reports = sum(data['total_reports'] for data in halls_data.values())
+        total_responses = sum(data['staff_responses'] for data in halls_data.values())
+        
+        reports_text += "DATA FOR QUANTITATIVE METRICS TABLE:\n"
+        reports_text += f"TOTALS: Reports={total_reports}, Lockouts={total_lockouts}, Maintenance={total_maintenance}, Violations={total_violations}, Safety={total_safety}, Responses={total_responses}\n\n"
+        
+        reports_text += "HALL-BY-HALL DATA:\n"
+        for hall, data in sorted(halls_data.items()):
+            reports_text += f"{hall}: Reports={data['total_reports']}, Lockouts={data['lockouts']}, Maintenance={data['maintenance']}, Violations={data['policy_violations']}, Safety={data['safety_concerns']}, Responses={data['staff_responses']}\n"
+        
+        reports_text += "\nDETAILED BREAKDOWN BY HALL:\n"
+        for hall, data in sorted(halls_data.items()):
+            total_incidents = data['lockouts'] + data['maintenance'] + data['policy_violations'] + data['safety_concerns']
+            reports_text += f"**{hall}** ({data['total_reports']} reports, {total_incidents} total incidents):\n"
+            reports_text += f"  • Lockouts: {data['lockouts']}\n"
+            reports_text += f"  • Maintenance: {data['maintenance']}\n"  
+            reports_text += f"  • Policy Violations: {data['policy_violations']}\n"
+            reports_text += f"  • Safety Concerns: {data['safety_concerns']}\n"
+            reports_text += f"  • Staff Responses: {data['staff_responses']}\n\n"
+        
+        reports_text += "\n=== WEEKLY ACTIVITY SUMMARY ===\n"
+        for week, data in sorted(weekly_data.items()):
+            reports_text += f"\n**{week}:**\n"
+            reports_text += f"- Total Reports: {data['total_reports']}\n"
+            reports_text += f"- Incident Reports: {data['incident_count']}\n"
+            reports_text += f"- Active Halls: {len(data['halls_active'])}\n"
+            reports_text += f"- Halls: {', '.join(sorted(data['halls_active']))}\n"
+        
+        reports_text += f"\n=== DETAILED REPORTS ===\n"
+        
+        for i, form in enumerate(selected_forms, 1):
+            current_revision = form.get('current_revision', {})
+            form_name = form.get('form_template_name', 'Unknown Form')
+            author = current_revision.get('author', 'Unknown')
+            date = current_revision.get('date', 'Unknown date')
+            
+            reports_text += f"\n--- REPORT {i}: {form_name} ---\n"
+            reports_text += f"Staff: {author}\n"
+            reports_text += f"Date: {date}\n\n"
+            
+            # Process responses
+            responses = current_revision.get('responses', [])
+            for response in responses:
+                field_label = response.get('field_label', 'Unknown Field')
+                field_response = response.get('response', '')
+                
+                if field_response and str(field_response).strip():
+                    reports_text += f"**{field_label}:** {field_response}\n"
+            
+            reports_text += "\n" + "="*50 + "\n"
+        
+        # Create specialized weekly duty report AI prompt
+        prompt = f"""
+You are analyzing residence life duty reports for administrative weekly summaries. Create a comprehensive weekly report that includes:
+
+1. **EXECUTIVE WEEKLY SUMMARY** (2-3 paragraphs)
+   - Overall activity level and trends for the week
+   - Key operational highlights and challenges
+   - Staff performance and engagement observations
+
+2. **QUANTITATIVE WEEKLY METRICS**
+   - Total reports submitted by hall
+   - Incident breakdown (lockouts, maintenance, policy violations, safety)
+   - Response effectiveness metrics
+   - Week-over-week trends if applicable
+
+3. **HALL-BY-HALL BREAKDOWN**
+   - Individual hall performance and incident summaries
+   - Specific concerns or positive highlights per hall
+   - Staffing effectiveness by location
+
+4. **CRITICAL INCIDENTS & FOLLOW-UPS**
+   - High-priority incidents requiring administrative attention
+   - Ongoing issues needing resolution
+   - Policy enforcement patterns
+
+5. **OPERATIONAL RECOMMENDATIONS**
+   - Immediate action items for administration
+   - Staff development or training needs identified
+   - Facility or policy improvements suggested
+
+6. **WEEKLY TRENDS & PATTERNS**
+   - Day-of-week incident patterns
+   - Common recurring issues
+   - Seasonal or temporal factors observed
+
+Format this as a professional administrative report suitable for inclusion in weekly residence life summaries. Use data-driven insights and specific examples while maintaining confidentiality.
+
+DUTY REPORTS DATA:
+{reports_text}
+
+Create a comprehensive weekly duty analysis report:
+"""
+
+        # Use Gemini 2.5 Flash for better quota efficiency with large datasets  
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        with st.spinner(f"AI is generating weekly duty report from {len(selected_forms)} reports..."):
+            result = model.generate_content(prompt)
+            return result.text
+            
+    except Exception as e:
+        return f"Error generating weekly duty report summary: {str(e)}"
+
+def store_duty_report_data(selected_forms, start_date, end_date, generated_by_user_id=None):
+    """Store individual duty report incidents in Supabase for historical analysis and graphing"""
+    if not selected_forms:
+        return {"success": False, "message": "No duty reports to store"}
+    
+    try:
+        # Check for existing records for this analysis period to prevent duplicates
+        existing_query = supabase.table("duty_report_incidents").select("*").eq("date_range_start", start_date.isoformat()).eq("date_range_end", end_date.isoformat())
+        
+        if generated_by_user_id:
+            existing_query = existing_query.eq("generated_by_user_id", generated_by_user_id)
+        
+        existing_response = existing_query.execute()
+        existing_records = existing_response.data if existing_response.data else []
+        
+        # If records exist for this analysis period, ask user what to do
+        if existing_records:
+            return {
+                "success": False, 
+                "message": f"Found {len(existing_records)} existing records for this analysis period ({start_date} to {end_date}). Use 'Replace Existing Data' option if you want to update the data.",
+                "existing_count": len(existing_records),
+                "duplicate_detected": True
+            }
+        
+        stored_records = []
+        
+        for form in selected_forms:
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            form_name = form.get('form_template_name', 'Unknown Form')
+            
+            # Parse date
+            report_date = None
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    report_date = form_datetime.date()
+                except:
+                    report_date = None
+            
+            # Extract hall/building info
+            hall_name = "Unknown Hall"
+            responses = current_revision.get('responses', [])
+            
+            # First pass: find hall/building
+            for response in responses:
+                field_label = response.get('field_label', '').lower()
+                field_response = str(response.get('response', '')).strip()
+                
+                if any(word in field_label for word in ['building', 'hall', 'location', 'area']):
+                    if field_response and field_response not in ['None', '']:
+                        hall_name = field_response
+                        break
+            
+            # Second pass: extract incidents and create records
+            report_text = ""
+            for response in responses:
+                field_response = str(response.get('response', '')).strip().lower()
+                report_text += field_response + " "
+            
+            # Create base record for this duty report
+            base_record = {
+                'report_date': report_date.isoformat() if report_date else None,
+                'hall_name': hall_name,
+                'staff_author': author,
+                'form_type': form_name,
+                'generated_by_user_id': generated_by_user_id,
+                'created_at': datetime.now().isoformat(),
+                'date_range_start': start_date.isoformat(),
+                'date_range_end': end_date.isoformat()
+            }
+            
+            # Create incident records based on detected patterns
+            incidents_found = []
+            
+            if any(word in report_text for word in ['lockout', 'locked out', 'key']):
+                incidents_found.append({**base_record, 'incident_type': 'lockout', 'incident_count': 1})
+            
+            if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
+                incidents_found.append({**base_record, 'incident_type': 'maintenance', 'incident_count': 1})
+            
+            if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
+                incidents_found.append({**base_record, 'incident_type': 'policy_violation', 'incident_count': 1})
+            
+            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
+                incidents_found.append({**base_record, 'incident_type': 'safety_concern', 'incident_count': 1})
+            
+            # If no specific incidents found, create a general activity record
+            if not incidents_found:
+                incidents_found.append({**base_record, 'incident_type': 'general_activity', 'incident_count': 1})
+            
+            stored_records.extend(incidents_found)
+        
+        # Store all records in Supabase
+        if stored_records:
+            response = supabase.table("duty_report_incidents").insert(stored_records).execute()
+            
+            if response.data:
+                return {
+                    "success": True, 
+                    "message": f"Stored {len(stored_records)} incident records from {len(selected_forms)} duty reports",
+                    "records_stored": len(stored_records),
+                    "reports_processed": len(selected_forms)
+                }
+            else:
+                return {"success": False, "message": "Failed to store records in database"}
+        else:
+            return {"success": False, "message": "No incident records generated"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error storing duty report data: {str(e)}"}
+
+def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None):
+    """Save a duty analysis report to the database for permanent storage"""
+    try:
+        # Determine report type
+        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        
+        # Handle date conversions for database storage
+        start_date = analysis_data['filter_info']['start_date']
+        end_date = analysis_data['filter_info']['end_date']
+        
+        # Convert to ISO format strings if they're date objects
+        if hasattr(start_date, 'isoformat'):
+            start_date = start_date.isoformat()
+        if hasattr(end_date, 'isoformat'):
+            end_date = end_date.isoformat()
+        
+        # Prepare data for saving
+        save_data = {
+            'week_ending_date': week_ending_date,
+            'report_type': report_type,
+            'date_range_start': start_date,
+            'date_range_end': end_date,
+            'reports_analyzed': len(analysis_data['selected_forms']),
+            'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
+            'analysis_text': analysis_data['summary'],
+            'created_by': created_by_user_id,
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        # Use upsert to handle duplicates (overwrite existing)
+        response = supabase.table("saved_duty_analyses").upsert(
+            save_data, 
+            on_conflict="week_ending_date, created_by, report_type"
+        ).execute()
+        
+        if response.data:
+            return {
+                "success": True, 
+                "message": f"Duty analysis saved for week ending {week_ending_date}",
+                "saved_id": response.data[0]['id']
+            }
+        else:
+            return {"success": False, "message": "Failed to save duty analysis"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error saving duty analysis: {str(e)}"}
+
+def save_staff_recognition(recognition_data, week_ending_date, created_by_user_id=None):
+    """Save a staff recognition report to the database for permanent storage"""
+    try:
+        # Extract recognition components
+        ascend_rec = recognition_data.get("ascend_recognition", {})
+        north_rec = recognition_data.get("north_recognition", {})
+        
+        # Create formatted recognition text
+        recognition_text = f"""# Weekly Staff Recognition Report
+
+**Week Ending:** {week_ending_date}
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## 🌟 ASCEND Recognition
+"""
+        
+        if ascend_rec:
+            recognition_text += f"""**Recipient:** {ascend_rec.get('staff_member', 'Unknown')}
+**Category:** {ascend_rec.get('category', 'Unknown')}
+**Performance Score:** {ascend_rec.get('score', 0)}/10
+**Reasoning:** {ascend_rec.get('reasoning', 'No reasoning provided')}
+
+"""
+        else:
+            recognition_text += "No ASCEND recognition awarded this week.\n\n"
+        
+        recognition_text += """## 🧭 NORTH Recognition
+"""
+        
+        if north_rec:
+            recognition_text += f"""**Recipient:** {north_rec.get('staff_member', 'Unknown')}
+**Category:** {north_rec.get('category', 'Unknown')}
+**Performance Score:** {north_rec.get('score', 0)}/10
+**Reasoning:** {north_rec.get('reasoning', 'No reasoning provided')}
+
+"""
+        else:
+            recognition_text += "No NORTH recognition awarded this week.\n\n"
+        
+        recognition_text += """---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Staff Recognition System"""
+        
+        # Prepare data for saving
+        save_data = {
+            'week_ending_date': week_ending_date,
+            'ascend_recognition': json.dumps(ascend_rec) if ascend_rec else None,
+            'north_recognition': json.dumps(north_rec) if north_rec else None,
+            'recognition_text': recognition_text,
+            'created_by': created_by_user_id,
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        # Use upsert to handle duplicates (overwrite existing)
+        response = supabase.table("saved_staff_recognition").upsert(
+            save_data, 
+            on_conflict="week_ending_date, created_by"
+        ).execute()
+        
+        if response.data:
+            return {
+                "success": True, 
+                "message": f"Staff recognition saved for week ending {week_ending_date}",
+                "saved_id": response.data[0]['id']
+            }
+        else:
+            return {"success": False, "message": "Failed to save staff recognition"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error saving staff recognition: {str(e)}"}
+
+def replace_duty_report_data(selected_forms, start_date, end_date, generated_by_user_id=None):
+    """Replace existing duty report data for the same analysis period"""
+    if not selected_forms:
+        return {"success": False, "message": "No duty reports to store"}
+    
+    try:
+        # Delete existing records for this analysis period
+        delete_query = supabase.table("duty_report_incidents").delete().eq("date_range_start", start_date.isoformat()).eq("date_range_end", end_date.isoformat())
+        
+        if generated_by_user_id:
+            delete_query = delete_query.eq("generated_by_user_id", generated_by_user_id)
+        
+        delete_response = delete_query.execute()
+        
+        # Now store the new data using the original function logic
+        stored_records = []
+        
+        for form in selected_forms:
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            form_name = form.get('form_template_name', 'Unknown Form')
+            
+            # Parse date
+            report_date = None
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    report_date = form_datetime.date()
+                except:
+                    report_date = None
+            
+            # Extract hall/building info
+            hall_name = "Unknown Hall"
+            responses = current_revision.get('responses', [])
+            
+            # First pass: find hall/building
+            for response in responses:
+                field_label = response.get('field_label', '').lower()
+                field_response = str(response.get('response', '')).strip()
+                
+                if any(word in field_label for word in ['building', 'hall', 'location', 'area']):
+                    if field_response and field_response not in ['None', '']:
+                        hall_name = field_response
+                        break
+            
+            # Second pass: extract incidents and create records
+            report_text = ""
+            for response in responses:
+                field_response = str(response.get('response', '')).strip().lower()
+                report_text += field_response + " "
+            
+            # Create base record for this duty report
+            base_record = {
+                'report_date': report_date.isoformat() if report_date else None,
+                'hall_name': hall_name,
+                'staff_author': author,
+                'form_type': form_name,
+                'generated_by_user_id': generated_by_user_id,
+                'created_at': datetime.now().isoformat(),
+                'date_range_start': start_date.isoformat(),
+                'date_range_end': end_date.isoformat()
+            }
+            
+            # Create incident records based on detected patterns
+            incidents_found = []
+            
+            if any(word in report_text for word in ['lockout', 'locked out', 'key']):
+                incidents_found.append({**base_record, 'incident_type': 'lockout', 'incident_count': 1})
+            
+            if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
+                incidents_found.append({**base_record, 'incident_type': 'maintenance', 'incident_count': 1})
+            
+            if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
+                incidents_found.append({**base_record, 'incident_type': 'policy_violation', 'incident_count': 1})
+            
+            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
+                incidents_found.append({**base_record, 'incident_type': 'safety_concern', 'incident_count': 1})
+            
+            # If no specific incidents found, create a general activity record
+            if not incidents_found:
+                incidents_found.append({**base_record, 'incident_type': 'general_activity', 'incident_count': 1})
+            
+            stored_records.extend(incidents_found)
+        
+        # Store all new records in Supabase
+        if stored_records:
+            response = supabase.table("duty_report_incidents").insert(stored_records).execute()
+            
+            if response.data:
+                return {
+                    "success": True, 
+                    "message": f"Replaced data: stored {len(stored_records)} incident records from {len(selected_forms)} duty reports",
+                    "records_stored": len(stored_records),
+                    "reports_processed": len(selected_forms),
+                    "operation": "replaced"
+                }
+            else:
+                return {"success": False, "message": "Failed to store new records in database"}
+        else:
+            return {"success": False, "message": "No incident records generated"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error replacing duty report data: {str(e)}"}
+
+def get_historical_duty_data(start_date=None, end_date=None, halls=None, incident_types=None):
+    """Retrieve historical duty report data for graphing and analysis"""
+    try:
+        query = supabase.table("duty_report_incidents").select("*")
+        
+        if start_date:
+            query = query.gte("report_date", start_date.isoformat())
+        if end_date:
+            query = query.lte("report_date", end_date.isoformat())
+        if halls:
+            query = query.in_("hall_name", halls)
+        if incident_types:
+            query = query.in_("incident_type", incident_types)
+        
+        response = query.order("report_date", desc=False).execute()
+        
+        return {"success": True, "data": response.data}
+        
+    except Exception as e:
+        return {"success": False, "message": f"Error retrieving historical data: {str(e)}"}
+
+def create_incident_graphs(start_date, end_date, halls=None, incident_types=None):
+    """Create graphs from historical duty report data"""
+    try:
+        # Get historical data
+        data_result = get_historical_duty_data(start_date, end_date, halls, incident_types)
+        
+        if not data_result["success"]:
+            return {"success": False, "message": data_result["message"]}
+        
+        incidents = data_result["data"]
+        
+        if not incidents:
+            return {"success": False, "message": "No historical data found for the specified criteria"}
+        
+        # Convert to DataFrame for easy analysis
+        import pandas as pd
+        df = pd.DataFrame(incidents)
+        df['report_date'] = pd.to_datetime(df['report_date'])
+        
+        # Create summary statistics
+        summary = {
+            "total_incidents": len(incidents),
+            "date_range": f"{start_date} to {end_date}",
+            "halls_covered": df['hall_name'].nunique(),
+            "incident_types": df['incident_type'].nunique(),
+            "by_hall": df.groupby('hall_name')['incident_count'].sum().to_dict(),
+            "by_type": df.groupby('incident_type')['incident_count'].sum().to_dict(),
+            "by_date": df.groupby(df['report_date'].dt.date)['incident_count'].sum().to_dict()
+        }
+        
+        return {"success": True, "data": incidents, "summary": summary, "dataframe": df}
+        
+    except Exception as e:
+        return {"success": False, "message": f"Error creating graphs: {str(e)}"}
+
+def create_duty_report_summary(selected_forms, start_date, end_date):
+    """Create a standard comprehensive duty report analysis"""
+    if not selected_forms:
+        return "No duty reports selected for analysis."
+    
+    try:
+        # Prepare duty report data for AI analysis
+        reports_text = f"\n=== DUTY REPORTS ANALYSIS ===\n"
+        reports_text += f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
+        reports_text += f"Total Reports: {len(selected_forms)}\n\n"
+        
+        for i, form in enumerate(selected_forms, 1):
+            current_revision = form.get('current_revision', {})
+            form_name = form.get('form_template_name', 'Unknown Form')
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', 'Unknown date')
+            
+            reports_text += f"\n--- REPORT {i}: {form_name} ---\n"
+            reports_text += f"Staff: {author}\n"
+            reports_text += f"Date: {date_str}\n\n"
+            
+            # Process responses
+            responses = current_revision.get('responses', [])
+            for response in responses:
+                field_label = response.get('field_label', 'Unknown Field')
+                field_response = response.get('response', '')
+                
+                if field_response and str(field_response).strip():
+                    reports_text += f"**{field_label}:** {field_response}\n"
+            
+            reports_text += "\n" + "="*50 + "\n"
+        
+        # Create comprehensive duty report AI prompt
+        prompt = f"""
+You are a senior residence life administrator analyzing duty reports for supervisory insights. Provide a comprehensive analysis that covers:
+
+1. **EXECUTIVE SUMMARY**
+   - Overview of reporting period and scope
+   - Key findings and trends identified
+   - Overall staff performance assessment
+
+2. **INCIDENT ANALYSIS**
+   - Categorized breakdown of all incidents reported
+   - Severity assessment and patterns identified
+   - Safety and security concerns highlighted
+
+3. **OPERATIONAL INSIGHTS**
+   - Staff response effectiveness and timeliness
+   - Policy compliance observations
+   - Training or procedural recommendations
+
+4. **FACILITY & MAINTENANCE TRENDS**
+   - Recurring facility issues requiring attention
+   - Maintenance response effectiveness
+   - Preventive action recommendations
+
+5. **SUPERVISORY RECOMMENDATIONS**
+   - Immediate action items requiring administrative follow-up
+   - Staff development opportunities identified
+   - Policy or procedural improvements suggested
+
+6. **COMMUNITY IMPACT ASSESSMENT**
+   - Resident satisfaction and engagement indicators
+   - Community standards enforcement patterns
+   - Educational programming opportunities identified
+
+Provide specific examples and data-driven insights while maintaining appropriate confidentiality. Focus on actionable recommendations for residence life leadership.
+
+DUTY REPORTS DATA:
+{reports_text}
+
+Please provide a comprehensive supervisory analysis:
+"""
+
+        # Use Gemini 2.5 Flash for better quota efficiency  
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
+            result = model.generate_content(prompt)
+            return result.text
+            
+    except Exception as e:
+        return f"Error generating duty report summary: {str(e)}"
+
 # --- User Authentication & Profile Functions ---
 def login_form():
     st.header("Login")
@@ -328,7 +2297,7 @@ def submit_and_edit_page():
             status = (report.get("status") or "draft").capitalize()
             with st.expander(f"Report for week ending {report.get('week_ending_date','Unknown')} (Status: {status})"):
                 if report.get("individual_summary"):
-                    st.info(f"**Your AI-Generated Summary:**\n\n{report.get('individual_summary')}")
+                    st.info(f"**Your AI-Generated Summary:**\n\n{clean_summary_response(report.get('individual_summary'))}")
                 report_body = report.get("report_body") or {}
                 for section_key, section_name in CORE_SECTIONS.items():
                     section_data = report_body.get(section_key)
@@ -1193,7 +3162,7 @@ def dashboard_page(supervisor_mode=False):
     button_text = "Generate Weekly Summary Report"
     if selected_date_for_summary in saved_summaries:
         st.info("A summary for this week already exists. Generating a new one will overwrite it.")
-        with st.expander("View existing saved summary"): st.markdown(saved_summaries[selected_date_for_summary])
+        with st.expander("View existing saved summary"): st.markdown(clean_summary_response(saved_summaries[selected_date_for_summary]))
         button_text = "🔄 Regenerate Weekly Summary"
     if st.button(button_text):
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
@@ -1256,43 +3225,145 @@ def dashboard_page(supervisor_mode=False):
 - **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
 """
 
+                    # Check for saved weekly duty reports to integrate
+                    duty_reports_section = ""
+                    if 'weekly_duty_reports' in st.session_state and st.session_state['weekly_duty_reports']:
+                        st.info("🛡️ **Including Weekly Duty Reports:** Found saved duty analysis reports to integrate into this summary.")
+                        duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
+                        for i, duty_report in enumerate(st.session_state['weekly_duty_reports'], 1):
+                            duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
+                            duty_reports_section += f"Generated: {duty_report['date_generated']}\n"
+                            duty_reports_section += f"Date Range: {duty_report['date_range']}\n"
+                            duty_reports_section += f"Reports Analyzed: {duty_report['reports_analyzed']}\n\n"
+                            duty_reports_section += duty_report['summary']
+                            duty_reports_section += "\n" + "="*50 + "\n"
+
                     # Unified prompt for both Admin and Supervisor summaries:
                     prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
 
+IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
+
+DATA SOURCES AVAILABLE:
+1. Weekly staff reports from residence life team members
+2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
+
 The report MUST contain the following sections, in this order, using markdown headings exactly as shown:
- 1.  **Executive Summary**: A 2-3 sentence high-level overview of the week's key takeaways.
- 2.  **ASCEND Framework Summary**: Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name.
- 3.  **Guiding NORTH Pillars Summary**: Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name.
- 4.  **UND LEADS Summary**: Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names:
-   - **Learning**: Professional development, training, skill building, educational initiatives, mentoring
-   - **Equity**: Diversity initiatives, inclusive practices, accessibility improvements, fair treatment efforts
-   - **Affinity**: Community building, relationship development, team cohesion, campus connections
-   - **Discovery**: Research, innovation, new approaches, creative problem-solving, exploration of best practices
-   - **Service**: Community service, helping others, volunteer work, supporting university initiatives
- 5.  **Overall Staff Well-being**: Start by stating, "The average well-being score for the week was {average_score} out of 5." Provide a 1-2 sentence qualitative summary and a subsection `#### Staff to Connect With` listing staff who reported low scores or concerning comments, with a brief reason.
- 6.  **Campus Events Summary**: Create a markdown table with the exact format below:
-   
-   | Event/Committee | Date | Attendees | Alignment |
-   |-----------------|------|-----------|-----------|
-   | Event Name | YYYY-MM-DD | Staff Member Name | ASCEND: Category, NORTH: Category |
-   
-   Include all campus events and committee meetings attended by staff this week. Group multiple attendees for the same event in one row.
- 7.  **For the Director's Attention**: A clear list of items that require director-level attention; mention the staff member who raised each item. If none, state "No specific concerns were raised for the Director this week."
- 8.  **Key Challenges**: Bullet-point summary of significant or recurring challenges reported by staff, noting who reported them where relevant.
- 9.  **Upcoming Projects & Initiatives**: Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
+
+## Executive Summary
+A 2-3 sentence high-level overview of the week's key takeaways.
+
+## ASCEND Framework Summary
+Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name.
+
+### Accountability
+[Include relevant staff activities and names]
+
+### Service
+[Include relevant staff activities and names]
+
+### Community
+[Include relevant staff activities and names]
+
+### Excellence
+[Include relevant staff activities and names]
+
+### Nurture
+[Include relevant staff activities and names]
+
+### Development
+[Include relevant staff activities and names]
+
+## Guiding NORTH Pillars Summary
+Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name.
+
+## UND LEADS Summary
+Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names:
+
+### Learning
+Professional development, training, skill building, educational initiatives, mentoring
+
+### Equity
+Diversity initiatives, inclusive practices, accessibility improvements, fair treatment efforts
+
+### Affinity
+Community building, relationship development, team cohesion, campus connections
+
+### Discovery
+Research, innovation, new approaches, creative problem-solving, exploration of best practices
+
+### Service
+Community service, helping others, volunteer work, supporting university initiatives
+
+## Overall Staff Well-being
+Start by stating, "The average well-being score for the week was {average_score} out of 5." Provide a 1-2 sentence qualitative summary and include a subsection.
+
+### Staff to Connect With
+List staff who reported low scores or concerning comments, with a brief reason.
+
+## Campus Events Summary
+Create a markdown table with the exact format below:
+
+| Event/Committee | Date | Attendees | Alignment |
+|-----------------|------|-----------|-----------|
+| Event Name | YYYY-MM-DD | Staff Member Name | ASCEND: Category, NORTH: Category |
+
+Include all campus events and committee meetings attended by staff this week. Group multiple attendees for the same event in one row.
+
+## For the Director's Attention
+A clear list of items that require director-level attention; mention the staff member who raised each item. If none, state "No specific concerns were raised for the Director this week."
+
+## Key Challenges
+Bullet-point summary of significant or recurring challenges reported by staff, noting who reported them where relevant.
+
+## Operational & Safety Summary
+If duty reports data is available, create this section with:
+
+### Quantitative Metrics
+Create a hall-by-hall breakdown table using this exact format:
+
+| Hall/Building | Total Reports | Lockouts | Maintenance | Policy Violations | Safety Concerns | Staff Responses |
+|---------------|---------------|----------|-------------|-------------------|-----------------|-----------------|
+| Hall Name | # | # | # | # | # | # |
+
+Include summary totals row at the bottom.
+
+### Trending Issues
+Bullet-point summary of patterns in lockouts, maintenance requests, policy violations based on the quantitative data above.
+
+### Staff Response Effectiveness  
+Assessment of duty staff performance and response times based on staff response data.
+
+### Safety & Security Highlights
+Critical incidents and follow-up actions needed based on safety concerns identified.
+
+## Upcoming Projects & Initiatives
+Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
  
- Additional instructions:
- - Use markdown headings and subheadings exactly as listed above.
- - When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...").
- - For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement).
- - Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets.
- - Ensure every staff member's activities are analyzed for UND LEADS alignment - do not leave this section empty.
-Here is the raw report data from all reports for the week, which includes the names of each team member and their categorized activities: {reports_text}
+CRITICAL FORMATTING REQUIREMENTS:
+- Use EXACTLY the markdown headings shown above (## for main sections, ### for subsections)
+- Follow the section structure precisely - do not skip sections or change the order
+- When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...")
+- For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement)
+- Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets
+- Ensure every staff member's activities are analyzed for UND LEADS alignment - do not leave this section empty
+- CREATE PROPER MARKDOWN TABLES: Use exact table formats shown, ensure proper alignment with | symbols
+- If duty reports data is provided, create the Quantitative Metrics table using the hall-by-hall data provided, including totals row
+- For Campus Events and Operational & Safety tables: follow exact column structures and formatting shown
+Here is the raw report data from all reports for the week, which includes the names of each team member and their categorized activities:
+
+STAFF REPORTS DATA:
+{reports_text}
+
+{duty_reports_section}
 """
                     model = genai.GenerativeModel("models/gemini-2.5-pro")
                     ai_response = model.generate_content(prompt)
-                    st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": ai_response.text}; st.rerun()
+                    
+                    # Clean up the response by removing unwanted intro text
+                    cleaned_text = clean_summary_response(ai_response.text)
+                    
+                    st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}; st.rerun()
             except Exception as e:
                 st.error(f"An error occurred while generating the summary: {e}")
 
@@ -1370,6 +3441,75 @@ Here is the raw report data from all reports for the week, which includes the na
                         st.success(f"**{north_rec.get('staff_member')}** - {north_rec.get('category')}")
                         st.write(f"**Reasoning:** {north_rec.get('reasoning')}")
                         st.metric("Performance Score", f"{north_rec.get('score', 0)}/10")
+                
+                # Add save and download options for staff recognition
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Create download data for staff recognition
+                    recognition_download_data = f"""# Weekly Staff Recognition Report
+
+**Week Ending:** {selected_date_for_summary}
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## 🌟 ASCEND Recognition
+"""
+                    if ascend_rec:
+                        recognition_download_data += f"""**Recipient:** {ascend_rec.get('staff_member', 'Unknown')}
+**Category:** {ascend_rec.get('category', 'Unknown')}
+**Performance Score:** {ascend_rec.get('score', 0)}/10
+**Reasoning:** {ascend_rec.get('reasoning', 'No reasoning provided')}
+
+"""
+                    else:
+                        recognition_download_data += "No ASCEND recognition awarded this week.\n\n"
+                    
+                    recognition_download_data += """## 🧭 NORTH Recognition
+"""
+                    if north_rec:
+                        recognition_download_data += f"""**Recipient:** {north_rec.get('staff_member', 'Unknown')}
+**Category:** {north_rec.get('category', 'Unknown')}
+**Performance Score:** {north_rec.get('score', 0)}/10
+**Reasoning:** {north_rec.get('reasoning', 'No reasoning provided')}
+
+"""
+                    else:
+                        recognition_download_data += "No NORTH recognition awarded this week.\n\n"
+                    
+                    recognition_download_data += """---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Staff Recognition System"""
+                    
+                    st.download_button(
+                        label="📄 Download Recognition",
+                        data=recognition_download_data,
+                        file_name=f"staff_recognition_{selected_date_for_summary}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help="Download the staff recognition report as a markdown file",
+                        key="download_staff_recognition"
+                    )
+                
+                with col2:
+                    # Save staff recognition button
+                    if st.button("💾 Save Recognition", type="primary", key="save_staff_recognition", 
+                               help="Save this staff recognition report to the database for permanent access"):
+                        
+                        user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                        
+                        with st.spinner("Saving staff recognition..."):
+                            save_result = save_staff_recognition(recognition_data["data"], selected_date_for_summary, user_id)
+                        
+                        if save_result["success"]:
+                            st.success(f"✅ {save_result['message']}")
+                        else:
+                            st.error(f"❌ Save failed: {save_result['message']}")
+                
+                with col3:
+                    # Clear recognition button
+                    if st.button("🗑️ Clear Recognition", type="secondary", key="clear_staff_recognition", 
+                               help="Clear the displayed recognition results"):
+                        del st.session_state['staff_recognition']
+                        st.rerun()
 
 @st.cache_data
 def load_rubrics():
@@ -1466,15 +3606,1243 @@ def supervisor_summaries_page():
             return
         for s in summaries:
             with st.expander(f"Week Ending {s['week_ending_date']} — Saved {s['created_at']}"):
-                st.markdown(s['summary_text'])
+                st.markdown(clean_summary_response(s['summary_text']))
     except Exception as e:
         st.error(f"Failed to fetch supervisor summaries: {e}")
+
+def supervisors_section_page():
+    """Page for supervisors to view and analyze Roompact form submissions"""
+    st.title("📋 Supervisors Section - Form Analysis")
+    st.markdown("""
+    This section provides two specialized analysis tools for reviewing Roompact form submissions 
+    and generating AI-powered summaries with actionable insights.
+    """)
+    
+    # Create tabs for the two analysis sections
+    tab1, tab2 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis"])
+    
+    with tab1:
+        duty_analysis_section()
+    
+    with tab2:
+        general_form_analysis_section()
+
+def duty_analysis_section():
+    """Specialized section for duty report analysis"""
+    st.subheader("🛡️ Duty Analysis")
+    st.markdown("""
+    **Focus:** Analyze specific duty reports from Resident Assistants, Community Assistants, RDs, and RMs.  
+    **Purpose:** Monitor daily operations, incidents, and staff performance during duty shifts.
+    """)
+    
+    # Predefined duty form types
+    DUTY_FORM_TYPES = [
+        "Resident Assistant Duty Report",
+        "Community Assistant Duty Report", 
+        "RD Duty Report",
+        "RM Duty Report"
+    ]
+    
+    # Date range selection for duty analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        duty_start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=30),
+            help="Analyze duty reports from this date forward",
+            key="duty_start_date"
+        )
+    
+    with col2:
+        duty_end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Analyze duty reports up to this date",
+            key="duty_end_date"
+        )
+    
+    st.info(f"📊 **Target Analysis:** {', '.join(DUTY_FORM_TYPES)} from {duty_start_date} to {duty_end_date}")
+    
+    # Fetch duty reports button
+    if st.button("🔄 Fetch Duty Reports", type="primary", key="fetch_duty_reports"):
+        with st.spinner("Fetching duty reports from Roompact..."):
+            # Calculate page limit based on realistic data patterns
+            # Assumption: ~10 duty reports per day, ~10 forms per API page
+            # For historical data, we need aggressive page limits to reach back far enough
+            days_back = (datetime.now().date() - duty_start_date).days
+            
+            # Use generous page limits based on date range (always ensure sufficient pages)
+            if days_back > 90:
+                max_pages = 1000  # 3+ months - maximum pages
+            elif days_back > 60:
+                max_pages = 800   # 2+ months - high page limit
+            elif days_back > 30:
+                max_pages = 600   # 1+ months - moderate page limit  
+            elif days_back > 14:
+                max_pages = 400   # 2+ weeks - sufficient pages
+            else:
+                max_pages = 200   # Recent data - conservative but adequate
+            
+            st.info(f"📊 Searching up to {max_pages} pages for duty reports going back {days_back} days to {duty_start_date}")
+            st.info(f"📈 **Estimate:** ~{days_back * 10} duty reports expected (10 per day × {days_back} days)")
+            
+            # Show expanded search warning for very old dates
+            if days_back > 30:
+                minutes_estimate = max(2, days_back // 20)  # Rough estimate: 1 minute per 20 days
+                st.warning(f"⏳ **Extended Search:** Searching {max_pages} pages may take {minutes_estimate}-{minutes_estimate + 1} minutes to complete.")
+            
+            progress_placeholder = st.empty()
+            
+            def show_duty_progress(page_num, total_forms, oldest_date, reached_target):
+                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                if oldest_date != "Unknown":
+                    status += f" | Oldest: {oldest_date}"
+                if reached_target:
+                    status += f" | ✅ Reached {duty_start_date}"
+                progress_placeholder.info(status)
+            
+            all_forms, error = fetch_roompact_forms(
+                max_pages=max_pages,
+                target_start_date=duty_start_date,
+                progress_callback=show_duty_progress
+            )
+            
+            if error:
+                st.error(error)
+                return
+            
+            if not all_forms:
+                st.warning("No forms found.")
+                return
+            
+            # Filter for duty reports only
+            duty_forms, filter_error = filter_forms_by_date_and_type(
+                all_forms, duty_start_date, duty_end_date, DUTY_FORM_TYPES
+            )
+            
+            if filter_error:
+                st.error(f"Error filtering duty reports: {filter_error}")
+                return
+            
+            # Show actual date range of retrieved forms
+            if all_forms:
+                form_dates = []
+                for form in all_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_dates.append(form_datetime)
+                        except:
+                            pass
+                
+                if form_dates:
+                    oldest_retrieved = min(form_dates).strftime('%Y-%m-%d')
+                    newest_retrieved = max(form_dates).strftime('%Y-%m-%d')
+                    st.info(f"📅 **Retrieved data range:** {oldest_retrieved} to {newest_retrieved}")
+                    
+                    if datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() > duty_start_date:
+                        days_missing = (datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() - duty_start_date).days
+                        st.warning(f"⚠️ **Missing {days_missing} days of data** - oldest form found is {oldest_retrieved}, but you requested back to {duty_start_date}")
+            
+            # Store duty forms in session state
+            st.session_state['duty_forms'] = duty_forms
+            st.session_state['duty_filter_info'] = {
+                'start_date': duty_start_date,
+                'end_date': duty_end_date,
+                'form_types': DUTY_FORM_TYPES,
+                'total_fetched': len(all_forms),
+                'filtered_count': len(duty_forms)
+            }
+            
+            if duty_forms:
+                st.success(f"✅ Found {len(duty_forms)} duty reports (from {len(all_forms)} total forms)")
+            else:
+                st.warning(f"No duty reports found in the date range {duty_start_date} to {duty_end_date}")
+    
+    # Display duty reports if available
+    if 'duty_forms' in st.session_state and st.session_state['duty_forms']:
+        duty_forms = st.session_state['duty_forms']
+        filter_info = st.session_state.get('duty_filter_info', {})
+        
+        st.subheader(f"🛡️ Duty Reports Found ({len(duty_forms)} reports)")
+        
+        # Show filter summary
+        if filter_info:
+            st.info(f"""
+            📊 **Analysis Ready:** {filter_info['filtered_count']} duty reports (from {filter_info['total_fetched']} total forms)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Report Types:** {', '.join(DUTY_FORM_TYPES)}
+            """)
+        
+        # Form selection and analysis
+        col_select, col_analyze = st.columns([2, 1])
+        
+        with col_select:
+            st.markdown("**Select duty reports to analyze:**")
+            
+            # Group duty reports by type
+            duty_by_type = {}
+            for form in duty_forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name not in duty_by_type:
+                    duty_by_type[template_name] = []
+                duty_by_type[template_name].append(form)
+            
+            selected_duty_forms = []
+            
+            for form_type, type_forms in duty_by_type.items():
+                st.markdown(f"**{form_type}** ({len(type_forms)} reports)")
+                
+                # Select all checkbox for this type
+                select_all_key = f"select_all_duty_{form_type.replace(' ', '_')}"
+                if st.checkbox(f"Select all {form_type}", key=select_all_key):
+                    selected_duty_forms.extend(type_forms)
+                else:
+                    # Individual report checkboxes (show first 15 per type)
+                    for i, form in enumerate(type_forms[:15]):
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Format date for display
+                        try:
+                            if date_str:
+                                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                display_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                display_date = 'Unknown date'
+                        except:
+                            display_date = date_str or 'Unknown date'
+                        
+                        form_key = f"duty_form_{form_type}_{i}"
+                        if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
+                            selected_duty_forms.append(form)
+                
+                st.write("---")
+        
+        with col_analyze:
+            st.markdown("**Analysis Options:**")
+            
+            # Report type selection
+            report_type = st.radio(
+                "Report Type:",
+                ["📊 Standard Analysis", "📅 Weekly Summary Report"],
+                help="Choose between comprehensive analysis or weekly admin summary format"
+            )
+            
+            max_duty_forms = st.slider("Max reports to analyze", 
+                                min_value=1, 
+                                max_value=1000, 
+                                value=500,
+                                help="Set high limit to analyze all reports (AI can handle large datasets)",
+                                key="max_duty_forms")
+            
+            if len(selected_duty_forms) > 0:
+                st.success(f"✅ {len(selected_duty_forms)} duty reports selected")
+                
+                # Show helpful message for large datasets
+                if len(selected_duty_forms) > 100:
+                    st.info(f"💪 **Large Dataset Ready:** You can analyze all {len(selected_duty_forms)} reports! Set the slider to {len(selected_duty_forms)} or higher.")
+                
+                if st.button("🤖 Generate Duty Analysis", type="primary", key="analyze_duty"):
+                    reports_to_analyze = min(len(selected_duty_forms), max_duty_forms)
+                    
+                    if reports_to_analyze > 100:
+                        st.info(f"📊 **Large Dataset Processing:** Analyzing {reports_to_analyze} reports...")
+                        st.info("💡 **Batch Processing:** For very large datasets, reports are processed in manageable chunks to respect API limits.")
+                    
+                    if len(selected_duty_forms) > max_duty_forms:
+                        st.warning(f"⚠️ Analyzing first {max_duty_forms} of {len(selected_duty_forms)} selected reports.")
+                    
+                    # Choose analysis type based on selection
+                    if report_type == "📅 Weekly Summary Report":
+                        summary = create_weekly_duty_report_summary(
+                            selected_duty_forms[:max_duty_forms], 
+                            filter_info['start_date'], 
+                            filter_info['end_date']
+                        )
+                        report_label = "Weekly Duty Summary"
+                        file_prefix = "weekly_duty_summary"
+                        
+                        # Immediately store weekly report in session state for admin integration
+                        if 'weekly_duty_reports' not in st.session_state:
+                            st.session_state['weekly_duty_reports'] = []
+                        
+                        weekly_report_data = {
+                            'date_generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'date_range': f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}",
+                            'reports_analyzed': min(len(selected_duty_forms), max_duty_forms),
+                            'total_selected': len(selected_duty_forms),
+                            'summary': summary
+                        }
+                        
+                        st.session_state['weekly_duty_reports'].append(weekly_report_data)
+                        
+                    else:
+                        summary = create_duty_report_summary(
+                            selected_duty_forms[:max_duty_forms], 
+                            filter_info['start_date'], 
+                            filter_info['end_date']
+                        )
+                        report_label = "Duty Analysis"
+                        file_prefix = "duty_analysis"
+                    
+                    # Store the current analysis in session state to persist after button clicks
+                    st.session_state['last_duty_analysis'] = {
+                        'summary': summary,
+                        'report_label': report_label,
+                        'file_prefix': file_prefix,
+                        'report_type': report_type,
+                        'selected_forms': selected_duty_forms[:max_duty_forms],
+                        'filter_info': filter_info,
+                        'max_forms': max_duty_forms,
+                        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    
+                    # Display results
+                    st.subheader(f"📊 {report_label} Results")
+                    st.markdown(summary)
+                    
+                    # Historical Data Storage Option
+                    st.markdown("---")
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        st.markdown("**📈 Historical Data Storage**")
+                        st.info("Store incident data for historical analysis, trending, and graphing by hall, incident type, and date.")
+                    
+                    with col2:
+                        # Get current user ID if available
+                        user_id = None
+                        if 'user' in st.session_state and st.session_state['user']:
+                            user_id = st.session_state['user'].id
+                        
+                        # Store new data button
+                        if st.button("💾 Store Data", type="secondary", key="store_duty_data", 
+                                   help="Store individual incident records in database for future analysis and graphing"):
+                            
+                            with st.spinner("Checking for existing data..."):
+                                storage_result = store_duty_report_data(
+                                    selected_duty_forms[:max_duty_forms],
+                                    filter_info['start_date'],
+                                    filter_info['end_date'],
+                                    user_id
+                                )
+                            
+                            if storage_result["success"]:
+                                st.success(f"✅ {storage_result['message']}")
+                                st.info(f"📊 **Stored:** {storage_result.get('records_stored', 0)} incident records from {storage_result.get('reports_processed', 0)} reports")
+                            elif storage_result.get("duplicate_detected"):
+                                st.warning(f"⚠️ {storage_result['message']}")
+                                st.info(f"📊 Found {storage_result.get('existing_count', 0)} existing records for this analysis period.")
+                            else:
+                                st.error(f"❌ Storage failed: {storage_result['message']}")
+                        
+                        # Replace existing data button (only show if duplicates might exist)
+                        if st.button("🔄 Replace Existing Data", type="secondary", key="replace_duty_data",
+                                   help="Delete existing records for this analysis period and store new data"):
+                            
+                            with st.spinner("Replacing existing incident data..."):
+                                replace_result = replace_duty_report_data(
+                                    selected_duty_forms[:max_duty_forms],
+                                    filter_info['start_date'],
+                                    filter_info['end_date'],
+                                    user_id
+                                )
+                            
+                            if replace_result["success"]:
+                                st.success(f"✅ {replace_result['message']}")
+                                st.info(f"📊 **Updated:** {replace_result.get('records_stored', 0)} incident records from {replace_result.get('reports_processed', 0)} reports")
+                            else:
+                                st.error(f"❌ Replacement failed: {replace_result['message']}")
+                    
+                    st.markdown("---")
+                    
+                    # Show success message for weekly reports (already saved above)
+                    if report_type == "📅 Weekly Summary Report":
+                        st.success("✅ **Weekly report saved!** This report is now available in the Admin Summary section for integration.")
+                    
+                    # Download option
+                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                    
+                    if report_type == "📅 Weekly Summary Report":
+                        summary_data = f"""# Weekly Duty Summary Report
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {min(len(selected_duty_forms), max_duty_forms)} of {len(selected_duty_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Weekly Duty Analysis
+Integration ready for Admin Weekly Summaries
+"""
+                    else:
+                        summary_data = f"""# Duty Reports Analysis Summary
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {min(len(selected_duty_forms), max_duty_forms)} of {len(selected_duty_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Duty Analysis Section
+"""
+                    
+                    st.download_button(
+                        label=f"📄 Download {report_label} Report",
+                        data=summary_data,
+                        file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help=f"Download the {report_label.lower()} as a markdown file",
+                        key="download_duty_analysis"
+                    )
+            else:
+                st.info("Select duty reports above to enable analysis")
+    
+    # Display previously generated analysis if available (persists after button clicks)
+    if 'last_duty_analysis' in st.session_state:
+        analysis_data = st.session_state['last_duty_analysis']
+        
+        st.markdown("---")
+        st.subheader("📋 Previously Generated Analysis")
+        st.info(f"**{analysis_data['report_label']}** generated at {analysis_data['generated_at']} | **{analysis_data['filter_info'].get('start_date', 'N/A')} to {analysis_data['filter_info'].get('end_date', 'N/A')}** | **{len(analysis_data['selected_forms'])} reports analyzed**")
+        
+        # Show the analysis in an expander to save space
+        with st.expander("📊 View Analysis Results", expanded=True):
+            st.markdown(analysis_data['summary'])
+        
+        # Recreate the storage and download options for the persisted analysis
+        st.markdown("**📈 Historical Data Storage**")
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.info("Store incident data from this analysis for historical trending and graphing.")
+        
+        with col2:
+            # Get current user ID if available
+            user_id = None
+            if 'user' in st.session_state and st.session_state['user']:
+                user_id = st.session_state['user'].id
+            
+            # Store new data button
+            if st.button("💾 Store Data", type="secondary", key="store_persisted_duty_data", 
+                       help="Store individual incident records from this analysis in database"):
+                
+                with st.spinner("Checking for existing data..."):
+                    storage_result = store_duty_report_data(
+                        analysis_data['selected_forms'],
+                        analysis_data['filter_info']['start_date'],
+                        analysis_data['filter_info']['end_date'],
+                        user_id
+                    )
+                
+                if storage_result["success"]:
+                    st.success(f"✅ {storage_result['message']}")
+                    st.info(f"📊 **Stored:** {storage_result.get('records_stored', 0)} incident records from {storage_result.get('reports_processed', 0)} reports")
+                elif storage_result.get("duplicate_detected"):
+                    st.warning(f"⚠️ {storage_result['message']}")
+                    st.info(f"📊 Found {storage_result.get('existing_count', 0)} existing records for this analysis period.")
+                else:
+                    st.error(f"❌ Storage failed: {storage_result['message']}")
+            
+            # Replace existing data button
+            if st.button("🔄 Replace Existing Data", type="secondary", key="replace_persisted_duty_data",
+                       help="Delete existing records for this analysis period and store new data"):
+                
+                with st.spinner("Replacing existing incident data..."):
+                    replace_result = replace_duty_report_data(
+                        analysis_data['selected_forms'],
+                        analysis_data['filter_info']['start_date'],
+                        analysis_data['filter_info']['end_date'],
+                        user_id
+                    )
+                
+                if replace_result["success"]:
+                    st.success(f"✅ {replace_result['message']}")
+                    st.info(f"📊 **Updated:** {replace_result.get('records_stored', 0)} incident records from {replace_result.get('reports_processed', 0)} reports")
+                else:
+                    st.error(f"❌ Replacement failed: {replace_result['message']}")
+        
+        # Download option for persisted analysis
+        date_range = f"{analysis_data['filter_info'].get('start_date', 'N/A')} to {analysis_data['filter_info'].get('end_date', 'N/A')}"
+        
+        if analysis_data['report_type'] == "📅 Weekly Summary Report":
+            summary_data = f"""# Weekly Duty Summary Report
+
+**Generated:** {analysis_data['generated_at']}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {len(analysis_data['selected_forms'])} selected  
+
+{analysis_data['summary']}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Weekly Duty Analysis
+Integration ready for Admin Weekly Summaries
+"""
+        else:
+            summary_data = f"""# Duty Reports Analysis Summary
+
+**Generated:** {analysis_data['generated_at']}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {len(analysis_data['selected_forms'])} selected  
+
+{analysis_data['summary']}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Duty Analysis Section
+"""
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.download_button(
+                label=f"📄 Download Report",
+                data=summary_data,
+                file_name=f"{analysis_data['file_prefix']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                mime="text/markdown",
+                help=f"Download the {analysis_data['report_label'].lower()} as a markdown file",
+                key="download_persisted_duty_analysis"
+            )
+        
+        with col2:
+            # Save analysis button
+            if st.button("💾 Save Analysis", type="primary", key="save_duty_analysis", 
+                       help="Save this analysis report to the database for permanent access"):
+                
+                # Calculate week ending date from the analysis date range
+                end_date = analysis_data['filter_info']['end_date']
+                
+                # Handle both date objects and strings
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                # Find the next Sunday (week ending date)
+                days_ahead = 6 - end_date.weekday()  # 6 = Sunday
+                if days_ahead < 0:  # Target day already happened this week
+                    days_ahead += 7
+                week_ending = end_date + timedelta(days=days_ahead)
+                
+                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                
+                with st.spinner("Saving duty analysis..."):
+                    save_result = save_duty_analysis(analysis_data, week_ending.isoformat(), user_id)
+                
+                if save_result["success"]:
+                    st.success(f"✅ {save_result['message']}")
+                else:
+                    st.error(f"❌ Save failed: {save_result['message']}")
+        
+        with col3:
+            # Clear analysis button
+            if st.button("🗑️ Clear Analysis", type="secondary", key="clear_duty_analysis", help="Clear the displayed analysis"):
+                del st.session_state['last_duty_analysis']
+                st.rerun()
+    
+    else:
+        st.info("👆 Click 'Fetch Duty Reports' to load reports from the four duty report types")
+
+def general_form_analysis_section():
+    """General form analysis section with form type discovery"""
+    st.subheader("📊 General Form Analysis")
+    st.markdown("""
+    **Focus:** Discover and analyze any form types from your Roompact system.  
+    **Purpose:** Flexible analysis tool for various form types beyond duty reports.
+    """)
+    
+    # Date range selection for general analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        general_start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=14),
+            help="Discover forms from this date forward",
+            key="general_start_date"
+        )
+    
+    with col2:
+        general_end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Discover forms up to this date",
+            key="general_end_date"
+        )
+    
+    # Form discovery section
+    st.subheader("🔍 Discover Available Forms")
+    
+    if st.button("🔄 Discover Forms", type="primary", key="discover_general_forms"):
+        # Calculate page limit for general forms (more forms than just duty reports)
+        days_back = (datetime.now().date() - general_start_date).days
+        
+        # Use generous page limits to ensure we reach historical data
+        if days_back > 90:
+            max_pages = 1200  # 3+ months - maximum pages for all form types
+        elif days_back > 60:
+            max_pages = 900   # 2+ months - high page limit
+        elif days_back > 30:
+            max_pages = 600   # 1+ months - moderate page limit  
+        elif days_back > 14:
+            max_pages = 400   # 2+ weeks - sufficient pages
+        else:
+            max_pages = 200   # Recent data - conservative but adequate
+        
+        st.info(f"🔍 Discovering forms (up to {max_pages} pages) going back {days_back} days to {general_start_date}")
+        st.info(f"📈 **Estimate:** ~{days_back * 15} total forms expected (15 per day × {days_back} days)")
+        
+        # Show extended search warning for very old dates
+        if days_back > 30:
+            minutes_estimate = max(2, days_back // 15)  # Rough estimate: 1 minute per 15 days
+            st.warning(f"⏳ **Extended Search:** Searching {max_pages} pages may take {minutes_estimate}-{minutes_estimate + 2} minutes to complete.")
+        
+        progress_placeholder = st.empty()
+        
+        def show_general_progress(page_num, total_forms, oldest_date, reached_target):
+            status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+            if oldest_date != "Unknown":
+                status += f" | Oldest: {oldest_date}" 
+            if reached_target:
+                status += f" | ✅ Reached {general_start_date}"
+            progress_placeholder.info(status)
+        
+        # Discover available form types
+        form_types_info = discover_form_types(
+            max_pages=max_pages,
+            target_start_date=general_start_date,
+            progress_callback=show_general_progress
+        )
+        
+        if form_types_info is None:
+            st.error("Failed to discover forms. Please check your API connection.")
+            return
+        
+        # Store discovered forms in session state
+        st.session_state['general_form_types'] = form_types_info
+        st.session_state['general_discovery_date'] = general_start_date
+        
+        if form_types_info:
+            st.success(f"✅ Discovered {len(form_types_info)} different form types")
+        else:
+            st.warning("No forms found in the specified date range")
+    
+    # Display discovered form types
+    if 'general_form_types' in st.session_state:
+        form_types_info = st.session_state['general_form_types']
+        discovery_date = st.session_state.get('general_discovery_date')
+        
+        st.subheader(f"📋 Available Form Types (since {discovery_date})")
+        
+        if form_types_info:
+            # Create multiselect for form type selection
+            form_type_options = []
+            form_type_details = {}
+            
+            for form_type, info in form_types_info.items():
+                count = info['count']
+                date_range = info['date_range']
+                option_label = f"{form_type} ({count} forms, {date_range})"
+                form_type_options.append(option_label)
+                form_type_details[option_label] = form_type
+            
+            selected_form_labels = st.multiselect(
+                "Select form types to analyze:",
+                form_type_options,
+                help="Choose which form types to include in your analysis",
+                key="selected_general_form_types"
+            )
+            
+            # Convert labels back to form type names
+            selected_form_types = [form_type_details[label] for label in selected_form_labels]
+            
+            if selected_form_types:
+                st.info(f"📊 **Selected for analysis:** {', '.join(selected_form_types)}")
+                
+                # Fetch forms button
+                if st.button("📥 Fetch Selected Forms", type="primary", key="fetch_general_forms"):
+                    with st.spinner("Fetching selected forms from Roompact..."):
+                        # Calculate page limit for fetching selected general forms
+                        days_back = (datetime.now().date() - general_start_date).days
+                        
+                        # Use same generous limits as discovery phase
+                        if days_back > 90:
+                            max_pages = 1200  # 3+ months
+                        elif days_back > 60:
+                            max_pages = 900   # 2+ months
+                        elif days_back > 30:
+                            max_pages = 600   # 1+ months  
+                        elif days_back > 14:
+                            max_pages = 400   # 2+ weeks
+                        else:
+                            max_pages = 200   # Recent data
+                        
+                        # Show extended search warning
+                        if days_back > 60:
+                            st.info(f"⏳ **Extended Search:** Going back {days_back} days requires searching up to {max_pages} pages. This may take 1-2 minutes.")
+                        
+                        progress_placeholder = st.empty()
+                        
+                        def show_fetch_progress(page_num, total_forms, oldest_date, reached_target):
+                            status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                            if oldest_date != "Unknown":
+                                status += f" | Oldest: {oldest_date}"
+                            if reached_target:
+                                status += f" | ✅ Reached {general_start_date}"
+                            progress_placeholder.info(status)
+                        
+                        all_forms, error = fetch_roompact_forms(
+                            max_pages=max_pages,
+                            target_start_date=general_start_date,
+                            progress_callback=show_fetch_progress
+                        )
+                        
+                        if error:
+                            st.error(error)
+                            return
+                        
+                        if not all_forms:
+                            st.warning("No forms found.")
+                            return
+                        
+                        # Filter for selected form types
+                        filtered_forms, filter_error = filter_forms_by_date_and_type(
+                            all_forms, general_start_date, general_end_date, selected_form_types
+                        )
+                        
+                        if filter_error:
+                            st.error(f"Error filtering forms: {filter_error}")
+                            return
+                        
+                        # Store filtered forms in session state
+                        st.session_state['general_filtered_forms'] = filtered_forms
+                        st.session_state['general_filter_info'] = {
+                            'start_date': general_start_date,
+                            'end_date': general_end_date,
+                            'form_types': selected_form_types,
+                            'total_fetched': len(all_forms),
+                            'filtered_count': len(filtered_forms)
+                        }
+                        
+                        if filtered_forms:
+                            st.success(f"✅ Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)")
+                        else:
+                            st.warning(f"No forms found matching your criteria in the date range {general_start_date} to {general_end_date}")
+        
+        else:
+            st.info("No forms discovered. Try expanding your date range or check your API connection.")
+    
+    # Display and analyze filtered forms
+    if 'general_filtered_forms' in st.session_state and st.session_state['general_filtered_forms']:
+        filtered_forms = st.session_state['general_filtered_forms']
+        filter_info = st.session_state.get('general_filter_info', {})
+        
+        st.subheader(f"📊 Forms Ready for Analysis ({len(filtered_forms)} forms)")
+        
+        # Show filter summary
+        if filter_info:
+            st.info(f"""
+            📊 **Analysis Ready:** {filter_info['filtered_count']} forms (from {filter_info['total_fetched']} total forms)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Types:** {', '.join(filter_info['form_types'])}
+            """)
+        
+        # Form selection and analysis
+        col_select, col_analyze = st.columns([2, 1])
+        
+        with col_select:
+            st.markdown("**Select forms to analyze:**")
+            
+            # Group forms by type
+            forms_by_type = {}
+            for form in filtered_forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name not in forms_by_type:
+                    forms_by_type[template_name] = []
+                forms_by_type[template_name].append(form)
+            
+            selected_general_forms = []
+            
+            for form_type, type_forms in forms_by_type.items():
+                st.markdown(f"**{form_type}** ({len(type_forms)} forms)")
+                
+                # Select all checkbox for this type
+                select_all_key = f"select_all_general_{form_type.replace(' ', '_')}"
+                if st.checkbox(f"Select all {form_type}", key=select_all_key):
+                    selected_general_forms.extend(type_forms)
+                else:
+                    # Individual form checkboxes (show first 15 per type)
+                    for i, form in enumerate(type_forms[:15]):
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Format date for display
+                        try:
+                            if date_str:
+                                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                display_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                display_date = 'Unknown date'
+                        except:
+                            display_date = date_str or 'Unknown date'
+                        
+                        form_key = f"general_form_{form_type}_{i}"
+                        if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
+                            selected_general_forms.append(form)
+                
+                st.write("---")
+        
+        with col_analyze:
+            st.markdown("**Analysis Options:**")
+            
+            max_general_forms = st.slider("Max forms to analyze", 
+                                min_value=1, 
+                                max_value=1000, 
+                                value=500,
+                                help="Set high limit to analyze all forms (AI can handle large datasets)",
+                                key="max_general_forms")
+            
+            if len(selected_general_forms) > 0:
+                st.success(f"✅ {len(selected_general_forms)} forms selected")
+                
+                # Show helpful message for large datasets
+                if len(selected_general_forms) > 100:
+                    st.info(f"💪 **Large Dataset Ready:** You can analyze all {len(selected_general_forms)} forms! Set the slider to {len(selected_general_forms)} or higher.")
+                
+                if st.button("🤖 Generate Analysis", type="primary", key="analyze_general"):
+                    if len(selected_general_forms) > max_general_forms:
+                        st.warning(f"⚠️ Too many forms selected. Analyzing first {max_general_forms} forms.")
+                    
+                    # Use general form summary
+                    summary = summarize_form_submissions(
+                        selected_general_forms[:max_general_forms], 
+                        max_general_forms
+                    )
+                    
+                    # Display results
+                    st.subheader("📊 General Analysis Results")
+                    st.markdown(summary)
+                    
+                    # Download option
+                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                    
+                    summary_data = f"""# General Form Analysis Summary
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Form Types:** {', '.join(filter_info.get('form_types', []))}  
+**Date Range:** {date_range}  
+**Forms Analyzed:** {min(len(selected_general_forms), max_general_forms)} of {len(selected_general_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analysis Section
+"""
+                    
+                    st.download_button(
+                        label=f"📄 Download Analysis Report",
+                        data=summary_data,
+                        file_name=f"general_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help="Download the analysis as a markdown file",
+                        key="download_general_analysis"
+                    )
+            else:
+                st.info("Select forms above to enable analysis")
+    
+    else:
+        st.info("👆 First discover available form types, then select and fetch the forms you want to analyze")
+
+    # Test API connectivity first
+    with st.expander("🔧 API Connection Status", expanded=False):
+        config, error = get_roompact_config()
+        if error:
+            st.error(error)
+            st.markdown("""
+            **Setup Instructions:**
+            1. Contact your system administrator to obtain a Roompact API token
+            2. Add the token to your Streamlit secrets under the key `roompact_api_token`
+            3. Refresh this page to test the connection
+            """)
+            return
+        else:
+            st.success("✅ Roompact API token configured successfully")
+            
+            # Test API connection
+            with st.spinner("Testing API connection..."):
+                test_data, test_error = make_roompact_request("forms", {"cursor": ""})
+                if test_error:
+                    st.error(f"API connection test failed: {test_error}")
+                    return
+                else:
+                    st.success("✅ API connection successful")
+                    total_forms = test_data.get('total_records', 0)
+                    st.info(f"📊 Total forms available: {total_forms}")
+    
+    st.divider()
+    
+    # Main form analysis interface
+    st.subheader("📝 Form Submissions Analysis")
+    
+    # Date range and filtering options
+    col_date1, col_date2, col_discover = st.columns([1, 1, 1])
+    
+    with col_date1:
+        start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=90),  # Extended to 90 days
+            help="Filter forms submitted on or after this date"
+        )
+    
+    with col_date2:
+        end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Filter forms submitted on or before this date"
+        )
+    
+    with col_discover:
+        if st.button("🔍 Discover Form Types", help="Scan available forms to see what types exist"):
+            # Calculate intelligent page limit based on date range
+            days_back = (datetime.now().date() - start_date).days
+            if days_back > 90:
+                max_pages = 300
+            elif days_back > 60:
+                max_pages = 200  
+            elif days_back > 30:
+                max_pages = 100
+            else:
+                max_pages = 50
+            
+            st.info(f"🔍 Scanning for forms (up to {max_pages} pages) going back {days_back} days to {start_date.strftime('%Y-%m-%d')}...")
+            
+            # Show extended search warning for very old dates
+            if days_back > 60:
+                st.warning(f"⏳ **Extended Search:** Going back {days_back} days requires searching many pages. This may take 1-2 minutes.")
+            
+            form_types, error = discover_form_types(
+                max_pages=max_pages, 
+                target_start_date=start_date
+            )
+            
+            if error:
+                st.error(f"Error discovering forms: {error}")
+            elif form_types:
+                st.session_state['discovered_form_types'] = form_types
+                st.session_state['discovery_date_range'] = {
+                    'start_date': start_date,
+                    'end_date': end_date
+                }
+                st.success(f"✅ Found {len(form_types)} different form types going back to {start_date}!")
+            else:
+                st.warning("No forms found to discover types from")
+    
+    # Form type selection
+    if 'discovered_form_types' in st.session_state:
+        form_options = st.session_state['discovered_form_types']
+        
+        st.subheader("📋 Select Form Types to Analyze")
+        
+        # Add "All Form Types" option
+        all_option = {"display_name": "All Form Types", "template_name": "All Form Types", "count": sum(f['count'] for f in form_options)}
+        display_options = [all_option] + form_options
+        
+        # Create multiselect with form type options
+        selected_displays = st.multiselect(
+            "Choose specific form types:",
+            options=[opt['display_name'] for opt in display_options],
+            default=["All Form Types"],
+            help="Select one or more form types to analyze. Default is all forms."
+        )
+        
+        # Convert display names back to template names
+        selected_form_types = []
+        for display_name in selected_displays:
+            for opt in display_options:
+                if opt['display_name'] == display_name:
+                    selected_form_types.append(opt['template_name'])
+                    break
+        
+        # Show selection summary
+        if selected_form_types and "All Form Types" not in selected_form_types:
+            total_count = sum(opt['count'] for opt in form_options if opt['template_name'] in selected_form_types)
+            st.info(f"📊 Selected {len(selected_form_types)} form type(s) with approximately {total_count} submissions")
+    
+    else:
+        st.info("👆 Click 'Discover Form Types' to see available form types and make specific selections")
+        selected_form_types = ["All Form Types"]  # Default fallback
+    
+    st.divider()
+    
+    # Fetch and display forms
+    if st.button("🔄 Fetch Forms in Date Range", type="primary"):
+        if not ('discovered_form_types' in st.session_state and selected_form_types):
+            st.warning("Please discover form types and make selections first!")
+            return
+            
+        with st.spinner("Fetching forms from Roompact..."):
+            # Calculate page limit based on date range for original supervisors section
+            days_back = (datetime.now().date() - start_date).days
+            
+            # Use generous page limits to ensure historical data access
+            if days_back > 90:
+                max_pages = 1000  # 3+ months
+            elif days_back > 60:
+                max_pages = 800   # 2+ months
+            elif days_back > 30:
+                max_pages = 600   # 1+ months  
+            elif days_back > 14:
+                max_pages = 400   # 2+ weeks
+            else:
+                max_pages = 200   # Recent data
+            
+            st.info(f"📊 Fetching up to {max_pages} pages of data going back {days_back} days to {start_date}")
+            
+            # Show extended search warning for very old dates
+            if days_back > 30:
+                st.warning(f"⏳ **Extended Search:** Going back {days_back} days requires searching many pages. This may take 2-3 minutes.")
+            
+            progress_placeholder = st.empty()
+            
+            def show_fetch_progress(page_num, total_forms, oldest_date, reached_target):
+                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                if oldest_date != "Unknown":
+                    status += f" | Oldest: {oldest_date}"
+                if reached_target:
+                    status += f" | ✅ Reached {start_date}"
+                progress_placeholder.info(status)
+            
+            all_forms, error = fetch_roompact_forms(
+                max_pages=max_pages,
+                target_start_date=start_date,
+                progress_callback=show_fetch_progress
+            )
+            
+            if error:
+                st.error(error)
+                return
+            
+            if not all_forms:
+                st.warning("No forms found.")
+                return
+            
+            # Filter forms by date range and selected types
+            filtered_forms, filter_error = filter_forms_by_date_and_type(
+                all_forms, start_date, end_date, selected_form_types
+            )
+            
+            if filter_error:
+                st.error(f"Error filtering forms: {filter_error}")
+                return
+            
+            # Store filtered forms in session state
+            st.session_state['roompact_forms'] = filtered_forms
+            st.session_state['filter_info'] = {
+                'start_date': start_date,
+                'end_date': end_date,
+                'form_types': selected_form_types,
+                'total_fetched': len(all_forms),
+                'filtered_count': len(filtered_forms)
+            }
+            
+            # Show actual date range of retrieved forms for debugging
+            if all_forms:
+                form_dates = []
+                for form in all_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_dates.append(form_datetime)
+                        except:
+                            pass
+                
+                if form_dates:
+                    oldest_retrieved = min(form_dates).strftime('%Y-%m-%d')
+                    newest_retrieved = max(form_dates).strftime('%Y-%m-%d')
+                    st.info(f"📅 **Retrieved data range:** {oldest_retrieved} to {newest_retrieved}")
+                    
+                    if datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() > start_date:
+                        days_missing = (datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() - start_date).days
+                        st.warning(f"⚠️ **Missing {days_missing} days of data** - oldest form found is {oldest_retrieved}, but you requested back to {start_date}. Try increasing page limits or check if forms exist for that period.")
+            
+            if filtered_forms:
+                st.success(f"✅ Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)")
+            else:
+                form_type_text = ", ".join(selected_form_types) if len(selected_form_types) <= 3 else f"{len(selected_form_types)} selected form types"
+                st.warning(f"No forms found in the date range {start_date} to {end_date} matching: {form_type_text}")
+    
+    # Display forms if available
+    if 'roompact_forms' in st.session_state and st.session_state['roompact_forms']:
+        forms = st.session_state['roompact_forms']
+        filter_info = st.session_state.get('filter_info', {})
+        
+        # Show filter summary
+        if filter_info:
+            form_types_display = filter_info.get('form_types', [])
+            if len(form_types_display) <= 3:
+                form_types_text = ", ".join(form_types_display)
+            else:
+                form_types_text = f"{len(form_types_display)} selected form types"
+                
+            st.info(f"""
+            📊 **Filter Results:** {filter_info['filtered_count']} forms found (from {filter_info['total_fetched']} total)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Types:** {form_types_text}
+            """)
+        
+        st.subheader(f"📋 Filtered Forms ({len(forms)} submissions)")
+        
+        # Create form selection interface
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("**Select forms to analyze:**")
+            
+            # Group forms by template name for better organization
+            forms_by_template = {}
+            for form in forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name not in forms_by_template:
+                    forms_by_template[template_name] = []
+                forms_by_template[template_name].append(form)
+            
+            selected_forms = []
+            
+            # Show forms grouped by template
+            for template_name, template_forms in forms_by_template.items():
+                st.markdown(f"**{template_name}** ({len(template_forms)} submissions)")
+                
+                # Select all checkbox for this template
+                select_all_key = f"select_all_{template_name.replace(' ', '_')}"
+                if st.checkbox(f"Select all {template_name}", key=select_all_key):
+                    selected_forms.extend(template_forms)
+                else:
+                    # Individual form checkboxes
+                    for i, form in enumerate(template_forms[:10]):  # Limit display to first 10 per template
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Format date for display
+                        try:
+                            if date_str:
+                                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                display_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                display_date = 'Unknown date'
+                        except:
+                            display_date = date_str or 'Unknown date'
+                        
+                        form_key = f"form_{template_name}_{i}"
+                        if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
+                            selected_forms.append(form)
+                
+                st.write("---")
+        
+        with col2:
+            st.markdown("**Analysis Options:**")
+            
+            max_forms = st.slider("Max forms to analyze", 
+                                min_value=1, 
+                                max_value=1000, 
+                                value=500,
+                                help="Set high limit to analyze all forms (AI can handle large datasets)")
+            
+            if len(selected_forms) > 0:
+                st.success(f"✅ {len(selected_forms)} forms selected")
+                
+                if st.button("🤖 Generate AI Summary", type="primary"):
+                    if len(selected_forms) > max_forms:
+                        st.warning(f"⚠️ Too many forms selected. Analyzing first {max_forms} forms.")
+                    
+                    # Check if focusing on duty reports for specialized analysis
+                    filter_info = st.session_state.get('filter_info', {})
+                    form_types = filter_info.get('form_types', [])
+                    
+                    # Use specialized duty report analysis if only duty-related forms are selected
+                    is_duty_focused = (
+                        len(form_types) == 1 and 
+                        any('duty' in form_type.lower() for form_type in form_types)
+                    ) or (
+                        len([ft for ft in form_types if 'duty' in ft.lower()]) > 0 and
+                        len([ft for ft in form_types if 'duty' not in ft.lower()]) == 0
+                    )
+                    
+                    if is_duty_focused and 'All Form Types' not in form_types:
+                        summary = create_duty_report_summary(
+                            selected_forms[:max_forms], 
+                            filter_info['start_date'], 
+                            filter_info['end_date']
+                        )
+                    else:
+                        # Use general form analysis
+                        summary = summarize_form_submissions(selected_forms, max_forms)
+                    
+                    # Display results
+                    st.subheader("📊 AI Analysis Results")
+                    st.markdown(summary)
+                    
+                    # Offer download option
+                    filter_info = st.session_state.get('filter_info', {})
+                    form_types = filter_info.get('form_types', ['Forms'])
+                    
+                    # Determine analysis type for filename and label
+                    if len(form_types) == 1 and 'duty' in form_types[0].lower():
+                        analysis_type = "Duty Reports"
+                        file_prefix = "duty_reports"
+                    elif len(form_types) <= 3:
+                        analysis_type = " & ".join(form_types)
+                        file_prefix = "forms_analysis"
+                    else:
+                        analysis_type = f"{len(form_types)} Form Types"
+                        file_prefix = "multi_forms_analysis"
+                    
+                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                    form_types_text = ", ".join(form_types) if len(form_types) <= 5 else f"{len(form_types)} selected form types"
+                    
+                    summary_data = f"""# Roompact Forms Analysis Summary
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Form Types:** {form_types_text}  
+**Date Range:** {date_range}  
+**Forms Analyzed:** {min(len(selected_forms), max_forms)} of {len(selected_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool
+"""
+                    
+                    st.download_button(
+                        label=f"📄 Download Analysis Report",
+                        data=summary_data,
+                        file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help="Download the forms analysis as a markdown file"
+                    )
+            else:
+                st.info("Select forms above to enable AI analysis")
+    
+    else:
+        st.info("👆 Click 'Fetch Latest Forms' to load form submissions from Roompact")
+
 
 def admin_settings_page():
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
     
-    tab1, tab2 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking"])
+    tab1, tab2, tab3 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration"])
     
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
@@ -1639,10 +5007,438 @@ def admin_settings_page():
                 st.info("No reports found.")
         except Exception as e:
             st.error(f"Error loading submission data: {e}")
+    
+    with tab3:
+        st.subheader("Email Configuration")
+        st.write("Configure email settings for sending UND LEADS summaries.")
+        
+        st.info("""
+        **Email Setup Instructions:**
+        
+        To enable email functionality, you need to configure email settings in your Streamlit secrets.
+        
+        **FOR GMAIL (Recommended):**
+        
+        1. **Enable 2-Step Verification** on your Gmail account:
+           - Go to myaccount.google.com → Security → 2-Step Verification
+           - Follow the setup process
+        
+        2. **Generate an App Password**:
+           - Go to myaccount.google.com → Security → 2-Step Verification → App passwords
+           - Select "Mail" and your device
+           - Copy the 16-digit password (e.g., "abcd efgh ijkl mnop")
+        
+        3. **Update your secrets.toml**:
+        ```toml
+        EMAIL_ADDRESS = "your-gmail@gmail.com"
+        EMAIL_PASSWORD = "abcd efgh ijkl mnop"  # 16-digit app password
+        SMTP_SERVER = "smtp.gmail.com"
+        ```
+        
+        **FOR UND/Office 365 Email:**
+        ```toml
+        EMAIL_ADDRESS = "your-email@und.edu"
+        EMAIL_PASSWORD = "your-regular-password"
+        SMTP_SERVER = "smtp.office365.com"
+        ```
+        
+        **IMPORTANT:** 
+        - Never use your regular Gmail password - only use App Passwords
+        - Restart Streamlit after updating secrets.toml
+        - Never commit secrets.toml to version control!
+        """)
+        
+        # Test email configuration
+        st.subheader("Test Email Configuration")
+        
+        with st.form("test_email"):
+            test_email = st.text_input("Send test email to:", placeholder="your-email@und.edu")
+            
+            if st.form_submit_button("📧 Send Test Email"):
+                if test_email:
+                    test_subject = "UND Housing Reports - Email Test"
+                    test_body = """This is a test email from the UND Housing Leadership Reports system.
+
+If you received this email, your email configuration is working correctly!
+
+Test sent at: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    with st.spinner("Sending test email..."):
+                        success = send_email(test_email, test_subject, test_body)
+                        if success:
+                            st.success(f"✅ Test email sent successfully to {test_email}")
+                        else:
+                            st.error("❌ Failed to send test email. Please check your configuration.")
+                else:
+                    st.error("Please enter an email address for testing.")
+        
+        # Display current email configuration status
+        st.subheader("Configuration Status")
+        
+        try:
+            # More detailed debugging
+            st.write("🔍 **Debug Information:**")
+            
+            # Show secrets file location
+            import os
+            current_dir = os.getcwd()
+            secrets_path = os.path.join(current_dir, ".streamlit", "secrets.toml")
+            st.info(f"**Secrets file location:** `{secrets_path}`")
+            st.info(f"**File exists:** {os.path.exists(secrets_path)}")
+            
+            # Check if secrets exist at all
+            try:
+                secrets_keys = list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else []
+                st.write(f"Available secrets keys: {secrets_keys}")
+            except Exception as e:
+                st.write(f"Error accessing secrets keys: {e}")
+            
+            # Check each configuration item
+            try:
+                email_address = st.secrets["EMAIL_ADDRESS"]
+                if email_address.startswith("your-") or "placeholder" in email_address.lower():
+                    st.error(f"❌ EMAIL_ADDRESS still contains placeholder: {email_address}")
+                    st.warning("Please update your .streamlit/secrets.toml with your real Gmail address")
+                else:
+                    st.success("✅ Email Address Found")
+                    st.text(f"From: {email_address}")
+            except KeyError:
+                st.error("❌ EMAIL_ADDRESS key not found in secrets")
+            except Exception as e:
+                st.error(f"❌ Error accessing EMAIL_ADDRESS: {e}")
+            
+            try:
+                email_password = st.secrets["EMAIL_PASSWORD"]
+                if email_password.startswith("your-") or "placeholder" in email_password.lower() or len(email_password) != 16:
+                    st.error(f"❌ EMAIL_PASSWORD appears to be placeholder or wrong length (should be 16 chars)")
+                    st.warning("Please update your .streamlit/secrets.toml with your real Gmail App Password")
+                else:
+                    st.success("✅ Email Password Found")
+                    st.text("Password: [HIDDEN - 16 characters detected]")
+            except KeyError:
+                st.error("❌ EMAIL_PASSWORD key not found in secrets")
+            except Exception as e:
+                st.error(f"❌ Error accessing EMAIL_PASSWORD: {e}")
+            
+            try:
+                smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
+                st.success("✅ SMTP Server Available")
+                st.text(f"Server: {smtp_server}")
+            except Exception as e:
+                st.error(f"❌ Error accessing SMTP_SERVER: {e}")
+                
+        except Exception as e:
+            st.error(f"Error checking configuration: {e}")
+            
+        # Instructions for common issues
+        st.subheader("Troubleshooting")
+        st.warning("""
+        **Common Issues:**
+        
+        1. **File Location**: Make sure `.streamlit/secrets.toml` is in your project root directory
+        2. **File Format**: Ensure the file uses TOML format with quotes around values
+        3. **Restart Required**: Restart Streamlit after modifying secrets.toml
+        4. **File Permissions**: Check that the secrets file is readable
+        
+        **Example secrets.toml:**
+        ```toml
+        EMAIL_ADDRESS = "your-email@und.edu"
+        EMAIL_PASSWORD = "your-password"
+        SMTP_SERVER = "smtp.office365.com"
+        ```
+        """)
+
+def saved_reports_page():
+    """View saved duty analyses, staff recognition reports, and weekly summaries"""
+    st.title("Saved Reports Archive")
+    st.write("View all saved reports: duty analyses, staff recognition, and weekly summaries.")
+    
+    # Tab selection for different report types
+    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
+    
+    with tab1:
+        st.subheader("Saved Duty Analyses")
+        
+        try:
+            # Get all saved duty analyses
+            analyses_response = supabase.table('saved_duty_analyses').select('*').order('week_ending_date', desc=True).execute()
+            analyses = analyses_response.data or []
+            
+            if not analyses:
+                st.info("No saved duty analyses yet.")
+            else:
+                # Group analyses by year for better organization
+                analyses_by_year = {}
+                for analysis in analyses:
+                    try:
+                        year = pd.to_datetime(analysis['week_ending_date']).year
+                        if year not in analyses_by_year:
+                            analyses_by_year[year] = []
+                        analyses_by_year[year].append(analysis)
+                    except:
+                        # If date parsing fails, group under "Unknown"
+                        if "Unknown" not in analyses_by_year:
+                            analyses_by_year["Unknown"] = []
+                        analyses_by_year["Unknown"].append(analysis)
+                
+                # Display analyses by year
+                for year in sorted(analyses_by_year.keys(), reverse=True):
+                    st.subheader(f"📅 {year}")
+                    year_analyses = analyses_by_year[year]
+                    
+                    for analysis in year_analyses:
+                        week_date = analysis.get('week_ending_date', 'Unknown')
+                        created_date = analysis.get('created_at', '')[:10] if analysis.get('created_at') else 'Unknown'
+                        created_by = analysis.get('created_by', 'Unknown')
+                        report_type = analysis.get('report_type', 'standard_analysis')
+                        reports_analyzed = analysis.get('reports_analyzed', 0)
+                        
+                        # Get creator name if possible
+                        creator_name = "Unknown"
+                        if created_by and created_by != 'Unknown':
+                            try:
+                                profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
+                                if profile_resp.data:
+                                    profile = profile_resp.data[0]
+                                    creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
+                            except:
+                                creator_name = "Unknown"
+                        
+                        report_type_display = "Weekly Summary" if report_type == "weekly_summary" else "Standard Analysis"
+                        
+                        with st.expander(f"Week Ending {week_date} — {report_type_display} ({reports_analyzed} reports) — Created {created_date} by {creator_name}"):
+                            st.markdown(analysis.get('analysis_text', 'No content available'))
+                            
+                            st.divider()
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # Download button
+                                download_filename = f"duty_analysis_{report_type}_{week_date}_{created_date}.md"
+                                st.download_button(
+                                    label="📄 Download Analysis",
+                                    data=analysis.get('analysis_text', ''),
+                                    file_name=download_filename,
+                                    mime="text/markdown",
+                                    help="Download this duty analysis as a markdown file",
+                                    key=f"download_duty_{analysis.get('id', week_date)}"
+                                )
+                            
+                            with col2:
+                                # Delete button (only for creator or admin)
+                                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                                if user_id and (user_id == created_by):  # Could add admin check here
+                                    if st.button(f"🗑️ Delete", key=f"delete_duty_{analysis.get('id', week_date)}", 
+                                               type="secondary", help="Delete this saved analysis"):
+                                        try:
+                                            supabase.table('saved_duty_analyses').delete().eq('id', analysis['id']).execute()
+                                            st.success("Analysis deleted!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to delete: {e}")
+        
+        except Exception as e:
+            st.error(f"Failed to fetch saved duty analyses: {e}")
+    
+    with tab2:
+        st.subheader("Saved Staff Recognition Reports")
+        
+        try:
+            # Get all saved staff recognition reports
+            recognition_response = supabase.table('saved_staff_recognition').select('*').order('week_ending_date', desc=True).execute()
+            recognitions = recognition_response.data or []
+            
+            if not recognitions:
+                st.info("No saved staff recognition reports yet.")
+            else:
+                # Group recognitions by year
+                recognitions_by_year = {}
+                for recognition in recognitions:
+                    try:
+                        year = pd.to_datetime(recognition['week_ending_date']).year
+                        if year not in recognitions_by_year:
+                            recognitions_by_year[year] = []
+                        recognitions_by_year[year].append(recognition)
+                    except:
+                        if "Unknown" not in recognitions_by_year:
+                            recognitions_by_year["Unknown"] = []
+                        recognitions_by_year["Unknown"].append(recognition)
+                
+                # Display recognitions by year
+                for year in sorted(recognitions_by_year.keys(), reverse=True):
+                    st.subheader(f"📅 {year}")
+                    year_recognitions = recognitions_by_year[year]
+                    
+                    for recognition in year_recognitions:
+                        week_date = recognition.get('week_ending_date', 'Unknown')
+                        created_date = recognition.get('created_at', '')[:10] if recognition.get('created_at') else 'Unknown'
+                        created_by = recognition.get('created_by', 'Unknown')
+                        
+                        # Get creator name
+                        creator_name = "Unknown"
+                        if created_by and created_by != 'Unknown':
+                            try:
+                                profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
+                                if profile_resp.data:
+                                    profile = profile_resp.data[0]
+                                    creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
+                            except:
+                                creator_name = "Unknown"
+                        
+                        # Extract recognition summary for title
+                        ascend_data = json.loads(recognition.get('ascend_recognition', '{}')) if recognition.get('ascend_recognition') else {}
+                        north_data = json.loads(recognition.get('north_recognition', '{}')) if recognition.get('north_recognition') else {}
+                        
+                        recipients = []
+                        if ascend_data.get('staff_member'):
+                            recipients.append(f"ASCEND: {ascend_data['staff_member']}")
+                        if north_data.get('staff_member'):
+                            recipients.append(f"NORTH: {north_data['staff_member']}")
+                        
+                        recipients_text = " | ".join(recipients) if recipients else "No recipients"
+                        
+                        with st.expander(f"Week Ending {week_date} — {recipients_text} — Created {created_date} by {creator_name}"):
+                            st.markdown(recognition.get('recognition_text', 'No content available'))
+                            
+                            st.divider()
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # Download button
+                                download_filename = f"staff_recognition_{week_date}_{created_date}.md"
+                                st.download_button(
+                                    label="📄 Download Recognition",
+                                    data=recognition.get('recognition_text', ''),
+                                    file_name=download_filename,
+                                    mime="text/markdown",
+                                    help="Download this staff recognition report as a markdown file",
+                                    key=f"download_recognition_{recognition.get('id', week_date)}"
+                                )
+                            
+                            with col2:
+                                # Delete button (only for creator or admin)
+                                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                                if user_id and (user_id == created_by):  # Could add admin check here
+                                    if st.button(f"🗑️ Delete", key=f"delete_recognition_{recognition.get('id', week_date)}", 
+                                               type="secondary", help="Delete this saved recognition report"):
+                                        try:
+                                            supabase.table('saved_staff_recognition').delete().eq('id', recognition['id']).execute()
+                                            st.success("Recognition report deleted!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to delete: {e}")
+        
+        except Exception as e:
+            st.error(f"Failed to fetch saved staff recognition reports: {e}")
+    
+    with tab3:
+        st.subheader("Saved Weekly Summaries")
+        
+        try:
+            # Get all saved weekly summaries
+            summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
+            summaries = summaries_response.data or []
+            
+            if not summaries:
+                st.info("No saved weekly summaries yet.")
+            else:
+                # Group summaries by year
+                summaries_by_year = {}
+                for summary in summaries:
+                    try:
+                        year = pd.to_datetime(summary['week_ending_date']).year
+                        if year not in summaries_by_year:
+                            summaries_by_year[year] = []
+                        summaries_by_year[year].append(summary)
+                    except:
+                        if "Unknown" not in summaries_by_year:
+                            summaries_by_year["Unknown"] = []
+                        summaries_by_year["Unknown"].append(summary)
+                
+                # Display summaries by year
+                for year in sorted(summaries_by_year.keys(), reverse=True):
+                    st.subheader(f"📅 {year}")
+                    year_summaries = summaries_by_year[year]
+                    
+                    for summary in year_summaries:
+                        week_date = summary.get('week_ending_date', 'Unknown')
+                        created_date = summary.get('created_at', '')[:10] if summary.get('created_at') else 'Unknown'
+                        created_by = summary.get('created_by', 'Unknown')
+                        
+                        # Get creator name
+                        creator_name = "Unknown"
+                        if created_by and created_by != 'Unknown':
+                            try:
+                                profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
+                                if profile_resp.data:
+                                    profile = profile_resp.data[0]
+                                    creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
+                            except:
+                                creator_name = "Unknown"
+                        
+                        with st.expander(f"Week Ending {week_date} — Created {created_date} by {creator_name}"):
+                            st.markdown(clean_summary_response(summary.get('summary_text', 'No content available')))
+                            
+                            st.divider()
+                            col1, col2, col3 = st.columns(3)
+                            
+                            # Download options (similar to admin_summaries_page)
+                            with col1:
+                                st.write("📄 **Download Options**")
+                                
+                                # HTML formatted download
+                                html_data, html_filename, html_mime = create_formatted_document_download(
+                                    clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "html"
+                                )
+                                st.download_button(
+                                    label="📊 Download HTML Report",
+                                    data=html_data,
+                                    file_name=html_filename,
+                                    mime=html_mime,
+                                    help="Downloads a nicely formatted HTML document that can be opened in any browser or printed",
+                                    key=f"download_html_archive_{summary.get('id', week_date)}"
+                                )
+                            
+                            with col2:
+                                # Plain text download
+                                text_data, text_filename, text_mime = create_formatted_document_download(
+                                    clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "text"
+                                )
+                                st.download_button(
+                                    label="📄 Download Text Version",
+                                    data=text_data,
+                                    file_name=text_filename,
+                                    mime=text_mime,
+                                    help="Downloads a formatted text document",
+                                    key=f"download_text_archive_{summary.get('id', week_date)}"
+                                )
+                            
+                            with col3:
+                                # Email UND LEADS section button
+                                if st.button(f"📧 Email UND LEADS", key=f"email_leads_archive_{summary.get('id', week_date)}", 
+                                           help="Extract and prepare UND LEADS section for email"):
+                                    # Extract UND LEADS section
+                                    leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
+                                    
+                                    if leads_section:
+                                        # Store in session state for email form
+                                        st.session_state['email_content'] = {
+                                            'subject': f"UND LEADS Summary - Week Ending {week_date}",
+                                            'body': leads_section,
+                                            'week_date': week_date
+                                        }
+                                        st.success("📧 UND LEADS section extracted! You can now use the email form in Admin Summaries to send it.")
+                                    else:
+                                        st.warning("No UND LEADS section found in this summary.")
+        
+        except Exception as e:
+            st.error(f"Failed to fetch saved weekly summaries: {e}")
 
 def admin_summaries_page():
-    st.title("All Saved Weekly Summaries")
-    st.write("View all saved weekly summaries from the entire department.")
+    st.title("Weekly Summaries - Email & Advanced Options")
+    st.write("View weekly summaries with email functionality for UND LEADS sections. For general report viewing, use the Saved Reports Archive.")
+    
+    st.info("💡 **Tip:** For browsing all saved reports (duty analyses, staff recognition, and weekly summaries), visit the **Saved Reports Archive** page.")
     
     try:
         # Get all saved summaries
@@ -1689,16 +5485,117 @@ def admin_summaries_page():
                         creator_name = "Unknown"
                 
                 with st.expander(f"Week Ending {week_date} — Created {created_date} by {creator_name}"):
-                    st.markdown(summary.get('summary_text', ''))
+                    st.markdown(clean_summary_response(summary.get('summary_text', '')))
                     
-                    # Add download button for each summary
-                    if st.button(f"📄 Download as Text", key=f"download_{summary.get('id', week_date)}"):
-                        st.download_button(
-                            label="Download Summary",
-                            data=summary.get('summary_text', ''),
-                            file_name=f"weekly_summary_{week_date}.txt",
-                            mime="text/plain"
+                    st.divider()
+                    col1, col2, col3 = st.columns(3)
+                    
+                    # Download button with format options
+                    with col1:
+                        st.write("📄 **Download Options**")
+                        
+                        # HTML formatted download
+                        html_data, html_filename, html_mime = create_formatted_document_download(
+                            clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "html"
                         )
+                        st.download_button(
+                            label="📊 Download Formatted Report (HTML)",
+                            data=html_data,
+                            file_name=html_filename,
+                            mime=html_mime,
+                            help="Downloads a nicely formatted HTML document that can be opened in any browser or printed",
+                            key=f"download_html_{summary.get('id', week_date)}"
+                        )
+                        
+                        # Plain text download (original)
+                        text_data, text_filename, text_mime = create_formatted_document_download(
+                            clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "text"
+                        )
+                        st.download_button(
+                            label="📄 Download Text Version",
+                            data=text_data,
+                            file_name=text_filename,
+                            mime=text_mime,
+                            help="Downloads a formatted text document",
+                            key=f"download_text_{summary.get('id', week_date)}"
+                        )
+                    
+                    # Email UND LEADS section button
+                    with col2:
+                        if st.button(f"📧 Email UND LEADS Section", key=f"email_leads_{summary.get('id', week_date)}"):
+                            # Extract UND LEADS section
+                            leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
+                            
+                            if leads_section:
+                                # Store in session state for email form
+                                st.session_state['email_content'] = {
+                                    'subject': f"UND LEADS Summary - Week Ending {week_date}",
+                                    'body': f"UND LEADS Summary for Week Ending {week_date}\n\n{leads_section}\n\n---\nGenerated from UND Housing Leadership Reports\nCreated {created_date} by {creator_name}",
+                                    'week_date': week_date,
+                                    'summary_id': summary.get('id', week_date)
+                                }
+                                st.rerun()
+                            else:
+                                st.error("Could not find UND LEADS section in this summary.")
+                    
+                    # Preview UND LEADS section button  
+                    with col3:
+                        if st.button(f"👁️ Preview UND LEADS", key=f"preview_leads_{summary.get('id', week_date)}"):
+                            leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
+                            if leads_section:
+                                st.session_state['preview_content'] = {
+                                    'content': leads_section,
+                                    'week_date': week_date
+                                }
+                                st.rerun()
+                            else:
+                                st.error("Could not find UND LEADS section in this summary.")
+                    
+                    # Show email form if content is ready
+                    if ('email_content' in st.session_state and 
+                        st.session_state['email_content']['summary_id'] == summary.get('id', week_date)):
+                        
+                        st.subheader("📧 Send UND LEADS Section")
+                        with st.form(f"email_form_{summary.get('id', week_date)}"):
+                            to_email = st.text_input("Recipient Email:", placeholder="example@und.edu")
+                            subject = st.text_input("Subject:", value=st.session_state['email_content']['subject'])
+                            body = st.text_area("Email Body:", value=st.session_state['email_content']['body'], height=200)
+                            
+                            col_send, col_cancel = st.columns(2)
+                            with col_send:
+                                if st.form_submit_button("📧 Send Email", type="primary"):
+                                    if to_email:
+                                        with st.spinner("Sending email..."):
+                                            success = send_email(to_email, subject, body)
+                                            if success:
+                                                st.success(f"✅ UND LEADS section emailed successfully to {to_email}")
+                                                # Clear the email content from session state
+                                                if 'email_content' in st.session_state:
+                                                    del st.session_state['email_content']
+                                                time.sleep(2)
+                                                st.rerun()
+                                            else:
+                                                st.error("Failed to send email. Please check email configuration.")
+                                    else:
+                                        st.error("Please enter a recipient email address.")
+                            
+                            with col_cancel:
+                                if st.form_submit_button("Cancel"):
+                                    if 'email_content' in st.session_state:
+                                        del st.session_state['email_content']
+                                    st.rerun()
+                    
+                    # Show preview if requested
+                    if ('preview_content' in st.session_state and 
+                        st.session_state['preview_content']['week_date'] == week_date):
+                        
+                        st.subheader("👁️ UND LEADS Section Preview")
+                        st.markdown(st.session_state['preview_content']['content'])
+                        
+                        if st.button("Close Preview", key=f"close_preview_{week_date}"):
+                            if 'preview_content' in st.session_state:
+                                del st.session_state['preview_content']
+                            st.rerun()
         
     except Exception as e:
         st.error(f"Failed to fetch summaries: {e}")
@@ -1809,11 +5706,15 @@ def main():
     if st.session_state.get("role") == "admin":
         pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
         pages["Admin Settings"] = admin_settings_page
-        pages["All Weekly Summaries"] = admin_summaries_page
+        pages["Weekly Summaries (Email)"] = admin_summaries_page
+        pages["📚 Saved Reports Archive"] = saved_reports_page
+        pages["Supervisors Section"] = supervisors_section_page
     
     if st.session_state.get("is_supervisor"):
         pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
         pages["My Team Summaries"] = supervisor_summaries_page
+        pages["📚 Saved Reports Archive"] = saved_reports_page
+        pages["Supervisors Section"] = supervisors_section_page
     
     # Page selection
     selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
