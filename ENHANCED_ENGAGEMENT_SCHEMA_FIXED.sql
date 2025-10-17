@@ -1,6 +1,7 @@
--- ENHANCED ENGAGEMENT DATABASE SCHEMA
+-- ENHANCED ENGAGEMENT DATABASE SCHEMA (Fixed Version)
 -- Updated to handle complete event lifecycle from proposal to completion
 -- Fall Semester: August 22 - End of December
+-- FIXED: Removed CURRENT_DATE from indexes (not immutable)
 
 -- Drop and recreate engagement_report_data with full form mapping
 DROP TABLE IF EXISTS engagement_report_data CASCADE;
@@ -95,7 +96,7 @@ CREATE TABLE engagement_report_data (
     form_debug_info JSONB -- For troubleshooting form mapping issues
 );
 
--- Comprehensive indexing strategy
+-- Basic indexes (no functions, all immutable)
 CREATE INDEX idx_engagement_form_id ON engagement_report_data(form_submission_id);
 CREATE INDEX idx_engagement_event_date ON engagement_report_data(event_date);
 CREATE INDEX idx_engagement_event_status ON engagement_report_data(event_status);
@@ -106,14 +107,14 @@ CREATE INDEX idx_engagement_semester ON engagement_report_data(semester);
 CREATE INDEX idx_engagement_submission_date ON engagement_report_data(submission_date);
 CREATE INDEX idx_engagement_last_updated ON engagement_report_data(last_updated);
 
--- Composite indexes for common queries
+-- Composite indexes for common queries (no functions)
 CREATE INDEX idx_engagement_semester_status ON engagement_report_data(semester, event_status);
 CREATE INDEX idx_engagement_hall_date ON engagement_report_data(hall, event_date);
 CREATE INDEX idx_engagement_date_approval ON engagement_report_data(event_date, event_approval);
--- Note: Weekly and upcoming event queries will use the basic event_date index
--- Cannot create partial indexes with CURRENT_DATE as it's not immutable
+CREATE INDEX idx_engagement_status_date ON engagement_report_data(event_status, event_date);
+CREATE INDEX idx_engagement_semester_date ON engagement_report_data(semester, event_date);
 
--- Fall semester date range check constraint (allow NULL dates for incomplete submissions)
+-- Fall semester date range check constraint (using static dates)
 ALTER TABLE engagement_report_data 
 ADD CONSTRAINT check_fall_semester_dates 
 CHECK (event_date IS NULL OR (event_date >= '2024-08-22' AND event_date <= '2024-12-31'));
@@ -155,4 +156,64 @@ TO authenticated
 USING (auth.uid() = generated_by_user_id OR generated_by_user_id IS NULL)
 WITH CHECK (auth.uid() = generated_by_user_id OR generated_by_user_id IS NULL);
 
-SELECT 'Enhanced engagement database schema created successfully!' as status;
+-- Success message
+SELECT 'Enhanced engagement database schema created successfully (Fixed Version)!' as status;
+
+-- Optional: Create a function for weekly event queries (immutable when passed specific dates)
+CREATE OR REPLACE FUNCTION get_weekly_events(week_start_date DATE, week_end_date DATE)
+RETURNS TABLE(
+    id BIGINT,
+    event_name TEXT,
+    event_date DATE,
+    event_status TEXT,
+    hall TEXT,
+    anticipated_attendance INTEGER
+) 
+LANGUAGE sql STABLE
+AS $$
+    SELECT 
+        e.id,
+        e.event_name,
+        e.event_date,
+        e.event_status,
+        e.hall,
+        e.anticipated_attendance
+    FROM engagement_report_data e
+    WHERE e.event_date >= week_start_date 
+    AND e.event_date <= week_end_date
+    AND e.event_status = 'approved'
+    ORDER BY e.event_date;
+$$;
+
+-- Create helper function for upcoming events
+CREATE OR REPLACE FUNCTION get_upcoming_events(days_ahead INTEGER DEFAULT 7)
+RETURNS TABLE(
+    id BIGINT,
+    event_name TEXT,
+    event_date DATE,
+    event_status TEXT,
+    hall TEXT,
+    event_organizer TEXT,
+    anticipated_attendance INTEGER
+) 
+LANGUAGE sql STABLE
+AS $$
+    SELECT 
+        e.id,
+        e.event_name,
+        e.event_date,
+        e.event_status,
+        e.hall,
+        e.event_organizer,
+        e.anticipated_attendance
+    FROM engagement_report_data e
+    WHERE e.event_date >= CURRENT_DATE
+    AND e.event_date <= CURRENT_DATE + (days_ahead || ' days')::INTERVAL
+    AND e.event_status = 'approved'
+    ORDER BY e.event_date;
+$$;
+
+COMMENT ON FUNCTION get_weekly_events IS 'Get approved events within a specific date range for weekly analysis';
+COMMENT ON FUNCTION get_upcoming_events IS 'Get approved events happening in the next N days (default 7)';
+
+SELECT 'Helper functions for weekly and upcoming event queries created successfully!' as function_status;
