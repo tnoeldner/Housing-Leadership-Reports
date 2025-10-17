@@ -48,6 +48,12 @@ ON saved_staff_recognition(week_ending_date, created_by);
 ALTER TABLE saved_duty_analyses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE saved_staff_recognition ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies to avoid conflicts, then recreate them
+DROP POLICY IF EXISTS "Allow authenticated users to read saved duty analyses" ON saved_duty_analyses;
+DROP POLICY IF EXISTS "Allow authenticated users to insert/update their own duty analyses" ON saved_duty_analyses;
+DROP POLICY IF EXISTS "Allow authenticated users to read saved staff recognition" ON saved_staff_recognition;
+DROP POLICY IF EXISTS "Allow authenticated users to insert/update their own staff recognition" ON saved_staff_recognition;
+
 -- Policies for duty analyses
 CREATE POLICY "Allow authenticated users to read saved duty analyses" 
 ON saved_duty_analyses FOR SELECT 

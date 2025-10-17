@@ -186,71 +186,118 @@ def clear_form_state():
 def extract_und_leads_section(summary_text):
     """Extract the UND LEADS Summary section from a weekly summary"""
     if not summary_text:
-        return None
+        return "No summary text provided."
     
     # Use multiple approaches to extract the complete UND LEADS section
     
-    # Method 1: Look for the exact numbered section pattern from the prompt
-    # Pattern looks for "4. **UND LEADS Summary**" until "5. **Overall Staff Well-being**"
-    pattern1 = r'(4\.\s*\*\*UND LEADS Summary\*\*.*?)(?=5\.\s*\*\*Overall Staff Well-being|$)'
+    # Method 1: Look for markdown header "## UND LEADS Summary" (most common format from AI prompts)
+    pattern1 = r'(##\s*UND LEADS Summary.*?)(?=\n##\s*(?!UND LEADS)(?!#)|$)'
     match = re.search(pattern1, summary_text, re.DOTALL | re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        extracted = match.group(1).strip()
+        # Make sure we got substantial content (more than just the header)
+        if len(extracted) > 100:  # Should have more than just the header
+            return extracted
+        else:
+            # Try to find more content after the header manually
+            header_pos = summary_text.find("## UND LEADS Summary")
+            if header_pos != -1:
+                remaining_text = summary_text[header_pos:]
+                # Look for the next main section header (## but not ###)
+                next_section = re.search(r'\n##\s*(?!UND LEADS)(?!#)', remaining_text, re.IGNORECASE)
+                if next_section:
+                    extracted = remaining_text[:next_section.start()].strip()
+                else:
+                    # Take a reasonable chunk if no next section found
+                    extracted = remaining_text[:2000].strip()  # Increased size
+                return extracted
+            return extracted
     
-    # Method 2: Look for "**UND LEADS Summary**" until "**Overall Staff Well-being**"
-    pattern2 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\*\*Overall Staff Well-being|$)'
+    # Method 2: Look for the exact numbered section pattern from the prompt
+    # Pattern looks for "4. **UND LEADS Summary**" until "5. **Overall Staff Well-being**"
+    pattern2 = r'(4\.\s*\*\*UND LEADS Summary\*\*.*?)(?=5\.\s*\*\*Overall Staff Well-being|$)'
     match = re.search(pattern2, summary_text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
     
-    # Method 3: Look for numbered section 4 until numbered section 5
-    pattern3 = r'(4\.\s*\*\*UND LEADS.*?)(?=5\.\s*\*\*|$)'
+    # Method 3: Look for "**UND LEADS Summary**" until "**Overall Staff Well-being**"
+    pattern3 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\*\*Overall Staff Well-being|$)'
     match = re.search(pattern3, summary_text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
     
-    # Method 4: Find UND LEADS section and capture everything until next major section
-    # This looks for common section patterns that follow UND LEADS
-    pattern4 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\n\s*\*\*(?:Overall|Campus Events|For the Director|Key Challenges|Upcoming Projects)|$)'
+    # Method 4: Look for numbered section 4 until numbered section 5
+    pattern4 = r'(4\.\s*\*\*UND LEADS.*?)(?=5\.\s*\*\*|$)'
     match = re.search(pattern4, summary_text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
     
-    # Method 5: Simple extraction - get UND LEADS until any major section marker
-    pattern5 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\n\s*[5-9]\.\s*\*\*|\n\s*##\s+[A-Z]|\n\s*\*\*[A-Z][^*]*\*\*(?!\s*:)|$)'
+    # Method 5: Find UND LEADS section and capture everything until next major section
+    # This looks for common section patterns that follow UND LEADS
+    pattern5 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\n\s*\*\*(?:Overall|Campus Events|For the Director|Key Challenges|Upcoming Projects)|$)'
     match = re.search(pattern5, summary_text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
     
-    # Method 6: Last resort - find the section header and extract a reasonable amount
-    header_pattern = r'\*\*UND LEADS Summary\*\*'
-    header_match = re.search(header_pattern, summary_text, re.IGNORECASE)
-    if header_match:
-        # Find the start position and try to extract content manually
-        start_pos = header_match.start()
-        remaining_text = summary_text[start_pos:]
-        
-        # Look for section breaks in the remaining text
-        section_breaks = [
-            r'\n\s*[5-9]\.\s*\*\*',  # Numbered sections 5-9
-            r'\n\s*##\s+',           # Markdown h2 headers
-            r'\n\s*\*\*(?:Overall|Campus|For the|Key|Upcoming)',  # Common next section names
-        ]
-        
-        end_pos = len(remaining_text)
-        for break_pattern in section_breaks:
-            break_match = re.search(break_pattern, remaining_text)
-            if break_match:
-                end_pos = min(end_pos, break_match.start())
-        
-        extracted = remaining_text[:end_pos].strip()
-        if len(extracted) > 50:  # Make sure we got substantial content
+    # Method 6: Simple extraction - get UND LEADS until any major section marker
+    pattern6 = r'(\*\*UND LEADS Summary\*\*.*?)(?=\n\s*[5-9]\.\s*\*\*|\n\s*##\s+[A-Z]|\n\s*\*\*[A-Z][^*]*\*\*(?!\s*:)|$)'
+    match = re.search(pattern6, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    
+    # Method 7: Look for markdown header followed by content until next header (broader pattern)
+    pattern7 = r'(##\s*UND LEADS.*?)(?=\n##\s*(?!UND LEADS)(?!#)|$)'
+    match = re.search(pattern7, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        extracted = match.group(1).strip()
+        # Make sure we have substantial content
+        if len(extracted) > 100:
             return extracted
-        else:
-            return f"**UND LEADS Summary**\n\nUND LEADS section found but content appears incomplete. Full section may not be available in this summary."
+    
+    # Method 8: Improved markdown header extraction
+    md_pattern = r'##\s*UND LEADS\s*Summary?\s*(.*?)(?=\n##\s*(?!UND LEADS)|$)'
+    match = re.search(md_pattern, summary_text, re.DOTALL | re.IGNORECASE)
+    if match:
+        content = match.group(1).strip()
+        if content and len(content) > 10:  # Make sure we have actual content, not just whitespace
+            return f"## UND LEADS Summary\n\n{content}"
+    
+    # Method 9: Last resort - find any UND LEADS header and extract content
+    header_patterns = [
+        r'\*\*UND LEADS Summary\*\*',
+        r'##\s*UND LEADS Summary',
+        r'##\s*UND LEADS'
+    ]
+    
+    for header_pattern in header_patterns:
+        header_match = re.search(header_pattern, summary_text, re.IGNORECASE)
+        if header_match:
+            # Find the start position and try to extract content manually
+            start_pos = header_match.start()
+            remaining_text = summary_text[start_pos:]
+            
+            # Look for section breaks in the remaining text
+            section_breaks = [
+                r'\n\s*[5-9]\.\s*\*\*',  # Numbered sections 5-9
+                r'\n\s*##\s+(?!UND LEADS)',           # Markdown h2 headers (not UND LEADS)
+                r'\n\s*\*\*(?:Overall|Campus|For the|Key|Upcoming)',  # Common next section names
+                r'\n\s*##\s*Guiding NORTH'  # Next section in template
+            ]
+            
+            end_pos = len(remaining_text)
+            for break_pattern in section_breaks:
+                break_match = re.search(break_pattern, remaining_text)
+                if break_match:
+                    end_pos = min(end_pos, break_match.start())
+            
+            extracted = remaining_text[:end_pos].strip()
+            if len(extracted) > 50:  # Make sure we got substantial content
+                return extracted
+            else:
+                return f"**UND LEADS Summary**\n\nUND LEADS section found but content appears incomplete. Content length: {len(extracted)}. Preview: {extracted[:100]}..."
     
     # No UND LEADS section found at all
-    return None
+    return "Could not find UND LEADS section in this summary. Please check the summary format."
 
 def get_logo_base64():
     """Convert logo image to base64 for embedding in HTML"""
@@ -1762,19 +1809,60 @@ def store_duty_report_data(selected_forms, start_date, end_date, generated_by_us
             
             stored_records.extend(incidents_found)
         
-        # Store all records in Supabase
+        # Store all records in Supabase with enhanced error handling
         if stored_records:
-            response = supabase.table("duty_report_incidents").insert(stored_records).execute()
+            saved_count = 0
+            skipped_count = 0
+            errors = []
             
-            if response.data:
-                return {
-                    "success": True, 
-                    "message": f"Stored {len(stored_records)} incident records from {len(selected_forms)} duty reports",
-                    "records_stored": len(stored_records),
-                    "reports_processed": len(selected_forms)
-                }
-            else:
-                return {"success": False, "message": "Failed to store records in database"}
+            # Process records in batches to handle duplicates gracefully
+            for record in stored_records:
+                try:
+                    # Check if this specific record already exists
+                    existing_check = supabase.table("duty_report_incidents").select("*").eq(
+                        "report_date", record['report_date']
+                    ).eq(
+                        "hall_name", record['hall_name']
+                    ).eq(
+                        "staff_author", record['staff_author']
+                    ).eq(
+                        "incident_type", record['incident_type']
+                    ).execute()
+                    
+                    if existing_check.data:
+                        skipped_count += 1
+                    else:
+                        # Safe to insert
+                        insert_response = supabase.table("duty_report_incidents").insert(record).execute()
+                        if insert_response.data:
+                            saved_count += 1
+                        else:
+                            errors.append(f"Failed to insert {record['incident_type']} record")
+                            
+                except Exception as e:
+                    error_msg = str(e)
+                    if "duplicate key" in error_msg or "violates unique constraint" in error_msg:
+                        skipped_count += 1
+                    else:
+                        errors.append(f"Error inserting record: {error_msg}")
+            
+            # Prepare result message
+            messages = []
+            if saved_count > 0:
+                messages.append(f"✅ Saved {saved_count} new incident records")
+            if skipped_count > 0:
+                messages.append(f"⚠️ Skipped {skipped_count} duplicate records")
+            if errors:
+                messages.append(f"❌ {len(errors)} errors occurred")
+            
+            return {
+                "success": saved_count > 0 or skipped_count > 0,
+                "message": " | ".join(messages) if messages else "No records processed",
+                "records_saved": saved_count,
+                "records_skipped": skipped_count,
+                "reports_processed": len(selected_forms),
+                "errors": errors
+            }
         else:
             return {"success": False, "message": "No incident records generated"}
             
@@ -1797,6 +1885,14 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
         if hasattr(end_date, 'isoformat'):
             end_date = end_date.isoformat()
         
+        # Check for existing analysis with same week ending date and user
+        existing_query = supabase.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
+        if created_by_user_id:
+            existing_query = existing_query.eq("created_by", created_by_user_id)
+        
+        existing_response = existing_query.execute()
+        existing_records = existing_response.data if existing_response.data else []
+        
         # Prepare data for saving
         save_data = {
             'week_ending_date': week_ending_date,
@@ -1810,21 +1906,49 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
             'updated_at': datetime.now().isoformat()
         }
         
-        # Use upsert to handle duplicates (overwrite existing)
-        response = supabase.table("saved_duty_analyses").upsert(
-            save_data, 
-            on_conflict="week_ending_date, created_by, report_type"
-        ).execute()
-        
-        if response.data:
+        # Save to database with enhanced duplicate detection
+        if existing_records:
+            # Record already exists, provide feedback but don't create duplicate
             return {
-                "success": True, 
-                "message": f"Duty analysis saved for week ending {week_ending_date}",
-                "saved_id": response.data[0]['id']
+                "success": True,
+                "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
+                "existing_id": existing_records[0]['id'],
+                "action": "duplicate_prevented"
             }
         else:
-            return {"success": False, "message": "Failed to save duty analysis"}
-            
+            # No existing record, safe to insert
+            try:
+                response = supabase.table("saved_duty_analyses").insert(save_data).execute()
+                
+                if response.data:
+                    return {
+                        "success": True, 
+                        "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
+                        "saved_id": response.data[0]['id'],
+                        "action": "created_new"
+                    }
+                else:
+                    return {"success": False, "message": "Failed to save duty analysis - no data returned"}
+                    
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Check if it's a table doesn't exist error
+                if "does not exist" in error_msg or "relation" in error_msg:
+                    return {
+                        "success": False, 
+                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
+                    }
+                # Check if it's a duplicate key error (fallback)
+                elif "duplicate key" in error_msg or "already exists" in error_msg or "violates unique constraint" in error_msg:
+                    return {
+                        "success": True,
+                        "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
+                        "action": "duplicate_prevented"
+                    }
+                else:
+                    return {"success": False, "message": f"Database error: {error_msg}"}
+                
     except Exception as e:
         return {"success": False, "message": f"Error saving duty analysis: {str(e)}"}
 
@@ -1880,20 +2004,37 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - Staff Recognit
             'updated_at': datetime.now().isoformat()
         }
         
-        # Use upsert to handle duplicates (overwrite existing)
-        response = supabase.table("saved_staff_recognition").upsert(
-            save_data, 
-            on_conflict="week_ending_date, created_by"
-        ).execute()
-        
-        if response.data:
-            return {
-                "success": True, 
-                "message": f"Staff recognition saved for week ending {week_ending_date}",
-                "saved_id": response.data[0]['id']
-            }
-        else:
-            return {"success": False, "message": "Failed to save staff recognition"}
+        # Save to database with graceful error handling
+        try:
+            # Try simple insert first
+            response = supabase.table("saved_staff_recognition").insert(save_data).execute()
+            
+            if response.data:
+                return {
+                    "success": True, 
+                    "message": f"Staff recognition saved for week ending {week_ending_date}",
+                    "saved_id": response.data[0]['id']
+                }
+            else:
+                return {"success": False, "message": "Failed to save staff recognition"}
+                
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Check if it's a table doesn't exist error
+            if "does not exist" in error_msg or "relation" in error_msg:
+                return {
+                    "success": False, 
+                    "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
+                }
+            # Check if it's a duplicate key error
+            elif "duplicate key" in error_msg or "already exists" in error_msg:
+                return {
+                    "success": True,
+                    "message": f"Recognition for week ending {week_ending_date} already exists (no duplicate created)"
+                }
+            else:
+                return {"success": False, "message": f"Database error: {error_msg}"}
             
     except Exception as e:
         return {"success": False, "message": f"Error saving staff recognition: {str(e)}"}
@@ -1983,20 +2124,42 @@ def replace_duty_report_data(selected_forms, start_date, end_date, generated_by_
             
             stored_records.extend(incidents_found)
         
-        # Store all new records in Supabase
+        # Store all new records in Supabase with enhanced error handling
         if stored_records:
-            response = supabase.table("duty_report_incidents").insert(stored_records).execute()
+            saved_count = 0
+            errors = []
             
-            if response.data:
+            # Insert records in batches with error handling
+            for record in stored_records:
+                try:
+                    insert_response = supabase.table("duty_report_incidents").insert(record).execute()
+                    if insert_response.data:
+                        saved_count += 1
+                    else:
+                        errors.append(f"Failed to insert {record['incident_type']} record")
+                        
+                except Exception as e:
+                    errors.append(f"Error inserting {record['incident_type']} record: {str(e)}")
+            
+            # Prepare result message
+            if saved_count > 0:
+                success_msg = f"✅ Replaced data: saved {saved_count} incident records from {len(selected_forms)} duty reports"
+                if errors:
+                    success_msg += f" | ❌ {len(errors)} errors occurred"
+                
                 return {
                     "success": True, 
-                    "message": f"Replaced data: stored {len(stored_records)} incident records from {len(selected_forms)} duty reports",
-                    "records_stored": len(stored_records),
+                    "message": success_msg,
+                    "records_stored": saved_count,
                     "reports_processed": len(selected_forms),
-                    "operation": "replaced"
+                    "operation": "replaced",
+                    "errors": errors
                 }
             else:
-                return {"success": False, "message": "Failed to store new records in database"}
+                return {
+                    "success": False, 
+                    "message": f"Failed to store any records. Errors: {'; '.join(errors)}"
+                }
         else:
             return {"success": False, "message": "No incident records generated"}
             
@@ -2142,6 +2305,833 @@ Please provide a comprehensive supervisory analysis:
             
     except Exception as e:
         return f"Error generating duty report summary: {str(e)}"
+
+# --- Engagement Analysis Functions ---
+def analyze_engagement_forms_with_ai(selected_forms, report_type, filter_info):
+    """Wrapper function to call appropriate engagement analysis function based on report type"""
+    if report_type == "📅 Weekly Summary Report":
+        return create_weekly_engagement_report_summary(selected_forms, filter_info)
+    else:
+        return create_engagement_report_summary(selected_forms, filter_info)
+
+def create_weekly_engagement_report_summary(selected_forms, filter_info):
+    """Create a weekly engagement report summary with quantitative data for admin integration"""
+    if not selected_forms:
+        return None
+    
+    try:
+        start_date = filter_info['start_date']
+        end_date = filter_info['end_date']
+        
+        # Extract quantitative data for events
+        events_data = extract_engagement_quantitative_data(selected_forms)
+        
+        # Generate text summary of events
+        events_text = f"\n=== ENGAGEMENT ANALYSIS (Weekly Report) ===\n"
+        events_text += f"Date Range: {start_date} to {end_date}\n"
+        events_text += f"Total Event Submissions: {len(selected_forms)}\n\n"
+        
+        # Add quantitative summary
+        if events_data['success']:
+            data_summary = events_data['summary']
+            events_text += f"QUANTITATIVE SUMMARY:\n"
+            events_text += f"- Total Events: {data_summary.get('total_events', 0)}\n"
+            events_text += f"- Total Attendance: {data_summary.get('total_attendance', 0)}\n"
+            events_text += f"- Active Halls: {data_summary.get('active_halls', 0)}\n"
+            events_text += f"- Unique Event Types: {data_summary.get('event_types', 0)}\n\n"
+        
+        # Add detailed form information
+        for i, form in enumerate(selected_forms[:20], 1):  # Limit for AI processing
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            
+            form_date = "Unknown Date"
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    form_date = form_datetime.strftime('%Y-%m-%d %H:%M')
+                except:
+                    pass
+            
+            events_text += f"\n--- Event Submission {i} ---\n"
+            events_text += f"Submitted by: {author}\n"
+            events_text += f"Submission Date: {form_date}\n"
+            
+            responses = current_revision.get('responses', [])
+            for response in responses:
+                field_label = response.get('field_label', 'Unknown Field')
+                field_response = str(response.get('response', '')).strip()
+                if field_response and field_response != 'None':
+                    events_text += f"{field_label}: {field_response}\n"
+            
+            events_text += "\n"
+        
+        # AI prompt for weekly engagement summary
+        prompt = f"""
+Based on the engagement data below, create a professional weekly summary report for UND Housing & Residence Life leadership.
+
+{events_text}
+
+Create a comprehensive report with these sections:
+
+## Weekly Engagement Summary ({start_date} to {end_date})
+
+### Event Programming Overview
+- Total events planned/conducted: [number]
+- Total attendance across all events: [number]  
+- Programming themes and types represented
+- Notable successful events or high attendance
+
+### Hall-by-Hall Activity
+- Events by residence hall/location
+- Attendance trends by location
+- Staff engagement and leadership in programming
+
+### Programming Categories Analysis
+- Educational programming
+- Social/community building events  
+- Wellness and recreation activities
+- Cultural and diversity programming
+- Academic support events
+
+### Upcoming Events & Planning
+- Events scheduled beyond the analysis period
+- Major programs in development
+- Collaborative initiatives with campus partners
+
+### Staff Recognition & Development
+- Staff members leading successful programming
+- Innovation in event planning and execution
+- Professional development through programming
+
+### Recommendations & Trends
+- Programming gaps or opportunities identified
+- Attendance patterns and preferences
+- Suggestions for future programming enhancement
+
+Format as professional markdown with clear headings and bullet points. Focus on actionable insights for supervisory decision-making.
+"""
+
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        with st.spinner(f"AI is analyzing {len(selected_forms)} event submissions..."):
+            result = model.generate_content(prompt)
+            
+            return {
+                'summary': result.text,
+                'report_type': "📅 Weekly Summary Report",
+                'selected_forms': selected_forms,
+                'filter_info': filter_info,
+                'quantitative_data': events_data if events_data['success'] else None
+            }
+            
+    except Exception as e:
+        return None
+
+def create_engagement_report_summary(selected_forms, filter_info):
+    """Create a standard comprehensive engagement analysis"""
+    if not selected_forms:
+        return None
+    
+    try:
+        start_date = filter_info['start_date']
+        end_date = filter_info['end_date']
+        
+        # Prepare engagement data for AI analysis
+        events_text = f"\n=== ENGAGEMENT ANALYSIS ===\n"
+        events_text += f"Date Range: {start_date} to {end_date}\n"
+        events_text += f"Total Event Submissions: {len(selected_forms)}\n\n"
+        
+        for i, form in enumerate(selected_forms, 1):
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            
+            form_date = "Unknown Date"
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    form_date = form_datetime.strftime('%Y-%m-%d %H:%M')
+                except:
+                    pass
+            
+            events_text += f"\n--- Event Submission {i} ---\n"
+            events_text += f"Submitted by: {author}\n"
+            events_text += f"Submission Date: {form_date}\n"
+            
+            responses = current_revision.get('responses', [])
+            for response in responses:
+                field_label = response.get('field_label', 'Unknown Field')
+                field_response = str(response.get('response', '')).strip()
+                if field_response and field_response != 'None':
+                    events_text += f"{field_label}: {field_response}\n"
+        
+        # AI prompt for standard engagement analysis
+        prompt = f"""
+Analyze the following event submission data and provide a comprehensive engagement analysis for UND Housing & Residence Life.
+
+{events_text}
+
+Please provide a detailed analysis organized in these sections:
+
+1. **EXECUTIVE SUMMARY**
+   - Overall engagement activity level and trends
+   - Key findings and notable events
+   - Total events and estimated attendance figures
+
+2. **EVENT PROGRAMMING ANALYSIS**  
+   - Types of events being planned and conducted
+   - Programming themes and target audiences
+   - Educational vs. social vs. wellness programming balance
+   - Innovation and creativity in event planning
+
+3. **COMMUNITY ENGAGEMENT INSIGHTS**
+   - Resident participation patterns and enthusiasm
+   - Community building effectiveness through events
+   - Cross-cultural and inclusive programming efforts
+   - Collaboration between halls and staff
+
+4. **STAFF DEVELOPMENT & LEADERSHIP**
+   - Staff members demonstrating leadership in programming
+   - Professional development through event coordination
+   - Training needs or opportunities identified
+   - Recognition of exceptional programming efforts
+
+5. **FACILITIES & RESOURCE UTILIZATION**
+   - Space usage patterns for events
+   - Resource allocation and budget considerations
+   - Technology and equipment needs
+   - Partnership with campus departments
+
+6. **UPCOMING EVENTS & STRATEGIC PLANNING**
+   - Future events in planning stages
+   - Seasonal programming considerations
+   - Long-term engagement strategy recommendations
+   - Calendar coordination and scheduling insights
+
+7. **SUPERVISORY RECOMMENDATIONS**
+   - Immediate support needed for upcoming events
+   - Staff development opportunities
+   - Resource allocation suggestions
+   - Policy or procedural improvements for better programming
+
+Provide actionable insights that will help supervisors support staff and enhance resident engagement through quality programming.
+"""
+
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        with st.spinner(f"AI is analyzing {len(selected_forms)} event submissions..."):
+            result = model.generate_content(prompt)
+            
+            return {
+                'summary': result.text,
+                'report_type': "📊 Standard Analysis",
+                'selected_forms': selected_forms,
+                'filter_info': filter_info
+            }
+            
+    except Exception as e:
+        return None
+
+def extract_engagement_quantitative_data(selected_forms):
+    """Extract quantitative metrics from engagement forms for database storage"""
+    if not selected_forms:
+        return {"success": False, "message": "No forms provided"}
+    
+    try:
+        # Group events data for analysis
+        from collections import defaultdict
+        
+        events_data = []
+        halls_data = defaultdict(lambda: {
+            'total_events': 0,
+            'total_attendance': 0,
+            'event_types': set(),
+            'organizers': set()
+        })
+        
+        monthly_data = defaultdict(lambda: {
+            'total_events': 0,
+            'total_attendance': 0,
+            'halls_active': set()
+        })
+        
+        # Process each form to extract engagement data
+        for i, form in enumerate(selected_forms):
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            
+            # Extract form ID from Roompact - try multiple possible locations
+            form_id = None
+            if form.get('id'):
+                form_id = str(form.get('id'))
+            elif form.get('form_id'):
+                form_id = str(form.get('form_id'))
+            elif current_revision.get('id'):
+                form_id = str(current_revision.get('id'))
+            else:
+                # Generate a unique ID if we can't find one
+                form_id = f"FORM_{i}_{hash(str(form))}"
+            
+            # Initialize event data structure
+            event_data = {
+                'report_date': None,
+                'event_title': 'Unknown Event',
+                'event_type': 'General',
+                'event_date': None,
+                'location_hall': 'Unknown Hall',
+                'location_details': '',
+                'staff_organizer': author,
+                'estimated_attendance': 0,
+                'event_status': 'planned',
+                'budget_amount': 0.0,
+                'collaboration_partners': '',
+                'programming_theme': 'General',
+                'target_audience': '',
+                'form_submission_id': form_id,
+                '_debug_form_structure': {
+                    'form_keys': list(form.keys()) if form else [],
+                    'form_id_found': form_id,
+                    'revision_keys': list(current_revision.keys()) if current_revision else []
+                }
+            }
+            
+            # Extract report date
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    event_data['report_date'] = form_datetime.date()
+                    month_key = form_datetime.strftime('Month of %Y-%m')
+                    monthly_data[month_key]['total_events'] += 1
+                except:
+                    pass
+            
+            # Extract data from responses
+            responses = current_revision.get('responses', [])
+            
+            # Map form fields to database columns with more specific matching
+            for response in responses:
+                field_label = response.get('field_label', '')
+                field_response = str(response.get('response', '')).strip()
+                
+                if field_response and field_response != 'None' and field_response:
+                    field_label_lower = field_label.lower()
+                    
+                    # Event title/name - exact field mapping
+                    if (field_label == 'Name of Event' or field_label == 'Name of event' or
+                        field_label in ['Event Name', 'Event Title', 'Program Name', 'Activity Name'] or 
+                        'name of event' in field_label_lower):
+                        event_data['event_title'] = field_response[:100]
+                    
+                    # Event type/category - more specific matching
+                    elif (field_label in ['Event Type', 'Program Type', 'Category', 'Type of Event'] or
+                          'event type' in field_label_lower or 'program type' in field_label_lower):
+                        event_data['event_type'] = field_response[:50]
+                        halls_data[event_data['location_hall']]['event_types'].add(field_response)
+                    
+                    # Event date - exact field mapping  
+                    elif (field_label == 'Date and Event Start Time' or field_label == 'Date' or
+                          field_label in ['Event Date', 'Date of Event', 'Program Date', 'When'] or
+                          'date and event start time' in field_label_lower or 'event date' in field_label_lower):
+                        try:
+                            import re
+                            try:
+                                from dateutil import parser as date_parser
+                            except ImportError:
+                                date_parser = None
+                            
+                            date_str = field_response.strip()
+                            
+                            # First try using dateutil parser if available
+                            if date_parser:
+                                try:
+                                    parsed_datetime = date_parser.parse(date_str)
+                                    event_data['event_date'] = parsed_datetime.date()
+                                except:
+                                    pass
+                            
+                            # If dateutil didn't work or isn't available, try manual parsing
+                            if not event_data['event_date']:
+                                # Fallback to manual parsing for common formats
+                                date_formats = [
+                                    '%Y-%m-%d %H:%M:%S',  # 2024-10-17 14:30:00
+                                    '%Y-%m-%d %H:%M',     # 2024-10-17 14:30
+                                    '%m/%d/%Y %H:%M:%S',  # 10/17/2024 2:30:00 PM
+                                    '%m/%d/%Y %H:%M',     # 10/17/2024 2:30 PM
+                                    '%m/%d/%Y %I:%M %p',  # 10/17/2024 2:30 PM
+                                    '%Y-%m-%d',           # 2024-10-17
+                                    '%m/%d/%Y',           # 10/17/2024
+                                    '%m-%d-%Y',           # 10-17-2024
+                                    '%B %d, %Y %H:%M',    # October 17, 2024 14:30
+                                    '%B %d, %Y',          # October 17, 2024
+                                    '%b %d, %Y'           # Oct 17, 2024
+                                ]
+                                
+                                for date_format in date_formats:
+                                    try:
+                                        # Remove extra whitespace and normalize
+                                        clean_date_str = ' '.join(date_str.split())
+                                        parsed_date = datetime.strptime(clean_date_str, date_format)
+                                        event_data['event_date'] = parsed_date.date()
+                                        break
+                                    except:
+                                        continue
+                                
+                                # If still no luck, try extracting just the date part with regex
+                                if not event_data['event_date']:
+                                    # Look for various date patterns
+                                    date_patterns = [
+                                        r'(\d{4}-\d{1,2}-\d{1,2})',        # YYYY-MM-DD
+                                        r'(\d{1,2}[/-]\d{1,2}[/-]\d{4})',  # MM/DD/YYYY or MM-DD-YYYY
+                                        r'(\d{1,2}[/-]\d{1,2}[/-]\d{2})'   # MM/DD/YY or MM-DD-YY
+                                    ]
+                                    
+                                    for pattern in date_patterns:
+                                        match = re.search(pattern, date_str)
+                                        if match:
+                                            try:
+                                                date_part = match.group(1)
+                                                if '-' in date_part and date_part.startswith('20'):
+                                                    # YYYY-MM-DD format
+                                                    event_data['event_date'] = datetime.strptime(date_part, '%Y-%m-%d').date()
+                                                elif '/' in date_part:
+                                                    # MM/DD/YYYY format
+                                                    event_data['event_date'] = datetime.strptime(date_part, '%m/%d/%Y').date()
+                                                break
+                                            except:
+                                                continue
+                        except Exception as e:
+                            # Debug: store parsing error for debugging
+                            event_data['_date_parse_error'] = f"Failed to parse '{field_response}': {str(e)}"
+                    
+                    # Location/hall - exact field mapping
+                    elif (field_label == 'Hall' or field_label == 'hall' or
+                          field_label in ['Location', 'Building', 'Where', 'Event Location'] or
+                          field_label_lower == 'hall'):
+                        event_data['location_hall'] = field_response[:50]
+                        event_data['location_details'] = field_response[:200]
+                        if month_key:
+                            monthly_data[month_key]['halls_active'].add(field_response)
+                    
+                    # Attendance - exact field mapping
+                    elif (field_label == 'Anticipated Number Attendees' or field_label == 'anticipated number attendees' or
+                          field_label in ['Anticipated Attendance', 'Attendance', 'Number of Attendees', 'Participants'] or
+                          'anticipated number attendees' in field_label_lower or 'anticipated attendance' in field_label_lower):
+                        try:
+                            import re
+                            # Extract numbers from response - handle various formats
+                            # Remove any non-digit characters except for spaces and commas
+                            clean_response = re.sub(r'[^\d\s,.-]', '', field_response)
+                            numbers = re.findall(r'\d+', clean_response)
+                            if numbers:
+                                attendance = int(numbers[0])
+                                event_data['estimated_attendance'] = attendance
+                                halls_data[event_data['location_hall']]['total_attendance'] += attendance
+                                if month_key:
+                                    monthly_data[month_key]['total_attendance'] += attendance
+                        except:
+                            pass
+                    
+                    # Budget/cost - more specific
+                    elif (field_label in ['Budget', 'Cost', 'Expense', 'Amount Spent'] or
+                          'budget' in field_label_lower or 'cost' in field_label_lower or
+                          'expense' in field_label_lower or 'spent' in field_label_lower):
+                        try:
+                            import re
+                            # Extract dollar amounts
+                            amounts = re.findall(r'[\d,.]+', field_response.replace('$', '').replace(',', ''))
+                            if amounts:
+                                event_data['budget_amount'] = float(amounts[0])
+                        except:
+                            pass
+                    
+                    # Status - look for completion status
+                    elif (field_label in ['Status', 'Event Status', 'Completed'] or
+                          'status' in field_label_lower or 'completed' in field_label_lower):
+                        response_lower = field_response.lower()
+                        if any(word in response_lower for word in ['complete', 'done', 'finished', 'yes']):
+                            event_data['event_status'] = 'completed'
+                        elif any(word in response_lower for word in ['cancel', 'cancelled', 'no']):
+                            event_data['event_status'] = 'cancelled'
+                        else:
+                            event_data['event_status'] = 'planned'
+                    
+                    # Programming theme
+                    elif (field_label in ['Theme', 'Program Focus', 'Category'] or
+                          'theme' in field_label_lower or 'focus' in field_label_lower):
+                        event_data['programming_theme'] = field_response[:50]
+                    
+                    # Target audience
+                    elif (field_label in ['Target Audience', 'Audience', 'Who attended'] or
+                          'audience' in field_label_lower or 'target' in field_label_lower):
+                        event_data['target_audience'] = field_response[:100]
+                    
+                    # Collaboration/partners
+                    elif (field_label in ['Partners', 'Collaboration', 'Sponsors'] or
+                          'partner' in field_label_lower or 'collaboration' in field_label_lower or
+                          'sponsor' in field_label_lower):
+                        event_data['collaboration_partners'] = field_response[:200]
+            
+            # Update hall data
+            halls_data[event_data['location_hall']]['total_events'] += 1
+            halls_data[event_data['location_hall']]['organizers'].add(author)
+            
+            # Debug: Store original field labels for debugging
+            event_data['_debug_fields'] = []
+            for response in responses:
+                field_label = response.get('field_label', '')
+                field_response = str(response.get('response', '')).strip()
+                if field_response and field_response != 'None':
+                    event_data['_debug_fields'].append(f"{field_label}: {field_response[:50]}...")
+            
+            events_data.append(event_data)
+        
+        # Calculate summary statistics
+        total_events = len(events_data)
+        total_attendance = sum(event['estimated_attendance'] for event in events_data)
+        active_halls = len([hall for hall, data in halls_data.items() if data['total_events'] > 0])
+        event_types = len(set(event['event_type'] for event in events_data))
+        
+        summary = {
+            'total_events': total_events,
+            'total_attendance': total_attendance,
+            'active_halls': active_halls,
+            'event_types': event_types,
+            'halls_breakdown': dict(halls_data),
+            'monthly_breakdown': dict(monthly_data)
+        }
+        
+        return {"success": True, "data": events_data, "summary": summary}
+        
+    except Exception as e:
+        return {"success": False, "message": f"Error extracting engagement data: {str(e)}"}
+
+def save_engagement_data(analysis_data, created_by_user_id=None):
+    """Save engagement quantitative data to the database for future analysis"""
+    try:
+        # Extract quantitative data from the analysis
+        quantitative_data = extract_engagement_quantitative_data(analysis_data['selected_forms'])
+        
+        if not quantitative_data['success']:
+            return {"success": False, "message": f"Failed to extract data: {quantitative_data['message']}"}
+        
+        events_data = quantitative_data['data']
+        filter_info = analysis_data['filter_info']
+        
+        # Handle date conversions
+        start_date = filter_info['start_date']
+        end_date = filter_info['end_date']
+        
+        if hasattr(start_date, 'isoformat'):
+            start_date = start_date.isoformat()
+        if hasattr(end_date, 'isoformat'):
+            end_date = end_date.isoformat()
+        
+        # Prepare data for database insertion
+        db_records = []
+        
+        for event in events_data:
+            # Convert dates to ISO format strings
+            report_date = event['report_date'].isoformat() if event['report_date'] else None
+            event_date = event['event_date'].isoformat() if event['event_date'] else None
+            
+            # Generate a unique form_submission_id if it's missing or empty
+            form_id = event.get('form_submission_id')
+            if not form_id or form_id.strip() == '':
+                # Create a unique ID based on event details and index
+                form_id = f"ENG_{len(db_records)}_{event.get('event_title', 'Unknown')[:10].replace(' ', '_')}_{start_date}"
+            
+            record = {
+                'report_date': report_date,
+                'event_title': event['event_title'],
+                'event_type': event['event_type'],
+                'event_date': event_date,
+                'location_hall': event['location_hall'],
+                'location_details': event['location_details'],
+                'staff_organizer': event['staff_organizer'],
+                'estimated_attendance': event['estimated_attendance'],
+                'event_status': event['event_status'],
+                'budget_amount': event['budget_amount'],
+                'collaboration_partners': event['collaboration_partners'],
+                'programming_theme': event['programming_theme'],
+                'target_audience': event['target_audience'],
+                'generated_by_user_id': created_by_user_id or 'system',  # Ensure not NULL
+                'date_range_start': start_date,
+                'date_range_end': end_date,
+                'form_submission_id': form_id
+            }
+            
+            db_records.append(record)
+        
+        # Insert data into database - check for duplicates first
+        if db_records:
+            try:
+                # Remove debug fields before processing
+                clean_records = []
+                for record in db_records:
+                    clean_record = {k: v for k, v in record.items() if not k.startswith('_debug') and not k.startswith('_')}
+                    clean_records.append(clean_record)
+                db_records = clean_records
+                
+                # Check for existing records based on the unique constraint
+                existing_records = []
+                new_records = []
+                
+                for record in db_records:
+                    form_id = record.get('form_submission_id')
+                    date_start = record.get('date_range_start')
+                    date_end = record.get('date_range_end') 
+                    user_id = record.get('generated_by_user_id')
+                    
+                    # Check if this exact combination already exists
+                    if form_id and date_start and date_end:
+                        check_query = supabase.table("engagement_report_data").select("id, form_submission_id, event_title")
+                        check_query = check_query.eq("form_submission_id", form_id)
+                        check_query = check_query.eq("date_range_start", date_start)
+                        check_query = check_query.eq("date_range_end", date_end)
+                        if user_id:
+                            check_query = check_query.eq("generated_by_user_id", user_id)
+                        
+                        check_response = check_query.execute()
+                        
+                        if check_response.data:
+                            existing_records.append({
+                                'form_id': form_id,
+                                'event_title': record.get('event_title', 'Unknown'),
+                                'existing_id': check_response.data[0]['id']
+                            })
+                        else:
+                            new_records.append(record)
+                    else:
+                        # If missing key fields, still try to insert (might be a data issue)
+                        new_records.append(record)
+                
+                # Report results
+                if existing_records and new_records:
+                    # Mixed case: some exist, some are new
+                    response = supabase.table("engagement_report_data").insert(new_records).execute()
+                    if response.data:
+                        return {
+                            "success": True,
+                            "message": f"✅ Saved {len(new_records)} new records. Skipped {len(existing_records)} duplicates: {', '.join([er['event_title'][:30] for er in existing_records[:3]])}{'...' if len(existing_records) > 3 else ''}",
+                            "records_saved": len(response.data),
+                            "duplicates_skipped": len(existing_records)
+                        }
+                elif existing_records and not new_records:
+                    # All are duplicates
+                    return {
+                        "success": True,
+                        "message": f"✅ All {len(existing_records)} records already exist in database. No duplicates created.",
+                        "records_saved": 0,
+                        "duplicates_skipped": len(existing_records)
+                    }
+                elif new_records and not existing_records:
+                    # All are new
+                    response = supabase.table("engagement_report_data").insert(new_records).execute()
+                    if response.data:
+                        return {
+                            "success": True,
+                            "message": f"✅ Successfully saved {len(new_records)} new engagement records to database",
+                            "records_saved": len(response.data)
+                        }
+                    else:
+                        return {"success": False, "message": "❌ No data was saved to database (response.data was empty)"}
+                else:
+                    return {"success": False, "message": "❌ No valid records to process"}
+                    
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Check if it's a table doesn't exist error
+                if "does not exist" in error_msg or "relation" in error_msg:
+                    return {
+                        "success": False, 
+                        "message": "❌ Database tables not found. Please run the database schema setup first. See database_schema_engagement_reports.sql"
+                    }
+                # Check if it's a duplicate key error - but first check if data actually exists
+                elif "duplicate key" in error_msg or "already exists" in error_msg:
+                    # Debug the constraint issue by showing what we're trying to insert
+                    try:
+                        first_record = db_records[0] if db_records else {}
+                        constraint_info = {
+                            'form_submission_id': first_record.get('form_submission_id'),
+                            'date_range_start': first_record.get('date_range_start'),
+                            'date_range_end': first_record.get('date_range_end'),
+                            'generated_by_user_id': first_record.get('generated_by_user_id'),
+                            'total_records_attempting': len(db_records)
+                        }
+                        
+                        form_id = first_record.get('form_submission_id')
+                        
+                        if form_id:
+                            # Check if this record actually exists in the database
+                            check_response = supabase.table("engagement_report_data").select("id, form_submission_id").eq("form_submission_id", form_id).execute()
+                            
+                            if check_response.data:
+                                return {
+                                    "success": True,
+                                    "message": f"✅ Data already exists in database - found {len(check_response.data)} existing records with form ID: {form_id}"
+                                }
+                            else:
+                                # Try to insert just one record to test
+                                try:
+                                    test_response = supabase.table("engagement_report_data").insert([first_record]).execute()
+                                    if test_response.data:
+                                        return {
+                                            "success": False,
+                                            "message": f"⚠️ Constraint issue resolved with single insert, but batch failed. Try reducing the number of events. Constraint fields: {constraint_info}"
+                                        }
+                                except Exception as single_error:
+                                    return {
+                                        "success": False,
+                                        "message": f"⚠️ Duplicate key error. Constraint fields causing issue: {constraint_info}. Single insert error: {str(single_error)[:100]}"
+                                    }
+                        else:
+                            return {
+                                "success": False,
+                                "message": f"⚠️ Missing form_submission_id. Constraint fields: {constraint_info}. Error: {error_msg[:200]}"
+                            }
+                    except Exception as check_error:
+                        return {
+                            "success": False,
+                            "message": f"⚠️ Duplicate key error analysis failed: {str(check_error)}"
+                        }
+                else:
+                    return {"success": False, "message": f"❌ Database error: {error_msg}"}
+        else:
+            return {"success": False, "message": "No valid engagement data to save"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error saving engagement data: {str(e)}"}
+
+def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id=None):
+    """Save an engagement analysis report to the database for permanent storage"""
+    try:
+        # Determine report type
+        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        
+        # Handle date conversions for database storage
+        start_date = analysis_data['filter_info']['start_date']
+        end_date = analysis_data['filter_info']['end_date']
+        
+        # Convert to ISO format strings if they're date objects
+        if hasattr(start_date, 'isoformat'):
+            start_date = start_date.isoformat()
+        if hasattr(end_date, 'isoformat'):
+            end_date = end_date.isoformat()
+        
+        # Extract upcoming events if available
+        upcoming_events = extract_upcoming_events(analysis_data['selected_forms'])
+        
+        # Prepare data for saving
+        save_data = {
+            'week_ending_date': week_ending_date,
+            'report_type': report_type,
+            'date_range_start': start_date,
+            'date_range_end': end_date,
+            'events_analyzed': len(analysis_data['selected_forms']),
+            'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
+            'analysis_text': analysis_data['summary'],
+            'upcoming_events': upcoming_events,
+            'created_by': created_by_user_id,
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        # Save to database with graceful error handling
+        try:
+            # Try simple insert first
+            response = supabase.table("saved_engagement_analyses").insert(save_data).execute()
+            
+            if response.data:
+                return {
+                    "success": True, 
+                    "message": f"Engagement analysis saved for week ending {week_ending_date}",
+                    "saved_id": response.data[0]['id']
+                }
+            else:
+                return {"success": False, "message": "Failed to save engagement analysis"}
+                
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Check if it's a table doesn't exist error
+            if "does not exist" in error_msg or "relation" in error_msg:
+                return {
+                    "success": False, 
+                    "message": "Database tables not found. Please run the database schema setup first. See database_schema_engagement_reports.sql"
+                }
+            # Check if it's a duplicate key error
+            elif "duplicate key" in error_msg or "already exists" in error_msg:
+                return {
+                    "success": True,
+                    "message": f"Analysis for week ending {week_ending_date} already exists (no duplicate created)"
+                }
+            else:
+                return {"success": False, "message": f"Database error: {error_msg}"}
+            
+    except Exception as e:
+        return {"success": False, "message": f"Error saving engagement analysis: {str(e)}"}
+
+def extract_upcoming_events(selected_forms):
+    """Extract a formatted list of upcoming events from engagement forms"""
+    try:
+        upcoming_events = []
+        current_date = datetime.now().date()
+        
+        for form in selected_forms:
+            current_revision = form.get('current_revision', {})
+            responses = current_revision.get('responses', [])
+            
+            event_info = {
+                'title': 'Event',
+                'date': None,
+                'location': 'TBD',
+                'organizer': current_revision.get('author', 'Unknown')
+            }
+            
+            # Extract event details
+            for response in responses:
+                field_label = response.get('field_label', '').lower()
+                field_response = str(response.get('response', '')).strip()
+                
+                if field_response and field_response != 'None':
+                    if any(word in field_label for word in ['title', 'name', 'event']):
+                        event_info['title'] = field_response
+                    elif any(word in field_label for word in ['date', 'when', 'scheduled']):
+                        try:
+                            # Try to parse date and check if it's in the future
+                            for date_format in ['%Y-%m-%d', '%m/%d/%Y', '%m-%d-%Y']:
+                                try:
+                                    event_date = datetime.strptime(field_response, date_format).date()
+                                    if event_date >= current_date:
+                                        event_info['date'] = event_date
+                                    break
+                                except:
+                                    continue
+                        except:
+                            pass
+                    elif any(word in field_label for word in ['location', 'where', 'hall']):
+                        event_info['location'] = field_response
+            
+            # Only include events with future dates
+            if event_info['date'] and event_info['date'] >= current_date:
+                upcoming_events.append(event_info)
+        
+        # Sort by date and format for display
+        upcoming_events.sort(key=lambda x: x['date'])
+        
+        if upcoming_events:
+            formatted_events = "## Upcoming Events\n\n"
+            for event in upcoming_events[:10]:  # Limit to 10 events
+                formatted_events += f"- **{event['title']}** - {event['date'].strftime('%B %d, %Y')} at {event['location']} (Organizer: {event['organizer']})\n"
+            return formatted_events
+        else:
+            return "## Upcoming Events\n\nNo upcoming events found in the analyzed submissions.\n"
+            
+    except Exception as e:
+        return f"## Upcoming Events\n\nError extracting upcoming events: {str(e)}\n"
 
 # --- User Authentication & Profile Functions ---
 def login_form():
@@ -3238,6 +4228,25 @@ def dashboard_page(supervisor_mode=False):
                             duty_reports_section += duty_report['summary']
                             duty_reports_section += "\n" + "="*50 + "\n"
 
+                    # Check for saved weekly engagement reports to integrate
+                    engagement_reports_section = ""
+                    if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
+                        st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
+                        engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
+                        for i, engagement_report in enumerate(st.session_state['weekly_engagement_reports'], 1):
+                            engagement_reports_section += f"\n--- ENGAGEMENT REPORT {i} ---\n"
+                            engagement_reports_section += f"Generated: {engagement_report['date_generated']}\n"
+                            engagement_reports_section += f"Date Range: {engagement_report['date_range']}\n"
+                            engagement_reports_section += f"Events Analyzed: {engagement_report['events_analyzed']}\n\n"
+                            engagement_reports_section += engagement_report['summary']
+                            
+                            # Include upcoming events if available
+                            if engagement_report.get('upcoming_events'):
+                                engagement_reports_section += f"\n\n--- UPCOMING EVENTS ---\n"
+                                engagement_reports_section += engagement_report['upcoming_events']
+                            
+                            engagement_reports_section += "\n" + "="*50 + "\n"
+
                     # Unified prompt for both Admin and Supervisor summaries:
                     prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
@@ -3247,6 +4256,7 @@ IMPORTANT: Start your response immediately with the first section heading. Do no
 DATA SOURCES AVAILABLE:
 1. Weekly staff reports from residence life team members
 2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
+3. Weekly engagement analysis (if available) - event programming, attendance data, community engagement activities
 
 The report MUST contain the following sections, in this order, using markdown headings exactly as shown:
 
@@ -3356,6 +4366,8 @@ STAFF REPORTS DATA:
 {reports_text}
 
 {duty_reports_section}
+
+{engagement_reports_section}
 """
                     model = genai.GenerativeModel("models/gemini-2.5-pro")
                     ai_response = model.generate_content(prompt)
@@ -3618,13 +4630,16 @@ def supervisors_section_page():
     and generating AI-powered summaries with actionable insights.
     """)
     
-    # Create tabs for the two analysis sections
-    tab1, tab2 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis"])
+    # Create tabs for the three analysis sections
+    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analysis", "🎉 Engagement Analysis", "📊 General Form Analysis"])
     
     with tab1:
         duty_analysis_section()
     
     with tab2:
+        engagement_analysis_section()
+    
+    with tab3:
         general_form_analysis_section()
 
 def duty_analysis_section():
@@ -4151,6 +5166,375 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - Duty Analysis 
     else:
         st.info("👆 Click 'Fetch Duty Reports' to load reports from the four duty report types")
 
+def engagement_analysis_section():
+    """Specialized section for Residence Life Event Submission analysis"""
+    st.subheader("🎉 Engagement Analysis")
+    st.markdown("""
+    **Focus:** Analyze Residence Life Event Submission forms to track programming, events, and community engagement.  
+    **Purpose:** Monitor event planning, attendance trends, programming effectiveness, and upcoming activities.
+    """)
+    
+    # Predefined engagement form type
+    ENGAGEMENT_FORM_TYPE = "Residence Life Event Submission"
+    
+    # Date range selection for engagement analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        engagement_start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=30),
+            help="Analyze event submissions from this date forward",
+            key="engagement_start_date"
+        )
+    
+    with col2:
+        engagement_end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Analyze event submissions up to this date",
+            key="engagement_end_date"
+        )
+    
+    st.info(f"📊 **Target Analysis:** {ENGAGEMENT_FORM_TYPE} forms from {engagement_start_date} to {engagement_end_date}")
+    
+    # Fetch engagement forms button
+    if st.button("🔄 Fetch Event Submissions", type="primary", key="fetch_engagement_forms"):
+        with st.spinner("Fetching event submissions from Roompact..."):
+            # Calculate page limit based on realistic data patterns
+            days_back = (datetime.now().date() - engagement_start_date).days
+            
+            # Use generous page limits based on date range
+            if days_back > 90:
+                max_pages = 1000  # 3+ months
+            elif days_back > 60:
+                max_pages = 800   # 2+ months  
+            elif days_back > 30:
+                max_pages = 600   # 1+ months
+            elif days_back > 14:
+                max_pages = 400   # 2+ weeks
+            else:
+                max_pages = 200   # Recent data
+            
+            st.info(f"📊 Searching up to {max_pages} pages for event submissions going back {days_back} days to {engagement_start_date}")
+            
+            # Show expanded search warning for very old dates
+            if days_back > 30:
+                minutes_estimate = max(2, days_back // 20)
+                st.warning(f"⏳ **Extended Search:** Searching {max_pages} pages may take {minutes_estimate}-{minutes_estimate + 1} minutes to complete.")
+            
+            progress_placeholder = st.empty()
+            
+            def show_engagement_progress(page_num, total_forms, oldest_date, reached_target):
+                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                if oldest_date != "Unknown":
+                    status += f" | Oldest: {oldest_date}"
+                if reached_target:
+                    status += f" | ✅ Reached {engagement_start_date}"
+                progress_placeholder.info(status)
+            
+            all_forms, error = fetch_roompact_forms(
+                max_pages=max_pages,
+                target_start_date=engagement_start_date,
+                progress_callback=show_engagement_progress
+            )
+            
+            if error:
+                st.error(error)
+                return
+            
+            if not all_forms:
+                st.warning("No forms found.")
+                return
+            
+            # Filter for engagement forms only
+            engagement_forms, filter_error = filter_forms_by_date_and_type(
+                all_forms, engagement_start_date, engagement_end_date, [ENGAGEMENT_FORM_TYPE]
+            )
+            
+            if filter_error:
+                st.error(f"Error filtering event submissions: {filter_error}")
+                return
+            
+            # Show actual date range of retrieved forms
+            if all_forms:
+                form_dates = []
+                for form in all_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_dates.append(form_datetime)
+                        except:
+                            pass
+                
+                if form_dates:
+                    oldest_retrieved = min(form_dates).strftime('%Y-%m-%d')
+                    newest_retrieved = max(form_dates).strftime('%Y-%m-%d')
+                    st.info(f"📅 **Retrieved data range:** {oldest_retrieved} to {newest_retrieved}")
+                    
+                    if datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() > engagement_start_date:
+                        days_missing = (datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() - engagement_start_date).days
+                        st.warning(f"⚠️ **Missing {days_missing} days of data** - oldest form found is {oldest_retrieved}, but you requested back to {engagement_start_date}")
+            
+            # Store engagement forms in session state
+            st.session_state['engagement_forms'] = engagement_forms
+            st.session_state['engagement_filter_info'] = {
+                'start_date': engagement_start_date,
+                'end_date': engagement_end_date,
+                'form_type': ENGAGEMENT_FORM_TYPE,
+                'total_fetched': len(all_forms),
+                'filtered_count': len(engagement_forms)
+            }
+            
+            if engagement_forms:
+                st.success(f"✅ Found {len(engagement_forms)} event submissions (from {len(all_forms)} total forms)")
+            else:
+                st.warning(f"No {ENGAGEMENT_FORM_TYPE} forms found in the date range {engagement_start_date} to {engagement_end_date}")
+    
+    # Display engagement forms if available
+    if 'engagement_forms' in st.session_state and st.session_state['engagement_forms']:
+        engagement_forms = st.session_state['engagement_forms']
+        filter_info = st.session_state.get('engagement_filter_info', {})
+        
+        st.subheader(f"🎉 Event Submissions Found ({len(engagement_forms)} submissions)")
+        
+        # Show filter summary
+        if filter_info:
+            st.info(f"""
+            📊 **Analysis Ready:** {filter_info['filtered_count']} event submissions (from {filter_info['total_fetched']} total forms)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Type:** {ENGAGEMENT_FORM_TYPE}
+            """)
+        
+        # Form selection and analysis
+        col_select, col_analyze = st.columns([2, 1])
+        
+        with col_select:
+            st.markdown("**Select event submissions to analyze:**")
+            
+            # Group submissions by month for better organization
+            submissions_by_month = {}
+            for form in engagement_forms:
+                current_revision = form.get('current_revision', {})
+                date_str = current_revision.get('date', '')
+                
+                if date_str:
+                    try:
+                        form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        month_key = form_datetime.strftime('%Y-%m (%B)')
+                    except:
+                        month_key = "Unknown Month"
+                else:
+                    month_key = "Unknown Month"
+                    
+                if month_key not in submissions_by_month:
+                    submissions_by_month[month_key] = []
+                submissions_by_month[month_key].append(form)
+            
+            selected_engagement_forms = []
+            
+            for month, month_forms in sorted(submissions_by_month.items()):
+                st.markdown(f"**{month}** ({len(month_forms)} submissions)")
+                
+                # Select all checkbox for this month
+                select_all_key = f"select_all_engagement_{month.replace(' ', '_').replace('(', '').replace(')', '')}"
+                if st.checkbox(f"Select all {month}", key=select_all_key):
+                    selected_engagement_forms.extend(month_forms)
+                else:
+                    # Individual form selection with better display
+                    for i, form in enumerate(month_forms):
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Extract event title from responses if available
+                        event_title = "Event"
+                        responses = current_revision.get('responses', [])
+                        for response in responses:
+                            field_label = response.get('field_label', '').lower()
+                            if any(word in field_label for word in ['title', 'name', 'event']):
+                                event_title = str(response.get('response', 'Event'))[:50]
+                                break
+                        
+                        form_date = "Unknown Date"
+                        if date_str:
+                            try:
+                                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                form_date = form_datetime.strftime('%m/%d/%Y')
+                            except:
+                                pass
+                        
+                        form_key = f"engagement_form_{month}_{i}"
+                        if st.checkbox(f"{event_title} - {author} ({form_date})", key=form_key):
+                            selected_engagement_forms.append(form)
+        
+        with col_analyze:
+            st.markdown("**Analysis Options:**")
+            
+            if selected_engagement_forms:
+                st.success(f"🎯 **Selected:** {len(selected_engagement_forms)} submissions")
+                
+                # Report type selection
+                engagement_report_type = st.selectbox(
+                    "📋 Report Type",
+                    ["📊 Standard Analysis", "📅 Weekly Summary Report"],
+                    help="Choose the type of analysis to generate",
+                    key="engagement_report_type"
+                )
+                
+                if st.button("🤖 Generate Engagement Analysis", type="primary", key="analyze_engagement"):
+                    with st.spinner("🧠 Analyzing event submissions with AI..."):
+                        engagement_analysis_result = analyze_engagement_forms_with_ai(
+                            selected_engagement_forms, 
+                            engagement_report_type,
+                            filter_info
+                        )
+                        
+                        if engagement_analysis_result:
+                            # Store the analysis
+                            st.session_state['last_engagement_analysis'] = engagement_analysis_result
+                            
+                            # If this is a weekly report, also store it for admin summaries integration
+                            if engagement_report_type == "📅 Weekly Summary Report":
+                                if 'weekly_engagement_reports' not in st.session_state:
+                                    st.session_state['weekly_engagement_reports'] = []
+                                
+                                weekly_engagement_data = {
+                                    'date_generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                    'date_range': f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}",
+                                    'events_analyzed': len(selected_engagement_forms),
+                                    'total_selected': len(selected_engagement_forms),
+                                    'summary': engagement_analysis_result['summary'],
+                                    'upcoming_events': extract_upcoming_events(selected_engagement_forms)
+                                }
+                                
+                                st.session_state['weekly_engagement_reports'].append(weekly_engagement_data)
+                            
+                            st.success("✅ Analysis complete!")
+                        else:
+                            st.error("❌ Analysis failed. Please try again.")
+            else:
+                st.info("👆 Select event submissions to analyze")
+    
+    # Display last analysis if available
+    if 'last_engagement_analysis' in st.session_state:
+        analysis_data = st.session_state['last_engagement_analysis']
+        
+        st.subheader("🎉 Engagement Analysis Results")
+        
+        # Display the analysis content
+        st.markdown(analysis_data['summary'])
+        
+        # Show data extraction debug info
+        with st.expander("🔍 Data Extraction Debug (Click to View)", expanded=False):
+            quantitative_data = extract_engagement_quantitative_data(analysis_data['selected_forms'])
+            if quantitative_data['success']:
+                st.write(f"**Successfully extracted data from {len(quantitative_data['data'])} events:**")
+                
+                for i, event in enumerate(quantitative_data['data'][:5]):  # Show first 5 events
+                    st.write(f"**Event {i+1}:**")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.write(f"- **Title:** {event.get('event_title', 'N/A')}")
+                        st.write(f"- **Type:** {event.get('event_type', 'N/A')}")
+                        st.write(f"- **Date:** {event.get('event_date', 'N/A')}")
+                        st.write(f"- **Hall:** {event.get('location_hall', 'N/A')}")
+                    with col_b:
+                        st.write(f"- **Estimated Attendance:** {event.get('estimated_attendance', 'N/A')}")
+                        st.write(f"- **Budget:** ${event.get('budget_amount', 0)}")
+                        st.write(f"- **Status:** {event.get('event_status', 'N/A')}")
+                        st.write(f"- **Form ID:** {event.get('form_submission_id', 'N/A')}")
+                    
+                    # Show form structure debug info
+                    if event.get('_debug_form_structure'):
+                        with st.expander(f"Form Structure Debug (Event {i+1})", expanded=False):
+                            debug_info = event['_debug_form_structure']
+                            st.write(f"**Form Keys Available:** {debug_info.get('form_keys', [])}")
+                            st.write(f"**Form ID Found:** {debug_info.get('form_id_found', 'None')}")
+                            st.write(f"**Revision Keys:** {debug_info.get('revision_keys', [])}")
+                    
+                    # Show original field labels for debugging
+                    if event.get('_debug_fields'):
+                        with st.expander(f"Original Form Fields (Event {i+1})", expanded=False):
+                            for field_info in event['_debug_fields']:
+                                st.text(field_info)
+                    st.write("---")
+                
+                if len(quantitative_data['data']) > 5:
+                    st.write(f"... and {len(quantitative_data['data']) - 5} more events")
+            else:
+                st.error(f"Failed to extract data: {quantitative_data['message']}")
+        
+        # Analysis action buttons
+        col1, col2, col3, col4 = st.columns(4)
+        
+        report_label = "Engagement Analysis"
+        if analysis_data['report_type'] == "📅 Weekly Summary Report":
+            report_label = "Weekly Engagement Summary"
+        
+        with col1:
+            # Download button
+            st.download_button(
+                "📥 Download Analysis",
+                data=analysis_data['summary'],
+                file_name=f"engagement_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                mime="text/markdown",
+                help="Download this engagement analysis as a markdown file",
+                key="download_engagement_analysis"
+            )
+        
+        with col2:
+            # Save quantitative data button
+            if st.button("💾 Save Data to Database", key="save_engagement_data", 
+                        help="Save quantitative metrics for future analysis and trending"):
+                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                
+                with st.spinner("Saving engagement data..."):
+                    save_result = save_engagement_data(analysis_data, user_id)
+                
+                if save_result["success"]:
+                    st.success(f"✅ {save_result['message']}")
+                else:
+                    st.error(f"❌ Save failed: {save_result['message']}")
+        
+        with col3:
+            # Save weekly analysis button  
+            if st.button("📋 Save Weekly Analysis", key="save_engagement_analysis",
+                        help="Save this analysis report for future reference"):
+                # Calculate week ending date from analysis period
+                end_date = analysis_data['filter_info']['end_date']
+                
+                # Handle both date objects and strings
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                # Find the next Sunday (week ending date)
+                days_ahead = 6 - end_date.weekday()  # 6 = Sunday
+                if days_ahead < 0:  # Target day already happened this week
+                    days_ahead += 7
+                week_ending = end_date + timedelta(days=days_ahead)
+                
+                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                
+                with st.spinner("Saving engagement analysis..."):
+                    save_result = save_engagement_analysis(analysis_data, week_ending.isoformat(), user_id)
+                
+                if save_result["success"]:
+                    st.success(f"✅ {save_result['message']}")
+                else:
+                    st.error(f"❌ Save failed: {save_result['message']}")
+        
+        with col4:
+            # Clear analysis button
+            if st.button("🗑️ Clear Analysis", type="secondary", key="clear_engagement_analysis", help="Clear the displayed analysis"):
+                del st.session_state['last_engagement_analysis']
+                st.rerun()
+    
+    else:
+        st.info("👆 Click 'Fetch Event Submissions' to load Residence Life Event Submission forms")
+
 def general_form_analysis_section():
     """General form analysis section with form type discovery"""
     st.subheader("📊 General Form Analysis")
@@ -4216,14 +5600,14 @@ def general_form_analysis_section():
             progress_placeholder.info(status)
         
         # Discover available form types
-        form_types_info = discover_form_types(
+        form_types_info, error = discover_form_types(
             max_pages=max_pages,
             target_start_date=general_start_date,
             progress_callback=show_general_progress
         )
         
-        if form_types_info is None:
-            st.error("Failed to discover forms. Please check your API connection.")
+        if form_types_info is None or error:
+            st.error(f"Failed to discover forms: {error or 'Unknown error'}")
             return
         
         # Store discovered forms in session state
@@ -4247,12 +5631,11 @@ def general_form_analysis_section():
             form_type_options = []
             form_type_details = {}
             
-            for form_type, info in form_types_info.items():
-                count = info['count']
-                date_range = info['date_range']
-                option_label = f"{form_type} ({count} forms, {date_range})"
-                form_type_options.append(option_label)
-                form_type_details[option_label] = form_type
+            for form_info in form_types_info:
+                display_name = form_info['display_name']
+                template_name = form_info['template_name']
+                form_type_options.append(display_name)
+                form_type_details[display_name] = template_name
             
             selected_form_labels = st.multiselect(
                 "Select form types to analyze:",
@@ -5149,12 +6532,12 @@ Test sent at: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         """)
 
 def saved_reports_page():
-    """View saved duty analyses, staff recognition reports, and weekly summaries"""
+    """View saved duty analyses, staff recognition reports, engagement analyses, and weekly summaries"""
     st.title("Saved Reports Archive")
-    st.write("View all saved reports: duty analyses, staff recognition, and weekly summaries.")
+    st.write("View all saved reports: duty analyses, engagement analyses, staff recognition, and weekly summaries.")
     
     # Tab selection for different report types
-    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🛡️ Duty Analyses", "🎉 Engagement Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
     
     with tab1:
         st.subheader("Saved Duty Analyses")
@@ -5241,6 +6624,106 @@ def saved_reports_page():
             st.error(f"Failed to fetch saved duty analyses: {e}")
     
     with tab2:
+        st.subheader("Saved Engagement Analyses")
+        
+        try:
+            # Get all saved engagement analyses
+            engagement_response = supabase.table('saved_engagement_analyses').select('*').order('week_ending_date', desc=True).execute()
+            engagement_analyses = engagement_response.data or []
+            
+            if not engagement_analyses:
+                st.info("No saved engagement analyses yet.")
+            else:
+                # Group analyses by year for better organization
+                engagement_by_year = {}
+                for analysis in engagement_analyses:
+                    try:
+                        year = pd.to_datetime(analysis['week_ending_date']).year
+                        if year not in engagement_by_year:
+                            engagement_by_year[year] = []
+                        engagement_by_year[year].append(analysis)
+                    except:
+                        if "Unknown" not in engagement_by_year:
+                            engagement_by_year["Unknown"] = []
+                        engagement_by_year["Unknown"].append(analysis)
+                
+                # Display engagement analyses by year
+                for year in sorted(engagement_by_year.keys(), reverse=True):
+                    st.write(f"### 🎉 {year} Engagement Analyses")
+                    
+                    year_analyses = engagement_by_year[year]
+                    for analysis in year_analyses:
+                        # Get creator info
+                        creator_name = "Unknown User"
+                        if analysis.get('created_by'):
+                            try:
+                                profile_response = supabase.table('profiles').select('full_name').eq('id', analysis['created_by']).execute()
+                                if profile_response.data:
+                                    creator_name = profile_response.data[0]['full_name']
+                            except:
+                                pass
+                        
+                        # Format dates
+                        week_date = analysis['week_ending_date']
+                        created_date = analysis['created_at'][:10] if analysis.get('created_at') else 'Unknown'
+                        
+                        # Display analysis info
+                        with st.expander(f"Week Ending {week_date} - {analysis.get('report_type', 'Analysis').title().replace('_', ' ')} - {creator_name}"):
+                            st.write(f"**Date Range:** {analysis.get('date_range_start', 'N/A')} to {analysis.get('date_range_end', 'N/A')}")
+                            st.write(f"**Events Analyzed:** {analysis.get('events_analyzed', 0)}")
+                            st.write(f"**Created:** {created_date} by {creator_name}")
+                            
+                            # Show upcoming events if available
+                            if analysis.get('upcoming_events'):
+                                st.markdown("**Upcoming Events:**")
+                                st.markdown(analysis['upcoming_events'])
+                            
+                            # Action buttons
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                # Download button
+                                st.download_button(
+                                    "📥 Download",
+                                    data=analysis['analysis_text'],
+                                    file_name=f"engagement_analysis_{week_date}.md",
+                                    mime="text/markdown",
+                                    help="Download this engagement analysis as a markdown file",
+                                    key=f"download_engagement_{analysis['id']}"
+                                )
+                            
+                            with col2:
+                                # Email UND LEADS section button (if applicable)
+                                if "UND LEADS" in analysis['analysis_text']:
+                                    if st.button(f"📧 Email UND LEADS", key=f"email_engagement_leads_{analysis['id']}", 
+                                               help="Extract and prepare UND LEADS section for email"):
+                                        leads_section = extract_und_leads_section(analysis['analysis_text'])
+                                        
+                                        if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
+                                            st.session_state['email_content'] = {
+                                                'subject': f"UND LEADS Summary - Week Ending {week_date}",
+                                                'body': leads_section,
+                                                'week_date': week_date
+                                            }
+                                            st.success("📧 UND LEADS section extracted! You can now use the email form in Admin Summaries to send it.")
+                                        else:
+                                            st.warning(f"⚠️ {leads_section}")
+                            
+                            with col3:
+                                # Delete button
+                                if st.button("🗑️ Delete", key=f"delete_engagement_{analysis['id']}", 
+                                           help="Permanently delete this engagement analysis"):
+                                    try:
+                                        supabase.table('saved_engagement_analyses').delete().eq('id', analysis['id']).execute()
+                                        st.success("✅ Engagement analysis deleted!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Failed to delete: {e}")
+        
+        except Exception as e:
+            st.error(f"Failed to fetch saved engagement analyses: {e}")
+    
+    with tab3:
         st.subheader("Saved Staff Recognition Reports")
         
         try:
@@ -5331,7 +6814,7 @@ def saved_reports_page():
         except Exception as e:
             st.error(f"Failed to fetch saved staff recognition reports: {e}")
     
-    with tab3:
+    with tab4:
         st.subheader("Saved Weekly Summaries")
         
         try:
@@ -5420,7 +6903,7 @@ def saved_reports_page():
                                     # Extract UND LEADS section
                                     leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
                                     
-                                    if leads_section:
+                                    if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
                                         # Store in session state for email form
                                         st.session_state['email_content'] = {
                                             'subject': f"UND LEADS Summary - Week Ending {week_date}",
@@ -5429,7 +6912,7 @@ def saved_reports_page():
                                         }
                                         st.success("📧 UND LEADS section extracted! You can now use the email form in Admin Summaries to send it.")
                                     else:
-                                        st.warning("No UND LEADS section found in this summary.")
+                                        st.warning(f"⚠️ {leads_section}")
         
         except Exception as e:
             st.error(f"Failed to fetch saved weekly summaries: {e}")
@@ -5526,7 +7009,7 @@ def admin_summaries_page():
                             # Extract UND LEADS section
                             leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
                             
-                            if leads_section:
+                            if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
                                 # Store in session state for email form
                                 st.session_state['email_content'] = {
                                     'subject': f"UND LEADS Summary - Week Ending {week_date}",
@@ -5536,20 +7019,20 @@ def admin_summaries_page():
                                 }
                                 st.rerun()
                             else:
-                                st.error("Could not find UND LEADS section in this summary.")
+                                st.error(f"⚠️ {leads_section}")
                     
                     # Preview UND LEADS section button  
                     with col3:
                         if st.button(f"👁️ Preview UND LEADS", key=f"preview_leads_{summary.get('id', week_date)}"):
                             leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
-                            if leads_section:
+                            if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
                                 st.session_state['preview_content'] = {
                                     'content': leads_section,
                                     'week_date': week_date
                                 }
                                 st.rerun()
                             else:
-                                st.error("Could not find UND LEADS section in this summary.")
+                                st.error(f"⚠️ {leads_section}")
                     
                     # Show email form if content is ready
                     if ('email_content' in st.session_state and 
