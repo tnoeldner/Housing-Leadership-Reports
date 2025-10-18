@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time as dt_time
 from supabase import create_client, Client
 import google.generativeai as genai
 try:
@@ -1397,6 +1397,284 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
                     'count': count
                 })
             
+            # Sort by count (most common first)
+            form_type_options.sort(key=lambda x: x['count'], reverse=True)
+            
+            return form_type_options, None
+            
+    except Exception as e:
+        return None, f"Error discovering form types: {str(e)}"
+
+def filter_forms_by_type_and_date(forms, selected_form_types, start_date, end_date):
+    """Filter forms by date range and selected form types"""
+    if not forms:
+        return [], "No forms to filter"
+    
+    filtered_forms = []
+    
+    try:
+        # Convert dates to datetime objects for comparison
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        
+        for form in forms:
+            # Get the form submission date
+            current_revision = form.get('current_revision', {})
+            date_str = current_revision.get('date', '')
+            
+            if not date_str:
+                continue  # Skip forms without dates
+            
+            try:
+                # Parse the ISO format date from Roompact API
+                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                # Convert to local time for comparison
+                form_datetime = form_datetime.replace(tzinfo=None)
+                
+                # Check if form is within date range
+                if not (start_datetime <= form_datetime <= end_datetime):
+                    continue
+                
+            except (ValueError, TypeError):
+                continue  # Skip forms with invalid dates
+            
+            # Check if form matches selected types
+            form_template_name = form.get('form_template_name', '')
+            if form_template_name in selected_form_types:
+                filtered_forms.append(form)
+        
+        return filtered_forms, None
+        
+    except Exception as e:
+        return [], f"Error filtering forms: {str(e)}"
+
+def analyze_general_forms_with_ai(selected_forms, form_types, start_date, end_date):
+    """Generate AI analysis for general form submissions"""
+    if not selected_forms:
+        return None
+    
+    try:
+        # Prepare forms data for AI analysis
+        forms_text = f"ANALYSIS PARAMETERS:\n"
+        forms_text += f"Form Types: {', '.join(form_types)}\n"
+        forms_text += f"Date Range: {start_date} to {end_date}\n"
+        forms_text += f"Total Forms: {len(selected_forms)}\n\n"
+        forms_text += "FORM SUBMISSIONS DATA:\n" + "="*50 + "\n"
+        
+        for i, form in enumerate(selected_forms, 1):
+            current_revision = form.get('current_revision', {})
+            author = current_revision.get('author', 'Unknown')
+            date_str = current_revision.get('date', '')
+            template_name = form.get('form_template_name', 'Unknown Form')
+            
+            # Format date for readability
+            form_date = "Unknown Date"
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    form_date = form_datetime.strftime('%Y-%m-%d %H:%M')
+                except:
+                    form_date = date_str
+            
+            forms_text += f"FORM #{i}: {template_name}\n"
+            forms_text += f"Submitted by: {author}\n"
+            forms_text += f"Date: {form_date}\n"
+            forms_text += f"Form ID: {form.get('id', 'Unknown')}\n\n"
+            
+            # Include form responses
+            responses = current_revision.get('responses', [])
+            for response in responses:
+                field_label = response.get('field_label', 'Unknown Field')
+                field_response = response.get('response', '')
+                
+                if field_response and str(field_response).strip():
+                    forms_text += f"**{field_label}:** {field_response}\n"
+            
+            forms_text += "\n" + "="*50 + "\n"
+        
+        # Create AI prompt for summarization
+        prompt = f"""
+You are analyzing form submissions from residence life staff for supervisory review. Please create a comprehensive summary that helps supervisors understand key themes, concerns, and insights from the submitted forms.
+
+FORM DATA:
+{forms_text}
+
+Please provide a summary that includes:
+
+1. **Executive Overview**: Brief summary of the number and types of forms analyzed
+2. **Key Themes**: Major patterns, recurring topics, or common themes across submissions  
+3. **Notable Incidents**: Any significant events, concerns, or issues reported
+4. **Staff Performance**: Observations about staff responsiveness, thoroughness, and professionalism
+5. **Operational Insights**: Patterns in facility issues, resident needs, or procedural gaps
+6. **Recommendations**: Actionable suggestions for improvements or follow-up actions
+7. **Data Summary**: Key statistics and trends from the submissions
+
+Provide specific examples and data-driven insights while maintaining appropriate confidentiality. Focus on actionable recommendations for residence life leadership.
+"""
+
+        # Use Gemini 2.5 Flash for better quota efficiency  
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        with st.spinner(f"AI is analyzing {len(selected_forms)} forms..."):
+            result = model.generate_content(prompt)
+            return result.text
+            
+    except Exception as e:
+        return f"Error generating form analysis: {str(e)}"
+    
+    try:
+        # Convert target_start_date to datetime for comparison if provided
+        target_datetime = None
+        if target_start_date:
+            target_datetime = datetime.combine(target_start_date, datetime.min.time())
+        
+        while page_count < max_pages and not reached_target_date:
+            params = {}
+            if next_cursor:
+                params['cursor'] = next_cursor
+                
+            data, error = make_roompact_request("forms", params)
+            if error:
+                return None, error
+            
+            # Add forms from this page
+            page_forms = data.get('data', [])
+            
+            # If we have a target date, check if we've reached forms older than our target
+            if target_datetime and page_forms:
+                for form in page_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_datetime = form_datetime.replace(tzinfo=None)
+                            
+                            # If this form is older than our target, we've gone far enough
+                            if form_datetime < target_datetime:
+                                reached_target_date = True
+                                break
+                        except:
+                            pass  # Skip forms with invalid dates
+            
+            forms.extend(page_forms)
+            
+            # Update progress if callback provided
+            if progress_callback:
+                oldest_date = "Unknown"
+                if page_forms:
+                    dates = []
+                    for form in page_forms:
+                        current_revision = form.get('current_revision', {})
+                        date_str = current_revision.get('date', '')
+                        if date_str:
+                            try:
+                                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                dates.append(form_datetime)
+                            except:
+                                pass
+                    if dates:
+                        oldest_date = min(dates).strftime('%Y-%m-%d')
+                
+                progress_callback(page_count + 1, len(forms), oldest_date, reached_target_date)
+            
+            # Check for pagination
+            links = data.get('links', [])
+            next_cursor = None
+            
+            for link in links:
+                if link.get('rel') == 'next':
+                    # Extract cursor from URI
+                    next_uri = link.get('uri', '')
+                    if 'cursor=' in next_uri:
+                        next_cursor = next_uri.split('cursor=')[1].split('&')[0]
+                    break
+            
+            page_count += 1
+            
+            # If no next page, break
+            if not next_cursor:
+                break
+                
+        return forms, None
+        
+    except Exception as e:
+        return None, f"Error fetching forms: {str(e)}"
+
+def discover_form_types(max_pages=600, target_start_date=None, progress_callback=None):
+    """Fetch forms and discover all available form types"""
+    try:
+        def progress_update(page_num, total_forms, oldest_date, reached_target):
+            status_text = f"📄 Page {page_num}: {total_forms} forms found"
+            if oldest_date != "Unknown":
+                status_text += f" | Oldest: {oldest_date}"
+            if reached_target:
+                status_text += " | ✅ Target date reached"
+            return status_text
+        
+        progress_placeholder = st.empty()
+        
+        def show_progress(page_num, total_forms, oldest_date, reached_target):
+            progress_placeholder.info(progress_update(page_num, total_forms, oldest_date, reached_target))
+        
+        with st.spinner("Discovering available form types..."):
+            forms, error = fetch_roompact_forms(
+                max_pages=max_pages, 
+                target_start_date=target_start_date,
+                progress_callback=show_progress
+            )
+            
+            if error:
+                return None, error
+            
+            if not forms:
+                return [], "No forms found"
+            
+            # Extract unique form template names with counts and date ranges
+            form_type_info = {}
+            for form in forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name and template_name != 'Unknown Form':
+                    if template_name not in form_type_info:
+                        form_type_info[template_name] = {
+                            'count': 0,
+                            'dates': []
+                        }
+                    
+                    form_type_info[template_name]['count'] += 1
+                    
+                    # Get submission date for date range info
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_type_info[template_name]['dates'].append(form_datetime)
+                        except:
+                            pass
+            
+            # Create form type options with metadata
+            form_type_options = []
+            for template_name, info in form_type_info.items():
+                count = info['count']
+                dates = info['dates']
+                
+                if dates:
+                    dates.sort()
+                    oldest = dates[0].strftime('%Y-%m-%d')
+                    newest = dates[-1].strftime('%Y-%m-%d')
+                    date_info = f"({oldest} to {newest})"
+                else:
+                    date_info = "(dates unknown)"
+                
+                display_name = f"{template_name} - {count} submissions {date_info}"
+                form_type_options.append({
+                    'display_name': display_name,
+                    'template_name': template_name,
+                    'count': count
+                })
+            
             # Sort by count (most common first) then alphabetically
             form_type_options.sort(key=lambda x: (-x['count'], x['template_name']))
             
@@ -2365,7 +2643,7 @@ def create_weekly_engagement_report_summary(selected_forms, filter_info):
                     event_info['name'] = field_response
                 
                 # Event approval status - CRITICAL for categorization
-                elif field_label == 'Event Approval':
+                elif field_label == 'Event approval' or field_label == 'Event Approval':
                     event_info['approval'] = field_response
                 
                 # Event date
@@ -2777,9 +3055,12 @@ def extract_engagement_quantitative_data(selected_forms):
                 field_label_lower = field_label.lower()
                 
                 # CRITICAL: Map Event Approval field to determine status
-                if (field_label == 'Event Approval' or 
+                # Updated to handle actual field names from API
+                if (field_label == 'Event approval' or  # Main approval field (lowercase 'a')
+                    field_label == 'Event Approval' or  # Legacy/alternative format
                     'event approval' in field_label_lower or
-                    field_label in ['Approval', 'Status', 'Event Status', 'Approval Status']):
+                    field_label in ['Approval', 'Status', 'Event Status', 'Approval Status',
+                                   'Event Approved-Supervisor Only', 'Tag Staff Program Approved For']):
                     event_data['event_approval'] = field_response
                     
                     # Track statistics
@@ -2789,6 +3070,112 @@ def extract_engagement_quantitative_data(selected_forms):
                         semester_stats['cancelled_events'] += 1
                     else:
                         semester_stats['pending_events'] += 1
+                
+                # NEW COMPREHENSIVE FIELD MAPPING
+                
+                # Meeting and Date Information
+                elif field_label == 'Date and Time of Meeting':
+                    event_data['meeting_date_time'] = field_response
+                elif field_label == 'Date':
+                    event_data['form_date'] = field_response
+                
+                # Staff and Supervisor Information
+                elif field_label == 'Tag your RD & CA':
+                    event_data['tag_rd_ca'] = field_response
+                elif field_label == 'Name of staff person(s) checking out master keys':
+                    event_data['staff_checking_out_keys'] = field_response
+                elif field_label == 'Duty Partner':
+                    event_data['duty_partner'] = field_response
+                
+                # Key Management
+                elif field_label == 'Checked Out - Date and Time':
+                    event_data['key_checkout_datetime'] = field_response
+                elif field_label == 'Checked In - Time ':
+                    event_data['key_checkin_time'] = field_response
+                elif field_label == 'Reason for checking out keys':
+                    event_data['key_checkout_reason'] = field_response
+                elif field_label == 'If assisting with a lockout, please tag the name of the resident':
+                    event_data['lockout_resident_name'] = field_response
+                
+                # Cost and Purchasing Information
+                elif field_label == 'Estimated Cost of Items for Meeting':
+                    try:
+                        event_data['estimated_meeting_cost'] = float(field_response) if field_response != '0' else 0
+                    except:
+                        pass
+                elif field_label == 'Items to Purchase':
+                    event_data['items_to_purchase'] = field_response
+                elif field_label == 'Catering Order':
+                    event_data['catering_order'] = field_response
+                elif field_label == 'Total Expenses':
+                    try:
+                        event_data['total_expenses'] = float(field_response) if field_response != '0' else 0
+                    except:
+                        pass
+                
+                # Round/Duty Information
+                elif field_label == 'Round Checklist: While on my first round, I did the following':
+                    event_data['round_first_checklist'] = field_response
+                elif field_label == 'Round Checklist: While on my second round, I completed the following':
+                    event_data['round_second_checklist'] = field_response
+                elif field_label == 'Round Checklist: While on my third round, I completed the following (Weekends Only)':
+                    event_data['round_third_checklist'] = field_response
+                elif field_label == 'I started my first round at':
+                    event_data['round_first_start_time'] = field_response
+                elif field_label == 'I ended my first round at':
+                    event_data['round_first_end_time'] = field_response
+                elif field_label == 'Round Summary: While on my first round, the following occurred':
+                    event_data['round_first_summary'] = field_response
+                elif field_label == 'I started my second round at':
+                    event_data['round_second_start_time'] = field_response
+                elif field_label == 'I ended my second round at':
+                    event_data['round_second_end_time'] = field_response
+                elif field_label == 'Round Summary: While on my second round, the following occurred':
+                    event_data['round_second_summary'] = field_response
+                elif field_label == 'I started my third round at (Weekends Only)':
+                    event_data['round_third_start_time'] = field_response
+                elif field_label == 'I ended my third round at (Weekends Only)':
+                    event_data['round_third_end_time'] = field_response
+                elif field_label == 'Round Summary: While on my third round, the following occurred (Weekends Only)':
+                    event_data['round_third_summary'] = field_response
+                elif field_label == 'Duty Notes:':
+                    event_data['duty_notes'] = field_response
+                
+                # Evaluation Fields
+                elif field_label == 'Evaluation Type':
+                    event_data['evaluation_type'] = field_response
+                elif field_label == 'Experience ':
+                    event_data['experience_rating'] = field_response
+                elif field_label == 'Experience Rating Justification':
+                    event_data['experience_justification'] = field_response
+                elif field_label == 'On Call Response ':
+                    event_data['on_call_response'] = field_response
+                elif field_label == 'On Call Rating Justification ':
+                    event_data['on_call_justification'] = field_response
+                elif field_label == 'Role Model':
+                    event_data['role_model_rating'] = field_response
+                elif field_label == 'Role Model Rating Justification ':
+                    event_data['role_model_justification'] = field_response
+                elif field_label == 'Community Development ':
+                    event_data['community_development_rating'] = field_response
+                elif field_label == 'Community Development Rating Justification ':
+                    event_data['community_development_justification'] = field_response
+                elif field_label == 'Goal Setting':
+                    event_data['goal_setting'] = field_response
+                elif field_label == 'At this time are you interested in returning to the RA position next academic year?':
+                    event_data['returning_interest'] = field_response
+                elif field_label == 'Outline how you will attract residents to the meeting, other than signs and/or advertisements. ':
+                    event_data['meeting_attraction_plan'] = field_response
+                
+                # Additional Information
+                elif field_label == 'Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. ':
+                    event_data['additional_phone_incidents'] = field_response
+                elif field_label == 'If other, explain below':
+                    # Could be added to a general notes field or specific context
+                    if 'other_explanation' not in event_data:
+                        event_data['other_explanation'] = field_response
+                
+                # EXISTING FIELD MAPPING (keep current logic)
                 
                 # Event name - exact field mapping
                 elif (field_label == 'Name of Event' or field_label == 'Name of event' or
@@ -2983,147 +3370,548 @@ def parse_event_datetime(datetime_string):
     except Exception:
         return None, None, None
 
+def safe_datetime_convert(value):
+    """Convert datetime objects to ISO format strings for database storage"""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, dt_time):
+        return value.isoformat()
+    return value
+
+def safe_json_convert(data):
+    """Convert complex objects to JSON-serializable format"""
+    if isinstance(data, dict):
+        return {k: safe_json_convert(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [safe_json_convert(item) for item in data]
+    elif isinstance(data, (datetime, date, dt_time)):
+        return safe_datetime_convert(data)
+    else:
+        return data
+
+def create_db_based_engagement_analysis():
+    """Create analysis based on database data with correct event_status"""
+    from collections import defaultdict
+    
+    st.write("🔍 **Database-Based Analysis** (Using Generated Event Status)")
+    
+    try:
+        # Query engagement data with event_status (generated column)
+        response = supabase.table("engagement_report_data").select(
+            "form_submission_id, event_name, event_approval, event_status, hall, "
+            "anticipated_attendance, total_attendees, author_first, author_last, "
+            "parsed_event_date, submission_date_chicago, specific_location, "
+            "event_description, target_audience, purchasing_items, business_purpose"
+        ).execute()
+        
+        if not response.data:
+            st.error("❌ No engagement data found in database. Please sync data first.")
+            return
+        
+        # Analyze the data with proper event_status
+        stats = {
+            'total_events': len(response.data),
+            'approved_events': 0,
+            'pending_events': 0,
+            'cancelled_events': 0
+        }
+        
+        events_by_status = defaultdict(list)
+        
+        for event in response.data:
+            status = event.get('event_status', 'pending')
+            events_by_status[status].append(event)
+            
+            # Count by status (using the generated column)
+            if status == 'approved':
+                stats['approved_events'] += 1
+            elif status == 'cancelled':
+                stats['cancelled_events'] += 1
+            else:
+                stats['pending_events'] += 1
+        
+        # Display overall statistics
+        st.write("📊 **Event Status Summary:**")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Events", stats['total_events'])
+        with col2:
+            st.metric("✅ Approved", stats['approved_events'])
+        with col3:
+            st.metric("⏳ Pending", stats['pending_events']) 
+        with col4:
+            st.metric("❌ Cancelled", stats['cancelled_events'])
+        
+        # Show breakdown by status
+        st.write("🔍 **Event Status Details:**")
+        
+        for status, events in events_by_status.items():
+            with st.expander(f"{status.title()} Events ({len(events)})", expanded=(status == 'approved')):
+                
+                if events:
+                    for event in events[:5]:  # Show first 5
+                        event_name = event.get('event_name', 'Unnamed Event')
+                        hall = event.get('hall', 'Unknown Hall')
+                        approval = event.get('event_approval', 'No approval data')
+                        
+                        st.write(f"**{event_name}** (Hall: {hall})")
+                        st.write(f"   - Form ID: {event.get('form_submission_id', 'N/A')}")
+                        st.write(f"   - Approval Field: '{approval}'")
+                        st.write(f"   - Generated Status: `{status}`")
+                        st.write("")
+                    
+                    if len(events) > 5:
+                        st.write(f"   ... and {len(events) - 5} more")
+        
+        # Check if event_approval field extraction is working
+        st.write("🧪 **Event Approval Field Analysis:**")
+        
+        approval_values = defaultdict(int)
+        empty_approval = 0
+        
+        for event in response.data:
+            approval = event.get('event_approval', '')
+            if approval and approval.strip():
+                approval_values[approval.strip()] += 1
+            else:
+                empty_approval += 1
+        
+        if approval_values:
+            st.write("**Found approval values:**")
+            for approval, count in approval_values.items():
+                st.write(f"- '{approval}': {count} events")
+        
+        if empty_approval > 0:
+            st.write(f"**Empty/Missing approval values:** {empty_approval} events")
+            st.warning("⚠️ Some events have empty event_approval fields. This may indicate field mapping issues.")
+        
+        # Test the generated column logic
+        with st.expander("🎯 **Generated Status Column Logic**", expanded=False):
+            st.write("The database automatically sets event_status based on:")
+            st.code("""
+CASE 
+    WHEN event_approval IS NULL OR event_approval = '' THEN 'pending'
+    WHEN event_approval ILIKE '%approved%' THEN 'approved'  
+    WHEN event_approval ILIKE '%cancelled%' OR event_approval ILIKE '%canceled%' THEN 'cancelled'
+    ELSE 'pending'
+END
+            """)
+            
+            st.write("**This means:**")
+            st.write("- Empty or null approval → 'pending'")
+            st.write("- Contains 'approved' (case-insensitive) → 'approved'")
+            st.write("- Contains 'cancelled'/'canceled' → 'cancelled'")
+            st.write("- Everything else → 'pending'")
+        
+    except Exception as e:
+        st.error(f"❌ Error loading engagement data: {e}")
+
 def save_engagement_data(analysis_data, created_by_user_id=None):
     """
-    Save or update engagement data using semester-long approach.
-    Each event is unique and gets updated as it progresses from proposal to completion.
+    Save or update engagement data using simplified approach that matches API structure.
+    Stores data exactly as received from the API to avoid serialization issues.
     """
     try:
-        # Extract complete engagement data
-        quantitative_data = extract_engagement_quantitative_data(analysis_data['selected_forms'])
+        # Test database connection first
+        try:
+            db_test = supabase.table("engagement_report_data").select("id").limit(1).execute()
+        except Exception as db_error:
+            error_msg = str(db_error).lower()
+            if "does not exist" in error_msg or "relation" in error_msg:
+                return {
+                    "success": False, 
+                    "message": "Database table 'engagement_report_data' does not exist",
+                    "error_details": "Run the SIMPLIFIED_ENGAGEMENT_SCHEMA.sql script in Supabase to create the table"
+                }
+            else:
+                return {
+                    "success": False, 
+                    "message": f"Database connection error: {str(db_error)}",
+                    "error_details": str(db_error)
+                }
         
-        if not quantitative_data['success']:
-            return {"success": False, "message": f"Failed to extract data: {quantitative_data['message']}"}
+        # Work directly with the selected forms (no complex extraction)
+        selected_forms = analysis_data['selected_forms']
         
-        events_data = quantitative_data['events_data']
-        semester_stats = quantitative_data['semester_statistics']
+        if not selected_forms:
+            return {"success": False, "message": "No forms provided for saving"}
         
-        # Prepare data for database with new schema
-        saved_count = 0
-        updated_count = 0
+        # Simple statistics tracking
+        total_saved = 0
         skipped_count = 0
         errors = []
         
-        for event in events_data:
+        # Process each form directly - extract CSV-like structure from API data
+        for form in selected_forms:
             try:
-                # Clean data for database insertion
-                db_record = {
-                    # Form metadata
-                    'form_submission_id': event['form_submission_id'],
-                    'submission_date': event['submission_date'],
-                    
-                    # Event basic information  
-                    'event_name': event['event_name'],
-                    'event_type': event['event_type'],
-                    'event_description': event['event_description'],
-                    
-                    # Event scheduling
-                    'event_date': event['event_date'],
-                    'event_start_time': event['event_start_time'],
-                    'event_end_time': event['event_end_time'],
-                    'event_duration_hours': event['event_duration_hours'],
-                    
-                    # CRITICAL: Event approval determines status
-                    'event_approval': event['event_approval'],
-                    
-                    # Location information
-                    'hall': event['hall'],
-                    'specific_location': event['specific_location'],
-                    'location_notes': event['location_notes'],
-                    
-                    # Attendance information
-                    'anticipated_attendance': event['anticipated_attendance'],
-                    'actual_attendance': event['actual_attendance'],
-                    
-                    # Staffing and organization
-                    'event_organizer': event['event_organizer'],
-                    'co_organizers': event['co_organizers'],
-                    'staff_advisor': event['staff_advisor'],
-                    
-                    # Programming details
-                    'programming_theme': event['programming_theme'],
-                    'target_audience': event['target_audience'],
-                    'educational_objectives': event['educational_objectives'],
-                    
-                    # Budget and resources
-                    'estimated_budget': event['estimated_budget'],
-                    'actual_budget': event['actual_budget'],
-                    'funding_source': event['funding_source'],
-                    'resources_needed': event['resources_needed'],
-                    
-                    # Partnerships and collaboration
-                    'collaboration_partners': event['collaboration_partners'],
-                    'campus_partners': event['campus_partners'],
-                    'external_partners': event['external_partners'],
-                    
-                    # Marketing and promotion
-                    'marketing_plan': event['marketing_plan'],
-                    'promotional_materials': event['promotional_materials'],
-                    'registration_required': event['registration_required'],
-                    'registration_deadline': event['registration_deadline'],
-                    
-                    # Follow-up and assessment
-                    'assessment_method': event['assessment_method'],
-                    'follow_up_actions': event['follow_up_actions'],
-                    'event_feedback': event['event_feedback'],
-                    'lessons_learned': event['lessons_learned'],
-                    
-                    # System fields
-                    'semester': event['semester'],
-                    'academic_year': event['academic_year'],
+                # Get basic form info
+                form_id = form.get('form_submission_id', '')
+                if not form_id:
+                    errors.append("Form missing form_submission_id")
+                    continue
+                
+                # Get current revision for parsing
+                current_revision = form.get('current_revision', {})
+                responses = current_revision.get('responses', [])
+                
+                # Initialize all CSV fields
+                csv_record = {
+                    'form_submission_id': form_id,
+                    'author_first': '',
+                    'author_last': '',
+                    'author_email': '',
+                    'author_student_id': '',
+                    'author_current_assignment': '',
+                    'author_assignment_at_submission': '',
+                    'submission_date_chicago': current_revision.get('date', ''),
+                    'last_revised_by': '',
+                    'last_revised_by_email': '',
+                    'last_revised_date_chicago': '',
+                    'hall': '',
+                    'tag_other_staff': '',
+                    'contact_info_organizer': '',
+                    'event_name': '',
+                    'event_date_start_time': '',
+                    'event_end_time': '',
+                    'specific_location': '',
+                    'event_description': '',
+                    'event_outline': '',
+                    'target_audience': '',
+                    'llc_sponsored_status': '',
+                    'purchasing_items': False,
+                    'purchasing_food': False,
+                    'vendor_name': '',
+                    'jp_morgan_location': '',
+                    'funding_account': '',
+                    'type_items_purchased': '',
+                    'list_items_purchased': '',
+                    'business_purpose': '',
+                    'total_cost_vendor': None,
+                    'total_cost_all': None,
+                    'prize_receipts_needed': 0,
+                    'receipt_acknowledgment': False,
+                    'anticipated_attendance': 0,
+                    'minors_attending': False,
+                    'funds_requester': '',
+                    'event_approval': '',
+                    'supervisor_comments': '',
+                    'event_attendance_tracking': '',
+                    'total_attendees': None,
+                    'assessment_summary': '',
+                    # NEW FIELDS FROM COMPREHENSIVE MAPPING
+                    'meeting_date_time': '',
+                    'tag_rd_ca': '',
+                    'estimated_meeting_cost': None,
+                    'items_to_purchase': '',
+                    'catering_order': '',
+                    'total_expenses': None,
+                    'staff_checking_out_keys': '',
+                    'key_checkout_datetime': '',
+                    'key_checkin_time': '',
+                    'key_checkout_reason': '',
+                    'lockout_resident_name': '',
+                    'additional_phone_incidents': '',
+                    'round_first_checklist': '',
+                    'round_second_checklist': '',
+                    'round_third_checklist': '',
+                    'round_first_start_time': '',
+                    'round_first_end_time': '',
+                    'round_first_summary': '',
+                    'round_second_start_time': '',
+                    'round_second_end_time': '',
+                    'round_second_summary': '',
+                    'round_third_start_time': '',
+                    'round_third_end_time': '',
+                    'round_third_summary': '',
+                    'duty_notes': '',
+                    'duty_partner': '',
+                    'evaluation_type': '',
+                    'experience_rating': '',
+                    'experience_justification': '',
+                    'on_call_response': '',
+                    'on_call_justification': '',
+                    'role_model_rating': '',
+                    'role_model_justification': '',
+                    'community_development_rating': '',
+                    'community_development_justification': '',
+                    'goal_setting': '',
+                    'returning_interest': '',
+                    'meeting_attraction_plan': '',
+                    'form_date': '',
+                    # EXISTING SYSTEM FIELDS
+                    'parsed_event_date': None,
+                    'parsed_event_start_time': None,
+                    'parsed_submission_date': None,
+                    'semester': 'Academic Year 2025-2026',
+                    'academic_year': '2025-2026',
                     'generated_by_user_id': created_by_user_id,
-                    
-                    # Store complete form data
-                    'form_responses': event['form_responses'],
-                    'form_debug_info': event['form_debug_info']
+                    'form_responses': json.dumps(form),
+                    'form_debug_info': json.dumps({
+                        'processing_timestamp': datetime.now().isoformat(),
+                        'responses_count': len(responses),
+                        'form_template': form.get('form_template_name', '')
+                    })
                 }
                 
-                # Check if this event already exists (by form_submission_id)
-                existing_check = supabase.table("engagement_report_data").select(
-                    "id, event_name, event_approval, last_updated"
-                ).eq("form_submission_id", event['form_submission_id']).execute()
+                # Extract author info from revision
+                author_name = current_revision.get('author', '')
+                if author_name:
+                    name_parts = author_name.split(' ', 1)
+                    csv_record['author_first'] = name_parts[0] if len(name_parts) > 0 else ''
+                    csv_record['author_last'] = name_parts[1] if len(name_parts) > 1 else ''
                 
-                if existing_check.data:
-                    # Event exists - update it with new information
-                    existing_record = existing_check.data[0]
+                # Extract key fields from form responses (matching CSV columns)
+                for response in responses:
+                    field_label = response.get('field_label', '').lower()
+                    response_value = response.get('response')
                     
-                    # Add update timestamp
-                    db_record['last_updated'] = datetime.now().isoformat()
-                    
-                    # Update existing record
-                    update_response = supabase.table("engagement_report_data").update(
-                        db_record
-                    ).eq("id", existing_record['id']).execute()
-                    
-                    if update_response.data:
-                        updated_count += 1
-                    else:
-                        errors.append(f"Failed to update event: {event.get('event_name', 'Unknown')}")
+                    if not response_value:
+                        continue
                         
-                else:
-                    # New event - insert it
-                    insert_response = supabase.table("engagement_report_data").insert(db_record).execute()
+                    # Map form fields to CSV columns
+                    if 'name of event' in field_label:
+                        csv_record['event_name'] = str(response_value)
+                    elif 'date and event start time' in field_label:
+                        csv_record['event_date_start_time'] = str(response_value)
+                        # Try to parse the date
+                        try:
+                            event_datetime = datetime.fromisoformat(str(response_value).replace('Z', '+00:00'))
+                            csv_record['parsed_event_date'] = event_datetime.date().isoformat()
+                            csv_record['parsed_event_start_time'] = event_datetime.time().isoformat()
+                        except:
+                            pass
+                    elif 'event end time' in field_label:
+                        csv_record['event_end_time'] = str(response_value)
+                    elif 'specific location' in field_label:
+                        csv_record['specific_location'] = str(response_value)
+                    elif 'description of event' in field_label:
+                        csv_record['event_description'] = str(response_value)
+                    elif 'outline of event' in field_label:
+                        csv_record['event_outline'] = str(response_value)
+                    elif 'hall' in field_label:
+                        # Handle array response for hall
+                        if isinstance(response_value, list):
+                            hall_names = [item.get('tag_name', '') for item in response_value if isinstance(item, dict)]
+                            csv_record['hall'] = ', '.join(hall_names)
+                        else:
+                            csv_record['hall'] = str(response_value)
+                    elif 'target audience' in field_label:
+                        # Handle array response for target audience
+                        if isinstance(response_value, list):
+                            audience_names = [item.get('tag_name', '') for item in response_value if isinstance(item, dict)]
+                            csv_record['target_audience'] = ', '.join(audience_names)
+                        else:
+                            csv_record['target_audience'] = str(response_value)
+                    elif 'llc sponsored' in field_label:
+                        if isinstance(response_value, list):
+                            llc_names = [item.get('tag_name', '') for item in response_value if isinstance(item, dict)]
+                            csv_record['llc_sponsored_status'] = ', '.join(llc_names)
+                        else:
+                            csv_record['llc_sponsored_status'] = str(response_value)
+                    elif 'anticipated number' in field_label and 'attend' in field_label:
+                        try:
+                            csv_record['anticipated_attendance'] = int(response_value)
+                        except:
+                            pass
+                    elif 'purchasing items' in field_label:
+                        csv_record['purchasing_items'] = str(response_value).lower() == 'yes'
+                    elif 'purchasing food' in field_label:
+                        csv_record['purchasing_food'] = str(response_value).lower() == 'yes'
+                    elif 'vendor name' in field_label:
+                        csv_record['vendor_name'] = str(response_value)
+                    elif 'contact information' in field_label and 'organizer' in field_label:
+                        csv_record['contact_info_organizer'] = str(response_value)
+                    elif ('event approval' in field_label or 
+                          'approval' in field_label or 
+                          'event status' in field_label or
+                          'status' in field_label and 'event' in field_label):
+                        csv_record['event_approval'] = str(response_value)
+                    elif 'supervisor' in field_label and ('comment' in field_label or 'revision' in field_label):
+                        csv_record['supervisor_comments'] = str(response_value)
+                    elif 'business purpose' in field_label:
+                        csv_record['business_purpose'] = str(response_value)
+                    elif 'total cost' in field_label and 'vendor' in field_label:
+                        try:
+                            csv_record['total_cost_vendor'] = float(response_value)
+                        except:
+                            pass
+                    elif 'total cost' in field_label and ('all' in field_label or 'items' in field_label):
+                        try:
+                            csv_record['total_cost_all'] = float(response_value)
+                        except:
+                            pass
+                    elif 'minors' in field_label and 'attending' in field_label:
+                        csv_record['minors_attending'] = str(response_value).lower() == 'yes'
+                    elif 'funds requester' in field_label or 'requesting funds' in field_label:
+                        csv_record['funds_requester'] = str(response_value)
+                    elif 'jp morgan' in field_label or 'purchasing card' in field_label:
+                        csv_record['jp_morgan_location'] = str(response_value)
+                    elif 'funding account' in field_label:
+                        csv_record['funding_account'] = str(response_value)
+                    elif 'items purchased' in field_label and 'type' in field_label:
+                        csv_record['type_items_purchased'] = str(response_value)
+                    elif 'items purchased' in field_label and 'list' in field_label:
+                        csv_record['list_items_purchased'] = str(response_value)
+                    elif 'receipt' in field_label and 'acknowledgment' in field_label:
+                        csv_record['receipt_acknowledgment'] = str(response_value).lower() == 'yes'
+                    elif 'total attendees' in field_label or 'number of attendees' in field_label:
+                        try:
+                            csv_record['total_attendees'] = int(response_value)
+                        except:
+                            pass
+                    elif 'assessment summary' in field_label:
+                        csv_record['assessment_summary'] = str(response_value)
                     
-                    if insert_response.data:
-                        saved_count += 1
+                    # NEW COMPREHENSIVE FIELD MAPPING FOR ALL UNMAPPED FIELDS
+                    elif 'date and time of meeting' in field_label:
+                        csv_record['meeting_date_time'] = str(response_value)
+                    elif 'tag your rd & ca' in field_label or 'tag your rd and ca' in field_label:
+                        csv_record['tag_rd_ca'] = str(response_value)
+                    elif 'estimated cost of items for meeting' in field_label:
+                        try:
+                            csv_record['estimated_meeting_cost'] = float(response_value) if str(response_value) != '0' else None
+                        except:
+                            pass
+                    elif 'items to purchase' in field_label and 'meeting' in field_label:
+                        csv_record['items_to_purchase'] = str(response_value)
+                    elif 'catering order' in field_label:
+                        csv_record['catering_order'] = str(response_value)
+                    elif 'total expenses' in field_label:
+                        try:
+                            csv_record['total_expenses'] = float(response_value) if str(response_value) != '0' else None
+                        except:
+                            pass
+                    elif 'name of staff person' in field_label and 'checking out' in field_label:
+                        csv_record['staff_checking_out_keys'] = str(response_value)
+                    elif 'checked out - date and time' in field_label:
+                        csv_record['key_checkout_datetime'] = str(response_value)
+                    elif 'checked in - time' in field_label:
+                        csv_record['key_checkin_time'] = str(response_value)
+                    elif 'reason for checking out keys' in field_label:
+                        csv_record['key_checkout_reason'] = str(response_value)
+                    elif 'assisting with a lockout' in field_label and 'resident' in field_label:
+                        csv_record['lockout_resident_name'] = str(response_value)
+                    elif 'additional information' in field_label and 'phone calls' in field_label:
+                        csv_record['additional_phone_incidents'] = str(response_value)
+                    elif 'round checklist' in field_label and 'first round' in field_label:
+                        csv_record['round_first_checklist'] = str(response_value)
+                    elif 'round checklist' in field_label and 'second round' in field_label:
+                        csv_record['round_second_checklist'] = str(response_value)
+                    elif 'round checklist' in field_label and 'third round' in field_label:
+                        csv_record['round_third_checklist'] = str(response_value)
+                    elif 'started my first round at' in field_label:
+                        csv_record['round_first_start_time'] = str(response_value)
+                    elif 'ended my first round at' in field_label:
+                        csv_record['round_first_end_time'] = str(response_value)
+                    elif 'round summary' in field_label and 'first round' in field_label:
+                        csv_record['round_first_summary'] = str(response_value)
+                    elif 'started my second round at' in field_label:
+                        csv_record['round_second_start_time'] = str(response_value)
+                    elif 'ended my second round at' in field_label:
+                        csv_record['round_second_end_time'] = str(response_value)
+                    elif 'round summary' in field_label and 'second round' in field_label:
+                        csv_record['round_second_summary'] = str(response_value)
+                    elif 'started my third round at' in field_label:
+                        csv_record['round_third_start_time'] = str(response_value)
+                    elif 'ended my third round at' in field_label:
+                        csv_record['round_third_end_time'] = str(response_value)
+                    elif 'round summary' in field_label and 'third round' in field_label:
+                        csv_record['round_third_summary'] = str(response_value)
+                    elif 'duty notes' in field_label:
+                        csv_record['duty_notes'] = str(response_value)
+                    elif 'duty partner' in field_label:
+                        csv_record['duty_partner'] = str(response_value)
+                    elif 'evaluation type' in field_label:
+                        csv_record['evaluation_type'] = str(response_value)
+                    elif field_label == 'experience ' or field_label == 'experience':
+                        csv_record['experience_rating'] = str(response_value)
+                    elif 'experience rating justification' in field_label:
+                        csv_record['experience_justification'] = str(response_value)
+                    elif 'on call response' in field_label:
+                        csv_record['on_call_response'] = str(response_value)
+                    elif 'on call rating justification' in field_label:
+                        csv_record['on_call_justification'] = str(response_value)
+                    elif 'role model' in field_label and 'justification' not in field_label:
+                        csv_record['role_model_rating'] = str(response_value)
+                    elif 'role model rating justification' in field_label:
+                        csv_record['role_model_justification'] = str(response_value)
+                    elif 'community development' in field_label and 'justification' not in field_label:
+                        csv_record['community_development_rating'] = str(response_value)
+                    elif 'community development rating justification' in field_label:
+                        csv_record['community_development_justification'] = str(response_value)
+                    elif 'goal setting' in field_label:
+                        csv_record['goal_setting'] = str(response_value)
+                    elif 'returning to the ra position' in field_label:
+                        csv_record['returning_interest'] = str(response_value)
+                    elif 'attract residents to the meeting' in field_label:
+                        csv_record['meeting_attraction_plan'] = str(response_value)
+                    elif field_label == 'date' and 'time' not in field_label:
+                        csv_record['form_date'] = str(response_value)
+                
+                # Parse submission date
+                try:
+                    if csv_record['submission_date_chicago']:
+                        submission_dt = datetime.fromisoformat(csv_record['submission_date_chicago'].replace('Z', '+00:00'))
+                        csv_record['parsed_submission_date'] = submission_dt.isoformat()
+                except:
+                    pass
+                
+                # Store data in database - try insert first, then update if exists
+                try:
+                    # Try insert first
+                    result = supabase.table("engagement_report_data").insert(csv_record).execute()
+                    
+                    if result.data:
+                        total_saved += 1
+                        event_display_name = csv_record.get('event_name', f"Event {form_id}")
+                        st.success(f"✅ Inserted: {event_display_name} (ID: {form_id})")
                     else:
-                        errors.append(f"Failed to insert event: {event.get('event_name', 'Unknown')}")
+                        errors.append(f"Database insert failed for {form_id}")
+                        
+                except Exception as insert_error:
+                    # If insert failed due to duplicate, try update
+                    if "duplicate key" in str(insert_error).lower() or "unique constraint" in str(insert_error).lower():
+                        try:
+                            # Update existing record
+                            csv_record['last_updated'] = datetime.now().isoformat()
+                            update_result = supabase.table("engagement_report_data").update(
+                                csv_record
+                            ).eq("form_submission_id", form_id).execute()
+                            
+                            if update_result.data:
+                                total_saved += 1
+                                event_display_name = csv_record.get('event_name', f"Event {form_id}")
+                                st.success(f"✅ Updated: {event_display_name} (ID: {form_id})")
+                            else:
+                                errors.append(f"Database update failed for {form_id}")
+                                
+                        except Exception as update_error:
+                            errors.append(f"Failed to update {form_id}: {update_error}")
+                            st.error(f"❌ Update failed for {form_id}")
+                    else:
+                        # Re-raise if it's not a duplicate key error
+                        raise insert_error
                         
             except Exception as e:
                 error_msg = str(e)
-                if "violates unique constraint" in error_msg or "duplicate key" in error_msg:
-                    skipped_count += 1
-                else:
-                    errors.append(f"Error processing {event.get('event_name', 'Unknown')}: {error_msg}")
+                event_name = csv_record.get('event_name', 'Unknown') if 'csv_record' in locals() else 'Unknown'
+                
+                # Log the full error for debugging
+                st.error(f"❌ Error processing {event_name}: {error_msg}")
+                errors.append(f"Error processing {event_name}: {error_msg}")
+                
+                # Don't count database errors as "skipped duplicates" - they're actual errors
         
         # Prepare comprehensive result message
         result_messages = []
         
-        if saved_count > 0:
-            result_messages.append(f"✅ Created {saved_count} new events")
-        
-        if updated_count > 0:
-            result_messages.append(f"🔄 Updated {updated_count} existing events")
+        if total_saved > 0:
+            result_messages.append(f"✅ Processed {total_saved} events")
         
         if skipped_count > 0:
             result_messages.append(f"⏭️ Skipped {skipped_count} duplicates")
@@ -3131,16 +3919,24 @@ def save_engagement_data(analysis_data, created_by_user_id=None):
         if errors:
             result_messages.append(f"❌ {len(errors)} errors occurred")
         
-        # Add semester statistics
-        stats_msg = f"Fall Semester Stats: {semester_stats['approved_events']} approved, {semester_stats['pending_events']} pending, {semester_stats['cancelled_events']} cancelled"
+        # Simple statistics
+        total_processed = total_saved + skipped_count
+        stats_msg = f"Academic Year 2025-2026: Processed {total_processed} events total"
+        
+        # Create simple semester statistics for compatibility
+        simple_stats = {
+            'approved_events': 0,  # Will be calculated by database generated column
+            'pending_events': total_saved,  # Assume pending until approval status is set
+            'cancelled_events': 0
+        }
         
         return {
-            "success": saved_count > 0 or updated_count > 0,
+            "success": total_saved > 0,
             "message": " | ".join(result_messages) if result_messages else "No events processed",
             "detailed_message": stats_msg,
-            "semester_statistics": semester_stats,
-            "records_created": saved_count,
-            "records_updated": updated_count,
+            "semester_statistics": simple_stats,
+            "records_created": total_saved,
+            "records_updated": 0,  # We're using upsert now, so no separate tracking
             "records_skipped": skipped_count,
             "errors": errors
         }
@@ -4772,20 +5568,17 @@ def supervisors_section_page():
     """Page for supervisors to view and analyze Roompact form submissions"""
     st.title("📋 Supervisors Section - Form Analysis")
     st.markdown("""
-    This section provides two specialized analysis tools for reviewing Roompact form submissions 
+    This section provides specialized analysis tools for reviewing form submissions 
     and generating AI-powered summaries with actionable insights.
     """)
     
-    # Create tabs for the three analysis sections
-    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analysis", "🎉 Engagement Analysis", "📊 General Form Analysis"])
+    # Create tabs for the analysis sections
+    tab1, tab2 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis"])
     
     with tab1:
         duty_analysis_section()
     
     with tab2:
-        engagement_analysis_section()
-    
-    with tab3:
         general_form_analysis_section()
 
 def duty_analysis_section():
@@ -5313,61 +6106,30 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - Duty Analysis 
         st.info("👆 Click 'Fetch Duty Reports' to load reports from the four duty report types")
 
 def engagement_analysis_section():
-    """Specialized section for Residence Life Event Submission analysis"""
-    st.subheader("🎉 Engagement Analysis")
+    """Specialized section for Residence Life Event Submission analysis - Full Semester Management"""
+    st.subheader("🎉 Engagement Analysis - Fall Semester")
     st.markdown("""
-    **Focus:** Analyze Residence Life Event Submission forms to track programming, events, and community engagement.  
-    **Purpose:** Monitor event planning, attendance trends, programming effectiveness, and upcoming activities.
+    **Focus:** Complete Fall semester event lifecycle management (Aug 22 - Dec 31, 2024)  
+    **Purpose:** Track all event submissions from proposal to completion with status updates and weekly analysis.
+    **Data Management:** Fetches ALL event submissions and updates existing records as events progress through approval/completion.
     """)
     
     # Predefined engagement form type
     ENGAGEMENT_FORM_TYPE = "Residence Life Event Submission"
     
-    # Date range selection for engagement analysis
-    col1, col2 = st.columns(2)
+    # Academic year info display
+    st.info("🏫 **Academic Year Management:** Event submissions from August 1, 2025 onward will be fetched and synchronized with the engagement database. Events are tracked uniquely throughout their lifecycle from proposal to completion.")
     
-    with col1:
-        engagement_start_date = st.date_input(
-            "📅 Start Date",
-            value=datetime.now().date() - timedelta(days=30),
-            help="Analyze event submissions from this date forward",
-            key="engagement_start_date"
-        )
-    
-    with col2:
-        engagement_end_date = st.date_input(
-            "📅 End Date", 
-            value=datetime.now().date(),
-            help="Analyze event submissions up to this date",
-            key="engagement_end_date"
-        )
-    
-    st.info(f"📊 **Target Analysis:** {ENGAGEMENT_FORM_TYPE} forms from {engagement_start_date} to {engagement_end_date}")
-    
-    # Fetch engagement forms button
-    if st.button("🔄 Fetch Event Submissions", type="primary", key="fetch_engagement_forms"):
-        with st.spinner("Fetching event submissions from Roompact..."):
-            # Calculate page limit based on realistic data patterns
-            days_back = (datetime.now().date() - engagement_start_date).days
+    # Fetch ALL engagement forms button (with August 1, 2025 target date)
+    if st.button("🔄 Fetch All Event Submissions", type="primary", key="fetch_all_engagement_forms"):
+        with st.spinner("Fetching event submissions from Roompact since August 1, 2025..."):
+            # Use comprehensive page limit for academic year data
+            max_pages = 1200  # Generous limit to capture academic year
+            # Set target date to August 1, 2025 to limit how far back we go
+            target_start_date = datetime(2025, 8, 1).date()
             
-            # Use generous page limits based on date range
-            if days_back > 90:
-                max_pages = 1000  # 3+ months
-            elif days_back > 60:
-                max_pages = 800   # 2+ months  
-            elif days_back > 30:
-                max_pages = 600   # 1+ months
-            elif days_back > 14:
-                max_pages = 400   # 2+ weeks
-            else:
-                max_pages = 200   # Recent data
-            
-            st.info(f"📊 Searching up to {max_pages} pages for event submissions going back {days_back} days to {engagement_start_date}")
-            
-            # Show expanded search warning for very old dates
-            if days_back > 30:
-                minutes_estimate = max(2, days_back // 20)
-                st.warning(f"⏳ **Extended Search:** Searching {max_pages} pages may take {minutes_estimate}-{minutes_estimate + 1} minutes to complete.")
+            st.info(f"📊 **Academic Year Sync:** Fetching event submissions from August 1, 2025 to present (up to {max_pages} pages)")
+            st.warning(f"⏳ **Comprehensive Search:** This may take 2-4 minutes to fetch and process event submissions")
             
             progress_placeholder = st.empty()
             
@@ -5376,12 +6138,13 @@ def engagement_analysis_section():
                 if oldest_date != "Unknown":
                     status += f" | Oldest: {oldest_date}"
                 if reached_target:
-                    status += f" | ✅ Reached {engagement_start_date}"
+                    status += " | ✅ August 1, 2025 reached"
                 progress_placeholder.info(status)
             
+            # Fetch forms with August 1, 2025 as target start date
             all_forms, error = fetch_roompact_forms(
                 max_pages=max_pages,
-                target_start_date=engagement_start_date,
+                target_start_date=target_start_date,  # Stop at August 1, 2025
                 progress_callback=show_engagement_progress
             )
             
@@ -5393,51 +6156,151 @@ def engagement_analysis_section():
                 st.warning("No forms found.")
                 return
             
-            # Filter for engagement forms only
-            engagement_forms, filter_error = filter_forms_by_date_and_type(
-                all_forms, engagement_start_date, engagement_end_date, [ENGAGEMENT_FORM_TYPE]
-            )
+            # Filter for engagement forms only (no date filtering)
+            engagement_forms = []
+            for form in all_forms:
+                if form.get('form_template_name') == ENGAGEMENT_FORM_TYPE:
+                    engagement_forms.append(form)
             
-            if filter_error:
-                st.error(f"Error filtering event submissions: {filter_error}")
-                return
-            
-            # Show actual date range of retrieved forms
+            # Show comprehensive data statistics
             if all_forms:
                 form_dates = []
-                for form in all_forms:
+                engagement_dates = []
+                
+                for form in engagement_forms:
                     current_revision = form.get('current_revision', {})
                     date_str = current_revision.get('date', '')
                     if date_str:
                         try:
                             form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                            form_dates.append(form_datetime)
+                            engagement_dates.append(form_datetime)
                         except:
                             pass
                 
-                if form_dates:
-                    oldest_retrieved = min(form_dates).strftime('%Y-%m-%d')
-                    newest_retrieved = max(form_dates).strftime('%Y-%m-%d')
-                    st.info(f"📅 **Retrieved data range:** {oldest_retrieved} to {newest_retrieved}")
-                    
-                    if datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() > engagement_start_date:
-                        days_missing = (datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() - engagement_start_date).days
-                        st.warning(f"⚠️ **Missing {days_missing} days of data** - oldest form found is {oldest_retrieved}, but you requested back to {engagement_start_date}")
+                if engagement_dates:
+                    oldest_engagement = min(engagement_dates).strftime('%Y-%m-%d')
+                    newest_engagement = max(engagement_dates).strftime('%Y-%m-%d')
+                    st.success(f"📅 **Event Submissions Range:** {oldest_engagement} to {newest_engagement}")
+                else:
+                    st.info("📅 **No date information** available in retrieved forms")
             
             # Store engagement forms in session state
             st.session_state['engagement_forms'] = engagement_forms
             st.session_state['engagement_filter_info'] = {
-                'start_date': engagement_start_date,
-                'end_date': engagement_end_date,
+                'start_date': datetime(2025, 8, 1).date(),  # Academic year start (Aug 1, 2025)
+                'end_date': datetime.now().date(),   # Current date (latest submissions)
                 'form_type': ENGAGEMENT_FORM_TYPE,
                 'total_fetched': len(all_forms),
-                'filtered_count': len(engagement_forms)
+                'filtered_count': len(engagement_forms),
+                'semester': 'Academic Year 2025-2026',
+                'management_mode': 'academic_year'
             }
             
             if engagement_forms:
-                st.success(f"✅ Found {len(engagement_forms)} event submissions (from {len(all_forms)} total forms)")
+                st.success(f"✅ Found {len(engagement_forms)} event submissions since August 1, 2025 (from {len(all_forms)} total forms)")
+                
+                # Automatically save/update all forms to database for semester-long management
+                with st.spinner("🔄 Synchronizing all event submissions to engagement database..."):
+                    # Create analysis data structure for saving
+                    sync_analysis_data = {
+                        'selected_forms': engagement_forms,
+                        'filter_info': st.session_state['engagement_filter_info']
+                    }
+                    
+                    # Get current user ID for tracking
+                    user_id = st.session_state.get('user_id', None)
+                    
+                    # Save all events to database
+                    sync_result = save_engagement_data(sync_analysis_data, user_id)
+                    
+                    if sync_result['success']:
+                        created = sync_result.get('records_created', 0)
+                        updated = sync_result.get('records_updated', 0)
+                        skipped = sync_result.get('records_skipped', 0)
+                        
+                        sync_message = f"✅ **Database Sync Complete:** "
+                        if created > 0:
+                            sync_message += f"{created} new events created"
+                        if updated > 0:
+                            if created > 0:
+                                sync_message += f", {updated} events updated"
+                            else:
+                                sync_message += f"{updated} events updated"
+                        if skipped > 0:
+                            if created > 0 or updated > 0:
+                                sync_message += f", {skipped} duplicates skipped"
+                            else:
+                                sync_message += f"{skipped} records already current"
+                        
+                        st.success(sync_message)
+                        
+                        # Show academic year statistics
+                        if 'semester_statistics' in sync_result:
+                            stats = sync_result['semester_statistics']
+                            st.info(f"📊 **Academic Year Status:** {stats.get('approved_events', 0)} approved events | {stats.get('pending_events', 0)} pending approval | {stats.get('cancelled_events', 0)} cancelled")
+                    else:
+                        sync_error_msg = sync_result.get('message', 'Database sync encountered issues')
+                        error_details = sync_result.get('error_details', '')
+                        errors = sync_result.get('errors', [])
+                        
+                        st.error(f"⚠️ **Sync Issue:** {sync_error_msg}")
+                        
+                        # Show detailed error information for debugging
+                        with st.expander("🔍 **Error Details** (Click to view)", expanded=False):
+                            if error_details:
+                                st.code(f"Technical Error: {error_details}")
+                            if errors:
+                                st.write("**Individual Event Errors:**")
+                                for error in errors[:10]:  # Show first 10 errors
+                                    st.write(f"• {error}")
+                                if len(errors) > 10:
+                                    st.write(f"... and {len(errors) - 10} more errors")
+                        
+                        # Add database connectivity test button
+                        if st.button("🔧 Test Database Connection", key="test_db_connection"):
+                            with st.spinner("Testing database connection..."):
+                                try:
+                                    # Test basic connection
+                                    test_result = supabase.table("engagement_report_data").select("id").limit(1).execute()
+                                    if test_result.data is not None:
+                                        st.success("✅ Database connection successful")
+                                        
+                                        # Test table structure
+                                        try:
+                                            schema_test = supabase.table("engagement_report_data").select(
+                                                "form_submission_id, event_name, event_approval, hall, semester"
+                                            ).limit(1).execute()
+                                            st.success("✅ Table structure is accessible")
+                                        except Exception as schema_error:
+                                            st.error(f"❌ Table structure issue: {str(schema_error)}")
+                                            
+                                            # Check if it's a "table doesn't exist" error
+                                            if "does not exist" in str(schema_error).lower() or "relation" in str(schema_error).lower():
+                                                st.info("💡 **Solution:** The `engagement_report_data` table needs to be created in your Supabase database.")
+                                                st.info("📝 **Next Steps:**")
+                                                st.code("""
+1. Open your Supabase Dashboard
+2. Go to SQL Editor
+3. Copy and paste the ENHANCED_ENGAGEMENT_SCHEMA_FIXED.sql file content
+4. Run the SQL to create the table
+5. Come back and try the sync again
+                                                """)
+                                                
+                                                with st.expander("📄 **Quick SQL Reference**", expanded=False):
+                                                    st.info("Use the ENHANCED_ENGAGEMENT_SCHEMA_FIXED.sql file in your project to create the table.")
+                                                    st.info("The file contains the complete schema with all required columns and constraints.")
+                                    else:
+                                        st.error("❌ Database connection failed - no data returned")
+                                except Exception as db_error:
+                                    error_str = str(db_error).lower()
+                                    if "does not exist" in error_str or "relation" in error_str:
+                                        st.error(f"❌ Database table missing: {str(db_error)}")
+                                        st.info("💡 **The engagement_report_data table doesn't exist in your database.**")
+                                        st.info("🔧 **To fix this:** Run the ENHANCED_ENGAGEMENT_SCHEMA_FIXED.sql script in your Supabase SQL Editor.")
+                                    else:
+                                        st.error(f"❌ Database connection error: {str(db_error)}")
             else:
-                st.warning(f"No {ENGAGEMENT_FORM_TYPE} forms found in the date range {engagement_start_date} to {engagement_end_date}")
+                st.warning(f"No {ENGAGEMENT_FORM_TYPE} forms found in the system")
     
     # Display engagement forms if available
     if 'engagement_forms' in st.session_state and st.session_state['engagement_forms']:
@@ -5446,12 +6309,13 @@ def engagement_analysis_section():
         
         st.subheader(f"🎉 Event Submissions Found ({len(engagement_forms)} submissions)")
         
-        # Show filter summary
+        # Show academic year management summary
         if filter_info:
             st.info(f"""
-            📊 **Analysis Ready:** {filter_info['filtered_count']} event submissions (from {filter_info['total_fetched']} total forms)  
-            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
-            📋 **Form Type:** {ENGAGEMENT_FORM_TYPE}
+            🏫 **Academic Year Management:** {filter_info['filtered_count']} event submissions loaded (from {filter_info['total_fetched']} total forms)  
+            📅 **Time Period:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Type:** {ENGAGEMENT_FORM_TYPE}  
+            🔄 **Management Mode:** {filter_info.get('management_mode', 'academic_year')}
             """)
         
         # Form selection and analysis
@@ -5530,6 +6394,11 @@ def engagement_analysis_section():
                     key="engagement_report_type"
                 )
                 
+                # Database-based analysis option
+                if st.button("🔍 Check Database Event Status", type="secondary", key="db_analysis"):
+                    st.write("---")
+                    create_db_based_engagement_analysis()
+                
                 if st.button("🤖 Generate Engagement Analysis", type="primary", key="analyze_engagement"):
                     with st.spinner("🧠 Analyzing event submissions with AI..."):
                         engagement_analysis_result = analyze_engagement_forms_with_ai(
@@ -5575,11 +6444,19 @@ def engagement_analysis_section():
         
         # Show data extraction debug info
         with st.expander("🔍 Data Extraction Debug (Click to View)", expanded=False):
-            quantitative_data = extract_engagement_quantitative_data(analysis_data['selected_forms'])
-            if quantitative_data['success']:
-                st.write(f"**Successfully extracted data from {len(quantitative_data['data'])} events:**")
+            try:
+                quantitative_data = extract_engagement_quantitative_data(analysis_data['selected_forms'])
+                if quantitative_data['success']:
+                    events_data = quantitative_data.get('events_data', [])
+                    st.write(f"**Successfully extracted data from {len(events_data)} events:**")
+            except Exception as e:
+                st.warning(f"⚠️ **Debug Info Error:** {str(e)} - This may be due to cached data. Try clearing analysis and regenerating.")
+                quantitative_data = {'success': False}
+                events_data = []
+            
+            if quantitative_data.get('success', False):
                 
-                for i, event in enumerate(quantitative_data['data'][:5]):  # Show first 5 events
+                for i, event in enumerate(events_data[:5]):  # Show first 5 events
                     st.write(f"**Event {i+1}:**")
                     col_a, col_b = st.columns(2)
                     with col_a:
@@ -5608,10 +6485,14 @@ def engagement_analysis_section():
                                 st.text(field_info)
                     st.write("---")
                 
-                if len(quantitative_data['data']) > 5:
-                    st.write(f"... and {len(quantitative_data['data']) - 5} more events")
+                if len(events_data) > 5:
+                    st.write(f"... and {len(events_data) - 5} more events")
             else:
-                st.error(f"Failed to extract data: {quantitative_data['message']}")
+                error_msg = quantitative_data.get('message', 'Unknown error occurred')
+                st.error(f"Failed to extract data: {error_msg}")
+        
+        # Auto-save notification
+        st.info("ℹ️ **Auto-Save:** Event data was automatically synchronized to the database when forms were fetched. Use Re-sync if you need to update database records.")
         
         # Analysis action buttons
         col1, col2, col3, col4 = st.columns(4)
@@ -5632,18 +6513,25 @@ def engagement_analysis_section():
             )
         
         with col2:
-            # Save quantitative data button
-            if st.button("💾 Save Data to Database", key="save_engagement_data", 
-                        help="Save quantitative metrics for future analysis and trending"):
+            # Re-sync database button (since data is auto-saved during fetch)
+            if st.button("� Re-sync Database", key="resync_engagement_data", 
+                        help="Re-synchronize event data with database (data is automatically saved during fetch)"):
                 user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
                 
-                with st.spinner("Saving engagement data..."):
+                with st.spinner("Re-synchronizing engagement data..."):
                     save_result = save_engagement_data(analysis_data, user_id)
                 
                 if save_result["success"]:
-                    st.success(f"✅ {save_result['message']}")
+                    created = save_result.get('records_created', 0)
+                    updated = save_result.get('records_updated', 0) 
+                    skipped = save_result.get('records_skipped', 0)
+                    
+                    if created == 0 and updated == 0:
+                        st.info("✅ Database already synchronized - no changes needed")
+                    else:
+                        st.success(f"✅ Re-sync complete: {created} created, {updated} updated, {skipped} skipped")
                 else:
-                    st.error(f"❌ Save failed: {save_result['message']}")
+                    st.error(f"❌ Re-sync failed: {save_result['message']}")
         
         with col3:
             # Save weekly analysis button  
@@ -5682,11 +6570,12 @@ def engagement_analysis_section():
         st.info("👆 Click 'Fetch Event Submissions' to load Residence Life Event Submission forms")
 
 def general_form_analysis_section():
-    """General form analysis section with form type discovery"""
-    st.subheader("📊 General Form Analysis")
+    """General form analysis section for any form type with automatic discovery"""
+    st.subheader("📊 General Form Analysis - Custom Report Generation")
     st.markdown("""
-    **Focus:** Discover and analyze any form types from your Roompact system.  
-    **Purpose:** Flexible analysis tool for various form types beyond duty reports.
+    **Focus:** Analyze ANY form type available in Roompact - automatically discover and select from available forms  
+    **Purpose:** Generate custom AI reports for any combination of form types and date ranges  
+    **Flexibility:** Choose specific forms, date ranges, and get tailored AI analysis
     """)
     
     # Date range selection for general analysis
@@ -6678,12 +7567,12 @@ Test sent at: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         """)
 
 def saved_reports_page():
-    """View saved duty analyses, staff recognition reports, engagement analyses, and weekly summaries"""
+    """View saved duty analyses, staff recognition reports, and weekly summaries"""
     st.title("Saved Reports Archive")
-    st.write("View all saved reports: duty analyses, engagement analyses, staff recognition, and weekly summaries.")
+    st.write("View all saved reports: duty analyses, staff recognition, and weekly summaries.")
     
     # Tab selection for different report types
-    tab1, tab2, tab3, tab4 = st.tabs(["🛡️ Duty Analyses", "🎉 Engagement Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
+    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
     
     with tab1:
         st.subheader("Saved Duty Analyses")
@@ -6770,59 +7659,58 @@ def saved_reports_page():
             st.error(f"Failed to fetch saved duty analyses: {e}")
     
     with tab2:
-        st.subheader("Saved Engagement Analyses")
+        st.subheader("Saved Staff Recognition Reports")
         
         try:
-            # Get all saved engagement analyses
-            engagement_response = supabase.table('saved_engagement_analyses').select('*').order('week_ending_date', desc=True).execute()
-            engagement_analyses = engagement_response.data or []
+            # Get all saved staff recognition reports
+            recognition_response = supabase.table('saved_staff_recognition').select('*').order('week_ending_date', desc=True).execute()
+            recognitions = recognition_response.data or []
             
-            if not engagement_analyses:
-                st.info("No saved engagement analyses yet.")
+            if not recognitions:
+                st.info("No saved staff recognition reports yet.")
             else:
-                # Group analyses by year for better organization
-                engagement_by_year = {}
-                for analysis in engagement_analyses:
+                # Group recognitions by year for better organization
+                recognitions_by_year = {}
+                for recognition in recognitions:
                     try:
-                        year = pd.to_datetime(analysis['week_ending_date']).year
-                        if year not in engagement_by_year:
-                            engagement_by_year[year] = []
-                        engagement_by_year[year].append(analysis)
+                        year = pd.to_datetime(recognition['week_ending_date']).year
+                        if year not in recognitions_by_year:
+                            recognitions_by_year[year] = []
+                        recognitions_by_year[year].append(recognition)
                     except:
-                        if "Unknown" not in engagement_by_year:
-                            engagement_by_year["Unknown"] = []
-                        engagement_by_year["Unknown"].append(analysis)
+                        if "Unknown" not in recognitions_by_year:
+                            recognitions_by_year["Unknown"] = []
+                        recognitions_by_year["Unknown"].append(recognition)
                 
-                # Display engagement analyses by year
-                for year in sorted(engagement_by_year.keys(), reverse=True):
-                    st.write(f"### 🎉 {year} Engagement Analyses")
+                # Display staff recognitions by year
+                for year in sorted(recognitions_by_year.keys(), reverse=True):
+                    st.write(f"### � {year} Staff Recognition Reports")
                     
-                    year_analyses = engagement_by_year[year]
-                    for analysis in year_analyses:
+                    year_recognitions = recognitions_by_year[year]
+                    for recognition in year_recognitions:
                         # Get creator info
                         creator_name = "Unknown User"
-                        if analysis.get('created_by'):
+                        if recognition.get('created_by'):
                             try:
-                                profile_response = supabase.table('profiles').select('full_name').eq('id', analysis['created_by']).execute()
+                                profile_response = supabase.table('profiles').select('full_name').eq('id', recognition['created_by']).execute()
                                 if profile_response.data:
                                     creator_name = profile_response.data[0]['full_name']
                             except:
                                 pass
                         
                         # Format dates
-                        week_date = analysis['week_ending_date']
-                        created_date = analysis['created_at'][:10] if analysis.get('created_at') else 'Unknown'
+                        week_date = recognition['week_ending_date']
+                        created_date = recognition['created_at'][:10] if recognition.get('created_at') else 'Unknown'
                         
-                        # Display analysis info
-                        with st.expander(f"Week Ending {week_date} - {analysis.get('report_type', 'Analysis').title().replace('_', ' ')} - {creator_name}"):
-                            st.write(f"**Date Range:** {analysis.get('date_range_start', 'N/A')} to {analysis.get('date_range_end', 'N/A')}")
-                            st.write(f"**Events Analyzed:** {analysis.get('events_analyzed', 0)}")
+                        # Display recognition info
+                        with st.expander(f"Week Ending {week_date} - Staff Recognition - {creator_name}"):
+                            st.write(f"**Staff Recognized:** {recognition.get('staff_recognized', 0)}")
                             st.write(f"**Created:** {created_date} by {creator_name}")
                             
-                            # Show upcoming events if available
-                            if analysis.get('upcoming_events'):
-                                st.markdown("**Upcoming Events:**")
-                                st.markdown(analysis['upcoming_events'])
+                            # Show recognition summary
+                            if recognition.get('summary'):
+                                st.markdown("**Recognition Summary:**")
+                                st.markdown(recognition['summary'])
                             
                             # Action buttons
                             col1, col2, col3 = st.columns(3)
@@ -6960,7 +7848,7 @@ def saved_reports_page():
         except Exception as e:
             st.error(f"Failed to fetch saved staff recognition reports: {e}")
     
-    with tab4:
+    with tab3:
         st.subheader("Saved Weekly Summaries")
         
         try:
