@@ -4219,6 +4219,25 @@ def submit_and_edit_page():
                 deadline_day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][deadline_config["day_of_week"]]
                 st.warning(f"The submission deadline ({deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}) for the report ending {active_saturday.strftime('%m/%d/%Y')} has passed. Contact your administrator if you need to submit a report.")
 
+        # Option to create reports for previous weeks
+        st.divider()
+        st.markdown("##### Create Report for Previous Week")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info("💡 Need to submit a report for a previous week? Select any Saturday (week ending date) below.")
+        with col2:
+            if st.button("📝 Create Previous Week Report", use_container_width=True):
+                # Calculate previous Saturdays as options
+                previous_saturday_1 = active_saturday - timedelta(days=7)
+                previous_saturday_2 = active_saturday - timedelta(days=14) 
+                previous_saturday_3 = active_saturday - timedelta(days=21)
+                
+                clear_form_state()
+                st.session_state["report_to_edit"] = {
+                    "week_ending_date": previous_saturday_1.strftime("%Y-%m-%d")  # Default to last week
+                }
+                st.rerun()
+
         st.divider()
         if not user_reports:
             st.info("You have not submitted any other reports yet.")
@@ -4389,7 +4408,21 @@ def submit_and_edit_page():
                 st.text_input("Submitted By", value=team_member_name, disabled=True)
             with col2:
                 default_date = pd.to_datetime(report_data.get("week_ending_date")).date()
-                week_ending_date = st.date_input("For the Week Ending", value=default_date, format="MM/DD/YYYY")
+                
+                # Show some recent Saturday options as help
+                today = datetime.now().date()
+                last_saturday = today - timedelta(days=(today.weekday() + 2) % 7)
+                recent_saturdays = [
+                    last_saturday - timedelta(days=7*i) for i in range(4)
+                ]
+                saturday_options = ", ".join([d.strftime("%m/%d") for d in recent_saturdays[:3]])
+                
+                week_ending_date = st.date_input(
+                    "For the Week Ending", 
+                    value=default_date, 
+                    format="MM/DD/YYYY",
+                    help=f"💡 Recent Saturdays: {saturday_options}... (Reports are for weeks ending on Saturdays)"
+                )
             st.divider()
             core_activities_tab, general_updates_tab = st.tabs(["📊 Core Activities", "📝 General Updates"])
             with core_activities_tab:
