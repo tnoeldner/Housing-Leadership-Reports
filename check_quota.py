@@ -8,8 +8,20 @@ from datetime import datetime
 def check_quota():
     """Check Google AI API quota and model information"""
     try:
-        # Use the same API key as your app
-        api_key = "AIzaSyAK699ku7TFQxBkiEA-9L8eE6iSxkkG4HM"
+        # Use API key from environment or secrets
+        import os
+        import streamlit as st
+        
+        try:
+            # Try to use Streamlit secrets first (if running in Streamlit context)
+            api_key = st.secrets["google_api_key"]
+        except:
+            # Fall back to environment variable
+            api_key = os.getenv("GOOGLE_API_KEY")
+            
+        if not api_key:
+            raise ValueError("Google API key not found. Please set GOOGLE_API_KEY environment variable or configure Streamlit secrets.")
+            
         genai.configure(api_key=api_key)
         
         print("🔍 Google AI API Quota Check")
