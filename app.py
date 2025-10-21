@@ -171,6 +171,38 @@ def clear_form_state():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
+
+def safe_db_query(query_builder, operation_name="Database query", max_retries=3):
+    """
+    Safely execute a Supabase query with retry logic and error handling.
+    
+    Args:
+        query_builder: The Supabase query builder object
+        operation_name: Description of the operation for error messages
+        max_retries: Maximum number of retry attempts
+    
+    Returns:
+        tuple: (success: bool, data: list|None, error: str|None)
+    """
+    import time
+    
+    for attempt in range(max_retries):
+        try:
+            response = query_builder.execute()
+            return True, response.data, None
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Check if it's a network/timeout error that might be retryable
+            if any(keyword in error_msg.lower() for keyword in ['timeout', 'connection', 'network', 'httpx', 'read']):
+                if attempt < max_retries - 1:
+                    time.sleep(1 * (attempt + 1))  # Exponential backoff: 1s, 2s, 3s
+                    continue
+            
+            # Return error on final attempt or non-retryable errors
+            return False, None, f"{operation_name} failed: {error_msg}"
+    
+    return False, None, f"{operation_name} failed after {max_retries} attempts"
     for section_key in CORE_SECTIONS.keys():
         if f"{section_key}_success_count" in st.session_state:
             del st.session_state[f"{section_key}_success_count"]
@@ -4292,43 +4324,100 @@ def submit_and_edit_page():
     def process_report_with_ai(items_to_categorize):
         if not items_to_categorize:
             return None
-        model = genai.GenerativeModel("models/gemini-2.5-pro")
-        ascend_list = ", ".join(ASCEND_VALUES)
-        north_list = ", ".join(NORTH_VALUES)
-        items_json = json.dumps(items_to_categorize)
-        prompt = f"""
-        You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities including campus events and committee participation:
-        1. Categorize each activity with one ASCEND and one Guiding NORTH category.
-        2. Generate a concise 2-4 sentence individual summary that includes mention of campus engagement and its alignment with frameworks.
         
-        ASCEND Categories: {ascend_list}
-        Guiding NORTH Categories: {north_list}
-
-        For campus events/committee participation, consider how attendance demonstrates:
-        - Community engagement and service (Community, Service)
-        - Professional development and learning (Development, Excellence)
-        - Supporting university initiatives (Accountability, Nurturing)
-        - Building relationships with stakeholders (Service, Transformative)
-
-        Also consider UND LEADS alignment in your summary:
-        - Learning: Training, workshops, skill development, educational activities
-        - Equity: Diversity events, inclusion initiatives, accessibility work
-        - Affinity: Networking, relationship building, team activities, community engagement
-        - Discovery: Innovation projects, research, exploring new methods, creative solutions
-        - Service: Volunteer work, helping others, community service, supporting university goals
-
-        Input JSON: {items_json}
-
-        Return valid JSON like:
-        {{
-          "categorized_items":[{{"id":0,"ascend_category":"Community","north_category":"Nurturing Student Success & Development"}}],
-          "individual_summary":"This week showed strong alignment with both ASCEND and NORTH frameworks through various activities and campus engagement. The work also demonstrates UND LEADS values through learning opportunities and service to the community..."
-        }}
-        """
         try:
-            response = model.generate_content(prompt)
-            clean_response = response.text.strip().replace("```json", "").replace("```", "")
-            return json.loads(clean_response)
+            model = genai.GenerativeModel("models/gemini-2.5-pro")
+            ascend_list = ", ".join(ASCEND_VALUES)
+            north_list = ", ".join(NORTH_VALUES)
+            items_json = json.dumps(items_to_categorize)
+            prompt = f"""
+            You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities including campus events and committee participation:
+            1. Categorize each activity with one ASCEND and one Guiding NORTH category.
+            2. Generate a concise 2-4 sentence individual summary that includes mention of campus engagement and its alignment with frameworks.
+            
+            ASCEND Categories: {ascend_list}
+            Guiding NORTH Categories: {north_list}
+
+            For campus events/committee participation, consider how attendance demonstrates:
+            - Community engagement and service (Community, Service)
+            - Professional development and learning (Development, Excellence)
+            - Supporting university initiatives (Accountability, Nurturing)
+            - Building relationships with stakeholders (Service, Transformative)
+
+            Also consider UND LEADS alignment in your summary:
+            - Learning: Training, workshops, skill development, educational activities
+            - Equity: Diversity events, inclusion initiatives, accessibility work
+            - Affinity: Networking, relationship building, team activities, community engagement
+            - Discovery: Innovation projects, research, exploring new methods, creative solutions
+            - Service: Volunteer work, helping others, community service, supporting university goals
+
+            Input JSON: {items_json}
+
+            CRITICAL: You must categorize EVERY item from the input. Return exactly {len(items_to_categorize)} categorized items.
+
+            Return valid JSON like:
+            {{
+              "categorized_items":[{{"id":0,"ascend_category":"Community","north_category":"Nurturing Student Success & Development"}}],
+              "individual_summary":"This week showed strong alignment with both ASCEND and NORTH frameworks through various activities and campus engagement. The work also demonstrates UND LEADS values through learning opportunities and service to the community..."
+            }}
+            """
+            
+            # Try up to 3 times with different strategies
+            for attempt in range(3):
+                try:
+                    response = model.generate_content(prompt)
+                    clean_response = response.text.strip().replace("```json", "").replace("```", "")
+                    result = json.loads(clean_response)
+                    
+                    # Validate the response
+                    if (result and 
+                        "categorized_items" in result and 
+                        "individual_summary" in result and
+                        isinstance(result["categorized_items"], list) and
+                        len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
+                        
+                        # Ensure we have categories for all items
+                        categorized_ids = {item.get("id") for item in result["categorized_items"]}
+                        missing_ids = [item["id"] for item in items_to_categorize if item["id"] not in categorized_ids]
+                        
+                        # Add default categories for missing items
+                        for missing_id in missing_ids:
+                            missing_item = next(item for item in items_to_categorize if item["id"] == missing_id)
+                            default_category = {
+                                "id": missing_id,
+                                "ascend_category": "Development",  # Safe default
+                                "north_category": "Nurturing Student Success & Development"  # Safe default
+                            }
+                            result["categorized_items"].append(default_category)
+                        
+                        return result
+                        
+                except json.JSONDecodeError as je:
+                    if attempt == 2:  # Last attempt
+                        st.warning(f"AI response parsing failed after {attempt + 1} attempts. Using fallback categorization.")
+                        break
+                    continue
+                except Exception as e:
+                    if attempt == 2:  # Last attempt
+                        st.warning(f"AI processing failed after {attempt + 1} attempts: {str(e)}")
+                        break
+                    continue
+            
+            # Fallback: Create default categorization
+            fallback_result = {
+                "categorized_items": [
+                    {
+                        "id": item["id"],
+                        "ascend_category": "Development",
+                        "north_category": "Nurturing Student Success & Development"
+                    } for item in items_to_categorize
+                ],
+                "individual_summary": "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
+            }
+            
+            st.info("ℹ️ AI categorization used fallback defaults. You can manually review and adjust categories if needed.")
+            return fallback_result
+            
         except Exception as e:
             st.error(f"An AI error occurred during processing: {e}")
             return None
@@ -4572,37 +4661,41 @@ def submit_and_edit_page():
 
                 ai_results = process_report_with_ai(items_to_process)
 
-                if ai_results and "categorized_items" in ai_results and "individual_summary" in ai_results and len(
-                    ai_results["categorized_items"]
-                ) == len(items_to_process):
-                    categorized_lookup = {item["id"]: item for item in ai_results["categorized_items"]}
-                    report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
-                    
-                    for item in items_to_process:
-                        item_id = item["id"]
-                        categories = categorized_lookup.get(item_id, {})
-                        categorized_item = {
-                            "text": item["text"],
-                            "ascend_category": categories.get("ascend_category", "N/A"),
-                            "north_category": categories.get("north_category", "N/A"),
-                        }
-                        report_body[item["section"]][item["type"]].append(categorized_item)
+                # More flexible validation - allow for fallback processing
+                if ai_results and "categorized_items" in ai_results and "individual_summary" in ai_results:
+                    try:
+                        categorized_lookup = {item["id"]: item for item in ai_results["categorized_items"]}
+                        report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
+                        
+                        for item in items_to_process:
+                            item_id = item["id"]
+                            categories = categorized_lookup.get(item_id, {})
+                            categorized_item = {
+                                "text": item["text"],
+                                "ascend_category": categories.get("ascend_category", "Development"),  # Safe default
+                                "north_category": categories.get("north_category", "Nurturing Student Success & Development"),  # Safe default
+                            }
+                            report_body[item["section"]][item["type"]].append(categorized_item)
 
-                    st.session_state["draft_report"] = {
-                        "report_id": report_data.get("id"),
-                        "team_member_name": team_member_name,
-                        "week_ending_date": str(week_ending_date),
-                        "report_body": report_body,
-                        "professional_development": st.session_state.get("prof_dev", ""),
-                        "key_topics_lookahead": st.session_state.get("lookahead", ""),
-                        "personal_check_in": st.session_state.get("personal_check_in", ""),
-                        "well_being_rating": well_being_rating,
-                        "individual_summary": ai_results["individual_summary"],
-                        "director_concerns": st.session_state.get("director_concerns", ""),
-                    }
-                    st.rerun()
+                        st.session_state["draft_report"] = {
+                            "report_id": report_data.get("id"),
+                            "team_member_name": team_member_name,
+                            "week_ending_date": str(week_ending_date),
+                            "report_body": report_body,
+                            "professional_development": st.session_state.get("prof_dev", ""),
+                            "key_topics_lookahead": st.session_state.get("lookahead", ""),
+                            "personal_check_in": st.session_state.get("personal_check_in", ""),
+                            "well_being_rating": well_being_rating,
+                            "individual_summary": ai_results["individual_summary"],
+                            "director_concerns": st.session_state.get("director_concerns", ""),
+                        }
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Report processing failed: {str(e)}. Please try again or contact support.")
+                        st.info("💡 **Troubleshooting Tips:**\n- Check that all text entries are properly filled\n- Try refreshing the page and submitting again\n- Ensure your internet connection is stable")
                 else:
-                    st.error("The AI failed to process the report consistently. Please check your entries and try again.")
+                    st.error("The AI processing service is temporarily unavailable. Please try again in a few moments.")
+                    st.info("💡 **If this persists:**\n- Check your internet connection\n- Try refreshing the page\n- Contact your administrator if the issue continues")
 
     def show_review_form():
         st.subheader("Review Your AI-Generated Report")
@@ -5007,9 +5100,18 @@ def dashboard_page(supervisor_mode=False):
             # Get all staff and check who hasn't submitted or has non-finalized reports
             all_staff_ids = [staff.get("id") for staff in all_staff]
             # Check for any existing reports (not just finalized ones)
-            existing_reports_response = supabase.table("reports").select("user_id, status").eq("week_ending_date", missed_week).execute()
-            existing_user_ids = {r['user_id'] for r in existing_reports_response.data}
-            finalized_user_ids = {r['user_id'] for r in existing_reports_response.data if r.get('status') == 'finalized'}
+            success, reports_data, error = safe_db_query(
+                supabase.table("reports").select("user_id, status").eq("week_ending_date", missed_week),
+                f"Checking reports for week {missed_week}"
+            )
+            
+            if success:
+                existing_user_ids = {r['user_id'] for r in reports_data}
+                finalized_user_ids = {r['user_id'] for r in reports_data if r.get('status') == 'finalized'}
+            else:
+                st.error(f"❌ {error}")
+                st.info("🔄 Please refresh the page and try again.")
+                return  # Exit the function if we can't get the data
             
             # Staff who need attention: no report at all OR have non-finalized reports
             missing_staff = [staff for staff in all_staff if staff.get("id") not in finalized_user_ids]
@@ -5031,8 +5133,17 @@ def dashboard_page(supervisor_mode=False):
                     
                     with col3:
                         # Check if report already exists for this user and week
-                        existing_report_response = supabase.table("reports").select("*").eq("user_id", staff.get("id")).eq("week_ending_date", missed_week).execute()
-                        existing_report = existing_report_response.data[0] if existing_report_response.data else None
+                        success, reports_data, error = safe_db_query(
+                            supabase.table("reports").select("*").eq("user_id", staff.get("id")).eq("week_ending_date", missed_week),
+                            f"Checking existing report for {staff.get('full_name', 'user')}"
+                        )
+                        
+                        if success:
+                            existing_report = reports_data[0] if reports_data else None
+                        else:
+                            st.error(f"❌ {error}")
+                            st.info("🔄 Please refresh the page and try again.")
+                            existing_report = None
                         
                         if existing_report:
                             # Report exists - offer to unlock or update it
