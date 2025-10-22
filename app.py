@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import json
@@ -15,6 +14,7 @@ except ImportError:
             return timezone.utc  # Simplified fallback
         return timezone.utc
 import time
+
 from collections import Counter
 import smtplib
 import re
@@ -30,11 +30,8 @@ st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="
 # --- Connections ---
 @st.cache_resource
 def init_connection():
-    import os
-    
-    # Try environment variables first (for deployment), then secrets (for local)
     url = os.getenv("SUPABASE_URL") or st.secrets.get("supabase_url")
-    key = os.getenv("SUPABASE_KEY") or st.secrets.get("supabase_key") 
+    key = os.getenv("SUPABASE_KEY") or st.secrets.get("supabase_key")
     api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("google_api_key")
     
     # Validate required keys exist
@@ -1771,6 +1768,12 @@ Format the response in clear markdown with headers and bullet points. Focus on a
         
         with st.spinner("AI is analyzing form submissions..."):
             result = model.generate_content(prompt)
+            if not result or not getattr(result, 'text', None) or not result.text.strip():
+                st.info("Prompt sent to AI:")
+                st.code(prompt)
+                st.info("Input data summary:")
+                st.code(reports_text)
+                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
             return result.text
             
     except Exception as e:
@@ -1829,10 +1832,7 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
         return "No duty reports selected for analysis."
     
     try:
-        # Group reports by hall and week for analysis
         from collections import defaultdict
-        
-        # Extract quantitative data
         halls_data = defaultdict(lambda: {
             'total_reports': 0,
             'incidents': [],
@@ -1842,33 +1842,31 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             'safety_concerns': 0,
             'staff_responses': 0
         })
-        
         weekly_data = defaultdict(lambda: {
             'total_reports': 0,
             'incident_count': 0,
             'halls_active': set()
         })
-        
+
         # Process each form to extract quantitative data
         for form in selected_forms:
             current_revision = form.get('current_revision', {})
             author = current_revision.get('author', 'Unknown')
             date_str = current_revision.get('date', '')
-            
+
             # Extract hall/building info from responses
             hall_name = "Unknown Hall"
             responses = current_revision.get('responses', [])
-            
+
             for response in responses:
                 field_label = response.get('field_label', '').lower()
                 field_response = str(response.get('response', '')).strip()
-                
                 # Try to identify hall/building
                 if any(word in field_label for word in ['building', 'hall', 'location', 'area']):
                     if field_response and field_response != 'None':
                         hall_name = field_response
                         break
-            
+
             # Extract week from date
             if date_str:
                 try:
@@ -1880,42 +1878,42 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
                     week_key = "Unknown Week"
             else:
                 week_key = "Unknown Week"
-            
+
             # Count incidents by type in this report
             report_text = ""
             for response in responses:
                 field_response = str(response.get('response', '')).strip().lower()
                 report_text += field_response + " "
-            
+
             # Increment hall counters
             halls_data[hall_name]['total_reports'] += 1
-            
+
             # Count specific incident types
             if any(word in report_text for word in ['lockout', 'locked out', 'key']):
                 halls_data[hall_name]['lockouts'] += 1
-            
+
             if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
                 halls_data[hall_name]['maintenance'] += 1
-            
+
             if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
                 halls_data[hall_name]['policy_violations'] += 1
                 weekly_data[week_key]['incident_count'] += 1
-            
+
             if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
                 halls_data[hall_name]['safety_concerns'] += 1
                 weekly_data[week_key]['incident_count'] += 1
-            
+
             if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
                 halls_data[hall_name]['staff_responses'] += 1
-        
+
         # Prepare comprehensive report data for AI analysis
         reports_text = f"\n=== WEEKLY DUTY REPORTS ANALYSIS ===\n"
         reports_text += f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
         reports_text += f"Total Reports: {len(selected_forms)}\n\n"
-        
+
         # Add quantitative breakdown by hall (formatted for table creation)
         reports_text += "=== HALL-BY-HALL INCIDENT BREAKDOWN (FOR TABLE) ===\n"
-        
+
         # Calculate totals for summary
         total_lockouts = sum(data['lockouts'] for data in halls_data.values())
         total_maintenance = sum(data['maintenance'] for data in halls_data.values())
@@ -1923,14 +1921,14 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
         total_safety = sum(data['safety_concerns'] for data in halls_data.values())
         total_reports = sum(data['total_reports'] for data in halls_data.values())
         total_responses = sum(data['staff_responses'] for data in halls_data.values())
-        
+
         reports_text += "DATA FOR QUANTITATIVE METRICS TABLE:\n"
         reports_text += f"TOTALS: Reports={total_reports}, Lockouts={total_lockouts}, Maintenance={total_maintenance}, Violations={total_violations}, Safety={total_safety}, Responses={total_responses}\n\n"
-        
+
         reports_text += "HALL-BY-HALL DATA:\n"
         for hall, data in sorted(halls_data.items()):
             reports_text += f"{hall}: Reports={data['total_reports']}, Lockouts={data['lockouts']}, Maintenance={data['maintenance']}, Violations={data['policy_violations']}, Safety={data['safety_concerns']}, Responses={data['staff_responses']}\n"
-        
+
         reports_text += "\nDETAILED BREAKDOWN BY HALL:\n"
         for hall, data in sorted(halls_data.items()):
             total_incidents = data['lockouts'] + data['maintenance'] + data['policy_violations'] + data['safety_concerns']
@@ -1940,7 +1938,7 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             reports_text += f"  • Policy Violations: {data['policy_violations']}\n"
             reports_text += f"  • Safety Concerns: {data['safety_concerns']}\n"
             reports_text += f"  • Staff Responses: {data['staff_responses']}\n\n"
-        
+
         reports_text += "\n=== WEEKLY ACTIVITY SUMMARY ===\n"
         for week, data in sorted(weekly_data.items()):
             reports_text += f"\n**{week}:**\n"
@@ -1948,80 +1946,64 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             reports_text += f"- Incident Reports: {data['incident_count']}\n"
             reports_text += f"- Active Halls: {len(data['halls_active'])}\n"
             reports_text += f"- Halls: {', '.join(sorted(data['halls_active']))}\n"
-        
+
         reports_text += f"\n=== DETAILED REPORTS ===\n"
-        
+
         for i, form in enumerate(selected_forms, 1):
             current_revision = form.get('current_revision', {})
             form_name = form.get('form_template_name', 'Unknown Form')
             author = current_revision.get('author', 'Unknown')
             date = current_revision.get('date', 'Unknown date')
-            
+
             reports_text += f"\n--- REPORT {i}: {form_name} ---\n"
             reports_text += f"Staff: {author}\n"
             reports_text += f"Date: {date}\n\n"
-            
+
             # Process responses
             responses = current_revision.get('responses', [])
             for response in responses:
                 field_label = response.get('field_label', 'Unknown Field')
                 field_response = response.get('response', '')
-                
+
                 if field_response and str(field_response).strip():
                     reports_text += f"**{field_label}:** {field_response}\n"
-            
+
             reports_text += "\n" + "="*50 + "\n"
-        
-        # Create specialized weekly duty report AI prompt
+
+        # Updated AI prompt for improved, actionable, bullet-pointed summary
         prompt = f"""
-You are analyzing residence life duty reports for administrative weekly summaries. Create a comprehensive weekly report that includes:
+You are analyzing residence life duty reports for a weekly administrative summary. Your goal is to produce a concise, actionable, and easy-to-read report for leadership. Please:
 
-1. **EXECUTIVE WEEKLY SUMMARY** (2-3 paragraphs)
-   - Overall activity level and trends for the week
-   - Key operational highlights and challenges
-   - Staff performance and engagement observations
+- Summarize the week's overall activity and key trends in 3-5 bullet points.
+- Highlight the most important incidents, challenges, or successes that require attention. Use bullet points for each item.
+- Provide a quantitative breakdown (number of reports, incidents by type, hall-by-hall summary) in a clear, readable format.
+- For each hall, create a dedicated section with the hall name as the header. The individual halls are: Swanson, West, McVey, Brannon, Noren, Selke, Johnstone, Smith, University Place. Under each hall, list the key items, incidents, challenges, successes, and any notable staff actions for that hall as bullet points. Do not group halls together; each hall should have its own section, even if some halls have no incidents or items to report.
+- List specific action items or recommendations for staff or administration. Make these actionable and direct.
+- Note any staff performance highlights or concerns.
+- If relevant, mention any policy, facility, or safety issues that need follow-up.
 
-2. **QUANTITATIVE WEEKLY METRICS**
-   - Total reports submitted by hall
-   - Incident breakdown (lockouts, maintenance, policy violations, safety)
-   - Response effectiveness metrics
-   - Week-over-week trends if applicable
+Do NOT include a separate "Recurring Issues" section. Instead, ensure hall-specific issues are included under each hall's section.
 
-3. **HALL-BY-HALL BREAKDOWN**
-   - Individual hall performance and incident summaries
-   - Specific concerns or positive highlights per hall
-   - Staffing effectiveness by location
-
-4. **CRITICAL INCIDENTS & FOLLOW-UPS**
-   - High-priority incidents requiring administrative attention
-   - Ongoing issues needing resolution
-   - Policy enforcement patterns
-
-5. **OPERATIONAL RECOMMENDATIONS**
-   - Immediate action items for administration
-   - Staff development or training needs identified
-   - Facility or policy improvements suggested
-
-6. **WEEKLY TRENDS & PATTERNS**
-   - Day-of-week incident patterns
-   - Common recurring issues
-   - Seasonal or temporal factors observed
-
-Format this as a professional administrative report suitable for inclusion in weekly residence life summaries. Use data-driven insights and specific examples while maintaining confidentiality.
+Format your response in markdown with clear headers and bullet points. Focus on actionable insights and brevity. Do not include unnecessary narrative or filler text.
 
 DUTY REPORTS DATA:
 {reports_text}
 
-Create a comprehensive weekly duty analysis report:
+Generate the weekly duty analysis summary below:
 """
 
-        # Use Gemini 2.5 Flash for better quota efficiency with large datasets  
+        import google.generativeai as genai
         model = genai.GenerativeModel("models/gemini-2.5-flash")
-        
+        import streamlit as st
         with st.spinner(f"AI is generating weekly duty report from {len(selected_forms)} reports..."):
             result = model.generate_content(prompt)
+            if not result or not getattr(result, 'text', None) or not result.text.strip():
+                st.info("Prompt sent to AI:")
+                st.code(prompt)
+                st.info("Input data summary:")
+                st.code(reports_text)
+                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
             return result.text
-            
     except Exception as e:
         return f"Error generating weekly duty report summary: {str(e)}"
 
@@ -2050,21 +2032,15 @@ def store_duty_report_data(selected_forms, start_date, end_date, generated_by_us
             }
         
         stored_records = []
-        
-        for form in selected_forms:
-            current_revision = form.get('current_revision', {})
-            author = current_revision.get('author', 'Unknown')
-            date_str = current_revision.get('date', '')
-            form_name = form.get('form_template_name', 'Unknown Form')
             
-            # Parse date
-            report_date = None
-            if date_str:
-                try:
-                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                    report_date = form_datetime.date()
-                except:
-                    report_date = None
+        # Parse date
+        report_date = None
+        if date_str:
+            try:
+                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                report_date = form_datetime.date()
+            except:
+                report_date = None
             
             # Extract hall/building info
             hall_name = "Unknown Hall"
@@ -2611,6 +2587,8 @@ Please provide a comprehensive supervisory analysis:
         
         with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
             result = model.generate_content(prompt)
+            if not result or not getattr(result, 'text', None) or not result.text.strip():
+                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
             return result.text
             
     except Exception as e:
@@ -8080,7 +8058,6 @@ def saved_reports_page():
                                            help="Extract and prepare UND LEADS section for email"):
                                     # Extract UND LEADS section
                                     leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
-                                    
                                     if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
                                         # Store in session state for email form
                                         st.session_state['email_content'] = {
@@ -8088,9 +8065,37 @@ def saved_reports_page():
                                             'body': leads_section,
                                             'week_date': week_date
                                         }
-                                        st.success("📧 UND LEADS section extracted! You can now use the email form in Admin Summaries to send it.")
+                                        st.success("📧 UND LEADS section extracted! You can now send the email below.")
                                     else:
                                         st.warning(f"⚠️ {leads_section}")
+                                # Show email form if content is ready and matches this summary
+                                if ('email_content' in st.session_state and st.session_state['email_content']['week_date'] == week_date):
+                                    st.subheader("📧 Send UND LEADS Section")
+                                    with st.form(f"email_form_archive_{week_date}"):
+                                        to_email = st.text_input("Recipient Email:", placeholder="example@und.edu")
+                                        subject = st.text_input("Subject:", value=st.session_state['email_content']['subject'])
+                                        body = st.text_area("Email Body:", value=st.session_state['email_content']['body'], height=200)
+                                        col_send, col_cancel = st.columns(2)
+                                        with col_send:
+                                            if st.form_submit_button("📧 Send Email", type="primary"):
+                                                if to_email:
+                                                    with st.spinner("Sending email..."):
+                                                        success = send_email(to_email, subject, body)
+                                                        if success:
+                                                            st.success(f"✅ UND LEADS section emailed successfully to {to_email}")
+                                                            if 'email_content' in st.session_state:
+                                                                del st.session_state['email_content']
+                                                            time.sleep(2)
+                                                            st.rerun()
+                                                        else:
+                                                            st.error("Failed to send email. Please check email configuration.")
+                                                else:
+                                                    st.error("Please enter a recipient email address.")
+                                        with col_cancel:
+                                            if st.form_submit_button("Cancel"):
+                                                if 'email_content' in st.session_state:
+                                                    del st.session_state['email_content']
+                                                st.rerun()
         
         except Exception as e:
             st.error(f"Failed to fetch saved weekly summaries: {e}")
@@ -8165,7 +8170,7 @@ def admin_summaries_page():
                             file_name=html_filename,
                             mime=html_mime,
                             help="Downloads a nicely formatted HTML document that can be opened in any browser or printed",
-                            key=f"download_html_{summary.get('id', week_date)}"
+                            key=f"download_html_{summary.get('summary_id', week_date)}"
                         )
                         
                         # Plain text download (original)
@@ -8178,12 +8183,12 @@ def admin_summaries_page():
                             file_name=text_filename,
                             mime=text_mime,
                             help="Downloads a formatted text document",
-                            key=f"download_text_{summary.get('id', week_date)}"
+                            key=f"download_text_{summary.get('summary_id', week_date)}"
                         )
                     
                     # Email UND LEADS section button
                     with col2:
-                        if st.button(f"📧 Email UND LEADS Section", key=f"email_leads_{summary.get('id', week_date)}"):
+                        if st.button(f"📧 Email UND LEADS Section", key=f"email_leads_{summary.get('summary_id', week_date)}"):
                             # Extract UND LEADS section
                             leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
                             
@@ -8193,7 +8198,7 @@ def admin_summaries_page():
                                     'subject': f"UND LEADS Summary - Week Ending {week_date}",
                                     'body': f"UND LEADS Summary for Week Ending {week_date}\n\n{leads_section}\n\n---\nGenerated from UND Housing Leadership Reports\nCreated {created_date} by {creator_name}",
                                     'week_date': week_date,
-                                    'summary_id': summary.get('id', week_date)
+                                    'summary_id': summary.get('summary_id', week_date)
                                 }
                                 st.rerun()
                             else:
@@ -8201,7 +8206,7 @@ def admin_summaries_page():
                     
                     # Preview UND LEADS section button  
                     with col3:
-                        if st.button(f"👁️ Preview UND LEADS", key=f"preview_leads_{summary.get('id', week_date)}"):
+                        if st.button(f"👁️ Preview UND LEADS", key=f"preview_leads_{summary.get('summary_id', week_date)}"):
                             leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
                             if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
                                 st.session_state['preview_content'] = {
@@ -8214,10 +8219,10 @@ def admin_summaries_page():
                     
                     # Show email form if content is ready
                     if ('email_content' in st.session_state and 
-                        st.session_state['email_content']['summary_id'] == summary.get('id', week_date)):
+                        st.session_state['email_content']['summary_id'] == summary.get('summary_id', week_date)):
                         
                         st.subheader("📧 Send UND LEADS Section")
-                        with st.form(f"email_form_{summary.get('id', week_date)}"):
+                        with st.form(f"email_form_{summary.get('summary_id', week_date)}"):
                             to_email = st.text_input("Recipient Email:", placeholder="example@und.edu")
                             subject = st.text_input("Subject:", value=st.session_state['email_content']['subject'])
                             body = st.text_area("Email Body:", value=st.session_state['email_content']['body'], height=200)
