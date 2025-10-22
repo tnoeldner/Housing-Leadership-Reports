@@ -7703,22 +7703,15 @@ def saved_reports_page():
     """View saved duty analyses, staff recognition reports, and weekly summaries"""
     st.title("Saved Reports Archive")
     st.write("View all saved reports: duty analyses, staff recognition, and weekly summaries.")
-    
-    # Tab selection for different report types
     tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
-    
     with tab1:
         st.subheader("Saved Duty Analyses")
-        
         try:
-            # Get all saved duty analyses
             analyses_response = supabase.table('saved_duty_analyses').select('*').order('week_ending_date', desc=True).execute()
             analyses = analyses_response.data or []
-            
             if not analyses:
                 st.info("No saved duty analyses yet.")
             else:
-                # Group analyses by year for better organization
                 analyses_by_year = {}
                 for analysis in analyses:
                     try:
@@ -7727,24 +7720,18 @@ def saved_reports_page():
                             analyses_by_year[year] = []
                         analyses_by_year[year].append(analysis)
                     except:
-                        # If date parsing fails, group under "Unknown"
                         if "Unknown" not in analyses_by_year:
                             analyses_by_year["Unknown"] = []
                         analyses_by_year["Unknown"].append(analysis)
-                
-                # Display analyses by year
                 for year in sorted(analyses_by_year.keys(), reverse=True):
                     st.subheader(f"📅 {year}")
                     year_analyses = analyses_by_year[year]
-                    
                     for analysis in year_analyses:
                         week_date = analysis.get('week_ending_date', 'Unknown')
                         created_date = analysis.get('created_at', '')[:10] if analysis.get('created_at') else 'Unknown'
                         created_by = analysis.get('created_by', 'Unknown')
                         report_type = analysis.get('report_type', 'standard_analysis')
                         reports_analyzed = analysis.get('reports_analyzed', 0)
-                        
-                        # Get creator name if possible
                         creator_name = "Unknown"
                         if created_by and created_by != 'Unknown':
                             try:
@@ -7754,17 +7741,12 @@ def saved_reports_page():
                                     creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
                             except:
                                 creator_name = "Unknown"
-                        
                         report_type_display = "Weekly Summary" if report_type == "weekly_summary" else "Standard Analysis"
-                        
                         with st.expander(f"Week Ending {week_date} — {report_type_display} ({reports_analyzed} reports) — Created {created_date} by {creator_name}"):
                             st.markdown(analysis.get('analysis_text', 'No content available'))
-                            
                             st.divider()
                             col1, col2 = st.columns(2)
-                            
                             with col1:
-                                # Download button
                                 download_filename = f"duty_analysis_{report_type}_{week_date}_{created_date}.md"
                                 st.download_button(
                                     label="📄 Download Analysis",
@@ -7774,11 +7756,9 @@ def saved_reports_page():
                                     help="Download this duty analysis as a markdown file",
                                     key=f"download_duty_{analysis.get('id', week_date)}"
                                 )
-                            
                             with col2:
-                                # Delete button (only for creator or admin)
                                 user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
-                                if user_id and (user_id == created_by):  # Could add admin check here
+                                if user_id and (user_id == created_by):
                                     if st.button(f"🗑️ Delete", key=f"delete_duty_{analysis.get('id', week_date)}", 
                                                type="secondary", help="Delete this saved analysis"):
                                         try:
@@ -7787,22 +7767,16 @@ def saved_reports_page():
                                             st.rerun()
                                         except Exception as e:
                                             st.error(f"Failed to delete: {e}")
-        
         except Exception as e:
             st.error(f"Failed to fetch saved duty analyses: {e}")
-    
     with tab2:
         st.subheader("Saved Staff Recognition Reports")
-        
         try:
-            # Get all saved staff recognition reports
             recognition_response = supabase.table('saved_staff_recognition').select('*').order('week_ending_date', desc=True).execute()
             recognitions = recognition_response.data or []
-            
             if not recognitions:
                 st.info("No saved staff recognition reports yet.")
             else:
-                # Group recognitions by year for better organization
                 recognitions_by_year = {}
                 for recognition in recognitions:
                     try:
@@ -7814,14 +7788,10 @@ def saved_reports_page():
                         if "Unknown" not in recognitions_by_year:
                             recognitions_by_year["Unknown"] = []
                         recognitions_by_year["Unknown"].append(recognition)
-                
-                # Display staff recognitions by year
                 for year in sorted(recognitions_by_year.keys(), reverse=True):
-                    st.write(f"### � {year} Staff Recognition Reports")
-                    
+                    st.subheader(f"🏆 {year} Staff Recognition Reports")
                     year_recognitions = recognitions_by_year[year]
                     for recognition in year_recognitions:
-                        # Get creator info
                         creator_name = "Unknown User"
                         if recognition.get('created_by'):
                             try:
@@ -7830,169 +7800,45 @@ def saved_reports_page():
                                     creator_name = profile_response.data[0]['full_name']
                             except:
                                 pass
-                        
-                        # Format dates
                         week_date = recognition['week_ending_date']
                         created_date = recognition['created_at'][:10] if recognition.get('created_at') else 'Unknown'
-                        
-                        # Display recognition info
                         with st.expander(f"Week Ending {week_date} - Staff Recognition - {creator_name}"):
                             st.write(f"**Staff Recognized:** {recognition.get('staff_recognized', 0)}")
                             st.write(f"**Created:** {created_date} by {creator_name}")
-                            
-                            # Show recognition summary
-                            if recognition.get('summary'):
-                                st.markdown("**Recognition Summary:**")
-                                st.markdown(recognition['summary'])
-                            
-                            # Action buttons
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                # Download button
-                                st.download_button(
-                                    "📥 Download",
-                                    data=analysis['analysis_text'],
-                                    file_name=f"engagement_analysis_{week_date}.md",
-                                    mime="text/markdown",
-                                    help="Download this engagement analysis as a markdown file",
-                                    key=f"download_engagement_{analysis['id']}"
-                                )
-                            
-                            with col2:
-                                # Email UND LEADS section button (if applicable)
-                                if "UND LEADS" in analysis['analysis_text']:
-                                    if st.button(f"📧 Email UND LEADS", key=f"email_engagement_leads_{analysis['id']}", 
-                                               help="Extract and prepare UND LEADS section for email"):
-                                        leads_section = extract_und_leads_section(analysis['analysis_text'])
-                                        
-                                        if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
-                                            st.session_state['email_content'] = {
-                                                'subject': f"UND LEADS Summary - Week Ending {week_date}",
-                                                'body': leads_section,
-                                                'week_date': week_date
-                                            }
-                                            st.success("📧 UND LEADS section extracted! You can now use the email form in Admin Summaries to send it.")
-                                        else:
-                                            st.warning(f"⚠️ {leads_section}")
-                            
-                            with col3:
-                                # Delete button
-                                if st.button("🗑️ Delete", key=f"delete_engagement_{analysis['id']}", 
-                                           help="Permanently delete this engagement analysis"):
-                                    try:
-                                        supabase.table('saved_engagement_analyses').delete().eq('id', analysis['id']).execute()
-                                        st.success("✅ Engagement analysis deleted!")
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Failed to delete: {e}")
-        
-        except Exception as e:
-            st.error(f"Failed to fetch saved engagement analyses: {e}")
-    
-    with tab3:
-        st.subheader("Saved Staff Recognition Reports")
-        
-        try:
-            # Get all saved staff recognition reports
-            recognition_response = supabase.table('saved_staff_recognition').select('*').order('week_ending_date', desc=True).execute()
-            recognitions = recognition_response.data or []
-            
-            if not recognitions:
-                st.info("No saved staff recognition reports yet.")
-            else:
-                # Group recognitions by year
-                recognitions_by_year = {}
-                for recognition in recognitions:
-                    try:
-                        year = pd.to_datetime(recognition['week_ending_date']).year
-                        if year not in recognitions_by_year:
-                            recognitions_by_year[year] = []
-                        recognitions_by_year[year].append(recognition)
-                    except:
-                        if "Unknown" not in recognitions_by_year:
-                            recognitions_by_year["Unknown"] = []
-                        recognitions_by_year["Unknown"].append(recognition)
-                
-                # Display recognitions by year
-                for year in sorted(recognitions_by_year.keys(), reverse=True):
-                    st.subheader(f"📅 {year}")
-                    year_recognitions = recognitions_by_year[year]
-                    
-                    for recognition in year_recognitions:
-                        week_date = recognition.get('week_ending_date', 'Unknown')
-                        created_date = recognition.get('created_at', '')[:10] if recognition.get('created_at') else 'Unknown'
-                        created_by = recognition.get('created_by', 'Unknown')
-                        
-                        # Get creator name
-                        creator_name = "Unknown"
-                        if created_by and created_by != 'Unknown':
-                            try:
-                                profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
-                                if profile_resp.data:
-                                    profile = profile_resp.data[0]
-                                    creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
-                            except:
-                                creator_name = "Unknown"
-                        
-                        # Extract recognition summary for title
-                        ascend_data = json.loads(recognition.get('ascend_recognition', '{}')) if recognition.get('ascend_recognition') else {}
-                        north_data = json.loads(recognition.get('north_recognition', '{}')) if recognition.get('north_recognition') else {}
-                        
-                        recipients = []
-                        if ascend_data.get('staff_member'):
-                            recipients.append(f"ASCEND: {ascend_data['staff_member']}")
-                        if north_data.get('staff_member'):
-                            recipients.append(f"NORTH: {north_data['staff_member']}")
-                        
-                        recipients_text = " | ".join(recipients) if recipients else "No recipients"
-                        
-                        with st.expander(f"Week Ending {week_date} — {recipients_text} — Created {created_date} by {creator_name}"):
-                            st.markdown(recognition.get('recognition_text', 'No content available'))
-                            
-                            st.divider()
+                            if recognition.get('recognition_text'):
+                                st.markdown("**Recognition Report:**")
+                                st.markdown(recognition['recognition_text'])
                             col1, col2 = st.columns(2)
-                            
                             with col1:
-                                # Download button
-                                download_filename = f"staff_recognition_{week_date}_{created_date}.md"
                                 st.download_button(
-                                    label="📄 Download Recognition",
+                                    label="📥 Download Report",
                                     data=recognition.get('recognition_text', ''),
-                                    file_name=download_filename,
+                                    file_name=f"staff_recognition_{week_date}_{created_date}.md",
                                     mime="text/markdown",
                                     help="Download this staff recognition report as a markdown file",
                                     key=f"download_recognition_{recognition.get('id', week_date)}"
                                 )
-                            
                             with col2:
-                                # Delete button (only for creator or admin)
                                 user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
-                                if user_id and (user_id == created_by):  # Could add admin check here
+                                if user_id and (user_id == recognition.get('created_by')):
                                     if st.button(f"🗑️ Delete", key=f"delete_recognition_{recognition.get('id', week_date)}", 
-                                               type="secondary", help="Delete this saved recognition report"):
+                                               type="secondary", help="Delete this saved recognition"):
                                         try:
                                             supabase.table('saved_staff_recognition').delete().eq('id', recognition['id']).execute()
-                                            st.success("Recognition report deleted!")
+                                            st.success("Recognition deleted!")
                                             st.rerun()
                                         except Exception as e:
                                             st.error(f"Failed to delete: {e}")
-        
         except Exception as e:
             st.error(f"Failed to fetch saved staff recognition reports: {e}")
-    
     with tab3:
         st.subheader("Saved Weekly Summaries")
-        
         try:
-            # Get all saved weekly summaries
             summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
             summaries = summaries_response.data or []
-            
             if not summaries:
                 st.info("No saved weekly summaries yet.")
             else:
-                # Group summaries by year
                 summaries_by_year = {}
                 for summary in summaries:
                     try:
@@ -8004,18 +7850,13 @@ def saved_reports_page():
                         if "Unknown" not in summaries_by_year:
                             summaries_by_year["Unknown"] = []
                         summaries_by_year["Unknown"].append(summary)
-                
-                # Display summaries by year
                 for year in sorted(summaries_by_year.keys(), reverse=True):
-                    st.subheader(f"📅 {year}")
+                    st.subheader(f"📅 {year} Weekly Summaries")
                     year_summaries = summaries_by_year[year]
-                    
                     for summary in year_summaries:
                         week_date = summary.get('week_ending_date', 'Unknown')
                         created_date = summary.get('created_at', '')[:10] if summary.get('created_at') else 'Unknown'
                         created_by = summary.get('created_by', 'Unknown')
-                        
-                        # Get creator name
                         creator_name = "Unknown"
                         if created_by and created_by != 'Unknown':
                             try:
@@ -8025,299 +7866,111 @@ def saved_reports_page():
                                     creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
                             except:
                                 creator_name = "Unknown"
-                        
                         with st.expander(f"Week Ending {week_date} — Created {created_date} by {creator_name}"):
-                            st.markdown(clean_summary_response(summary.get('summary_text', 'No content available')))
-                            
+                            st.markdown(summary.get('summary_text', 'No content available'))
                             st.divider()
-                            col1, col2, col3 = st.columns(3)
-                            
-                            # Download options (similar to admin_summaries_page)
+                            col1, col2 = st.columns(2)
                             with col1:
-                                st.write("📄 **Download Options**")
-                                
-                                # HTML formatted download
-                                html_data, html_filename, html_mime = create_formatted_document_download(
-                                    clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "html"
-                                )
+                                download_filename = f"weekly_summary_{week_date}_{created_date}.md"
                                 st.download_button(
-                                    label="📊 Download HTML Report",
-                                    data=html_data,
-                                    file_name=html_filename,
-                                    mime=html_mime,
-                                    help="Downloads a nicely formatted HTML document that can be opened in any browser or printed",
-                                    key=f"download_html_archive_{summary.get('id', week_date)}"
+                                    label="📄 Download Summary",
+                                    data=summary.get('summary_text', ''),
+                                    file_name=download_filename,
+                                    mime="text/markdown",
+                                    help="Download this weekly summary as a markdown file",
+                                    key=f"download_weekly_{summary.get('id', week_date)}"
                                 )
-                            
                             with col2:
-                                # Plain text download
-                                text_data, text_filename, text_mime = create_formatted_document_download(
-                                    clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "text"
-                                )
-                                st.download_button(
-                                    label="📄 Download Text Version",
-                                    data=text_data,
-                                    file_name=text_filename,
-                                    mime=text_mime,
-                                    help="Downloads a formatted text document",
-                                    key=f"download_text_archive_{summary.get('id', week_date)}"
-                                )
-                            
-                            with col3:
-                                # Email UND LEADS section button
-                                if st.button(f"📧 Email UND LEADS", key=f"email_leads_archive_{summary.get('id', week_date)}", 
-                                           help="Extract and prepare UND LEADS section for email"):
-                                    # Extract UND LEADS section
-                                    leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
-                                    if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
-                                        # Store in session state for email form
-                                        st.session_state['email_content'] = {
-                                            'subject': f"UND LEADS Summary - Week Ending {week_date}",
-                                            'body': leads_section,
-                                            'week_date': week_date
-                                        }
-                                        st.success("📧 UND LEADS section extracted! You can now send the email below.")
-                                    else:
-                                        st.warning(f"⚠️ {leads_section}")
-                                # Show email form if content is ready and matches this summary
-                                if ('email_content' in st.session_state and st.session_state['email_content']['week_date'] == week_date):
-                                    st.subheader("📧 Send UND LEADS Section")
-                                    with st.form(f"email_form_archive_{week_date}"):
-                                        to_email = st.text_input("Recipient Email:", placeholder="example@und.edu")
-                                        subject = st.text_input("Subject:", value=st.session_state['email_content']['subject'])
-                                        body = st.text_area("Email Body:", value=st.session_state['email_content']['body'], height=200)
-                                        col_send, col_cancel = st.columns(2)
-                                        with col_send:
-                                            if st.form_submit_button("📧 Send Email", type="primary"):
-                                                if to_email:
-                                                    with st.spinner("Sending email..."):
-                                                        success = send_email(to_email, subject, body)
-                                                        if success:
-                                                            st.success(f"✅ UND LEADS section emailed successfully to {to_email}")
-                                                            if 'email_content' in st.session_state:
-                                                                del st.session_state['email_content']
-                                                            time.sleep(2)
-                                                            st.rerun()
-                                                        else:
-                                                            st.error("Failed to send email. Please check email configuration.")
-                                                else:
-                                                    st.error("Please enter a recipient email address.")
-                                        with col_cancel:
-                                            if st.form_submit_button("Cancel"):
-                                                if 'email_content' in st.session_state:
-                                                    del st.session_state['email_content']
-                                                st.rerun()
-        
+                                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                                if user_id and (user_id == created_by):
+                                    if st.button(f"🗑️ Delete", key=f"delete_weekly_{summary.get('id', week_date)}", 
+                                               type="secondary", help="Delete this saved summary"):
+                                        try:
+                                            supabase.table('saved_weekly_summaries').delete().eq('id', summary['id']).execute()
+                                            st.success("Summary deleted!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to delete: {e}")
         except Exception as e:
             st.error(f"Failed to fetch saved weekly summaries: {e}")
-
-def admin_summaries_page():
-    st.title("Weekly Summaries - Email & Advanced Options")
-    st.write("View weekly summaries with email functionality for UND LEADS sections. For general report viewing, use the Saved Reports Archive.")
-    
-    st.info("💡 **Tip:** For browsing all saved reports (duty analyses, staff recognition, and weekly summaries), visit the **Saved Reports Archive** page.")
-    
-    try:
-        # Get all saved summaries
-        summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
-        summaries = summaries_response.data or []
-        
-        if not summaries:
-            st.info("No weekly summaries have been saved yet.")
-            return
-        
-        # Group summaries by year for better organization
-        summaries_by_year = {}
-        for summary in summaries:
-            try:
-                year = pd.to_datetime(summary['week_ending_date']).year
-                if year not in summaries_by_year:
-                    summaries_by_year[year] = []
-                summaries_by_year[year].append(summary)
-            except:
-                # If date parsing fails, group under "Unknown"
-                if "Unknown" not in summaries_by_year:
-                    summaries_by_year["Unknown"] = []
-                summaries_by_year["Unknown"].append(summary)
-        
-        # Display summaries by year
-        for year in sorted(summaries_by_year.keys(), reverse=True):
-            st.subheader(f"📅 {year}")
-            year_summaries = summaries_by_year[year]
-            
-            for summary in year_summaries:
-                week_date = summary.get('week_ending_date', 'Unknown')
-                created_date = summary.get('created_at', '')[:10] if summary.get('created_at') else 'Unknown'
-                created_by = summary.get('created_by', 'Unknown')
-                
-                # Get creator name if possible
-                creator_name = "Unknown"
-                if created_by and created_by != 'Unknown':
-                    try:
-                        profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
-                        if profile_resp.data:
-                            profile = profile_resp.data[0]
-                            creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
-                    except:
-                        creator_name = "Unknown"
-                
-                with st.expander(f"Week Ending {week_date} — Created {created_date} by {creator_name}"):
-                    st.markdown(clean_summary_response(summary.get('summary_text', '')))
-                    
-                    st.divider()
-                    col1, col2, col3 = st.columns(3)
-                    
-                    # Download button with format options
-                    with col1:
-                        st.write("📄 **Download Options**")
-                        
-                        # HTML formatted download
-                        html_data, html_filename, html_mime = create_formatted_document_download(
-                            clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "html"
-                        )
-                        st.download_button(
-                            label="📊 Download Formatted Report (HTML)",
-                            data=html_data,
-                            file_name=html_filename,
-                            mime=html_mime,
-                            help="Downloads a nicely formatted HTML document that can be opened in any browser or printed",
-                            key=f"download_html_{summary.get('summary_id', week_date)}"
-                        )
-                        
-                        # Plain text download (original)
-                        text_data, text_filename, text_mime = create_formatted_document_download(
-                            clean_summary_response(summary.get('summary_text', '')), week_date, creator_name, "text"
-                        )
-                        st.download_button(
-                            label="📄 Download Text Version",
-                            data=text_data,
-                            file_name=text_filename,
-                            mime=text_mime,
-                            help="Downloads a formatted text document",
-                            key=f"download_text_{summary.get('summary_id', week_date)}"
-                        )
-                    
-                    # Email UND LEADS section button
-                    with col2:
-                        if st.button(f"📧 Email UND LEADS Section", key=f"email_leads_{summary.get('summary_id', week_date)}"):
-                            # Extract UND LEADS section
-                            leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
-                            
-                            if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
-                                # Store in session state for email form
-                                st.session_state['email_content'] = {
-                                    'subject': f"UND LEADS Summary - Week Ending {week_date}",
-                                    'body': f"UND LEADS Summary for Week Ending {week_date}\n\n{leads_section}\n\n---\nGenerated from UND Housing Leadership Reports\nCreated {created_date} by {creator_name}",
-                                    'week_date': week_date,
-                                    'summary_id': summary.get('summary_id', week_date)
-                                }
-                                st.rerun()
-                            else:
-                                st.error(f"⚠️ {leads_section}")
-                    
-                    # Preview UND LEADS section button  
-                    with col3:
-                        if st.button(f"👁️ Preview UND LEADS", key=f"preview_leads_{summary.get('summary_id', week_date)}"):
-                            leads_section = extract_und_leads_section(clean_summary_response(summary.get('summary_text', '')))
-                            if leads_section and not leads_section.startswith("Could not find UND LEADS") and not leads_section.startswith("No summary text"):
-                                st.session_state['preview_content'] = {
-                                    'content': leads_section,
-                                    'week_date': week_date
-                                }
-                                st.rerun()
-                            else:
-                                st.error(f"⚠️ {leads_section}")
-                    
-                    # Show email form if content is ready
-                    if ('email_content' in st.session_state and 
-                        st.session_state['email_content']['summary_id'] == summary.get('summary_id', week_date)):
-                        
-                        st.subheader("📧 Send UND LEADS Section")
-                        with st.form(f"email_form_{summary.get('summary_id', week_date)}"):
-                            to_email = st.text_input("Recipient Email:", placeholder="example@und.edu")
-                            subject = st.text_input("Subject:", value=st.session_state['email_content']['subject'])
-                            body = st.text_area("Email Body:", value=st.session_state['email_content']['body'], height=200)
-                            
-                            col_send, col_cancel = st.columns(2)
-                            with col_send:
-                                if st.form_submit_button("📧 Send Email", type="primary"):
-                                    if to_email:
-                                        with st.spinner("Sending email..."):
-                                            success = send_email(to_email, subject, body)
-                                            if success:
-                                                st.success(f"✅ UND LEADS section emailed successfully to {to_email}")
-                                                # Clear the email content from session state
-                                                if 'email_content' in st.session_state:
-                                                    del st.session_state['email_content']
-                                                time.sleep(2)
-                                                st.rerun()
-                                            else:
-                                                st.error("Failed to send email. Please check email configuration.")
-                                    else:
-                                        st.error("Please enter a recipient email address.")
-                            
-                            with col_cancel:
-                                if st.form_submit_button("Cancel"):
-                                    if 'email_content' in st.session_state:
-                                        del st.session_state['email_content']
-                                    st.rerun()
-                    
-                    # Show preview if requested
-                    if ('preview_content' in st.session_state and 
-                        st.session_state['preview_content']['week_date'] == week_date):
-                        
-                        st.subheader("👁️ UND LEADS Section Preview")
-                        st.markdown(st.session_state['preview_content']['content'])
-                        
-                        if st.button("Close Preview", key=f"close_preview_{week_date}"):
-                            if 'preview_content' in st.session_state:
-                                del st.session_state['preview_content']
-                            st.rerun()
-        
-    except Exception as e:
-        st.error(f"Failed to fetch summaries: {e}")
+        # (Staff recognition code moved to tab2)
 
 def user_manual_page():
-    st.title("User Manual")
-    st.markdown("""
-    This manual describes how to use the Weekly Impact Reporting Tool and explains differences between regular users, supervisors, and admins.
+        st.title("User Manual & Getting Started Guide")
+        st.markdown("""
+## Welcome to the UND Housing Leadership Reporting Tool
 
-    ## 1. Account & Access
-    - Sign Up: Use "Sign Up" in the sidebar. Provide email, full name, position title, and password.
-    - Email Confirmation: After sign up you must confirm your email (Supabase confirmation link).
-    - Login: Use "Login" in the sidebar. After logging in the sidebar shows pages available to your role.
-    - Roles:
-      - Regular staff: Submit and view your own reports.
-      - Supervisor: Submit/view own reports; view team reports for direct reports; generate and save team summaries (supervisor-scoped).
-      - Admin/Director: Full access to all finalized reports and archived weekly summaries.
+This guide will help you get started and make the most of the app, whether you are a staff member, supervisor, or admin.
 
-    ## 2. Report Workflow (Draft → Review → Finalize)
-    1. Go to "Submit / Edit Report".
-    2. Create or edit the report for the active week (app calculates the current week and grace period).
-    3. Fill Core Activities tabs and General Updates:
-       - Core Activities: Sections include Students/Stakeholders, Projects, Collaborations, General Job Responsibilities, Staffing, KPIs.
-       - For each section add Successes and Challenges; you can add multiple entries.
-       - General Updates: Personal check-in, Professional development, Lookahead, and optional Director concerns (see privacy rules below).
-    4. Save Draft: Saves your progress as a draft (you can come back later).
-    5. Proceed to Review: The app sends your entries to the AI to categorize each item using ASCEND and Guiding NORTH, and to generate a concise individual summary.
-    6. Review Screen: Edit categories, adjust the AI summary, confirm well-being score and general updates.
-    7. Lock and Submit: Finalizes the report and marks it "finalized". Finalized reports cannot be edited without supervisor/admin assistance.
+---
 
-    ## 3. Privacy and Visibility Rules
-    - Row-Level Security (RLS) is enforced: users only see rows they are permitted to view.
-    - Regular staff can only view their own reports.
-    - Supervisors can view finalized reports for their direct reports only.
-    - Director concerns (the "Concerns for Director" field) are shown only to:
-      - The report owner, or
-      - Admin/Director accounts.
-      Supervisors and other staff will not see director concerns for another person's report.
-    - Admin/Director accounts have access to all reports and global weekly summaries.
+### 1. Getting Started: Account & Access
+- **Sign Up:** Use the sidebar to create an account. Enter your UND email, full name, position title, and a password.
+- **Email Confirmation:** After signing up, check your email for a Supabase confirmation link. You must confirm before logging in.
+- **Login:** Use the sidebar to log in. Once logged in, the sidebar will show pages available for your role.
+- **Roles:**
+        - **Staff:** Submit and view your own reports, view your own recognition.
+        - **Supervisor:** Submit/view own reports, view team reports, generate and save team summaries, view team recognition.
+        - **Admin/Director:** Full access to all finalized reports, archived weekly summaries, and all recognition.
 
-    ## 4. Troubleshooting & Tips
-    - If the app shows unexpected behavior, restart the app and check Streamlit logs for exceptions.
-    - Missing finalized reports in the supervisor view: Confirm the report is finalized and profile.supervisor_id is set correctly.
-    - AI errors: Simplify long or ambiguous entries and retry "Proceed to Review".
-    """, unsafe_allow_html=False)
+---
+
+### 2. Submitting a Weekly Report
+1. Go to **Submit / Edit Report** in the sidebar.
+2. Select the active week (the app calculates the current week and grace period).
+3. Complete the following sections:
+        - **Core Activities:** Add entries for Students/Stakeholders, Projects, Collaborations, General Job Responsibilities, Staffing, KPIs. For each, add Successes and Challenges.
+        - **General Updates:** Personal check-in, Professional development, Lookahead, and (optionally) Director concerns.
+4. **Save Draft:** You can save your progress and return later.
+5. **Proceed to Review:** The app uses AI to categorize your entries (ASCEND/NORTH) and generate a summary.
+6. **Review & Edit:** Edit categories, adjust the AI summary, confirm well-being score and general updates.
+7. **Lock and Submit:** Finalizes the report. Finalized reports cannot be edited without supervisor/admin help.
+
+---
+
+### 3. Staff Recognition
+1. Go to **Staff Recognition** tab in the Saved Reports Archive.
+2. View weekly recognition reports for ASCEND and NORTH categories.
+3. Download recognition reports as markdown files.
+4. Supervisors and admins can view all staff recognition; staff see their own.
+
+---
+
+### 4. Viewing Weekly Summaries
+1. Go to **Weekly Summaries** tab in the Saved Reports Archive.
+2. View all finalized weekly summaries grouped by year.
+3. Download summaries as markdown files.
+4. Supervisors and admins can view all summaries; staff see their own.
+
+---
+
+### 5. Navigation & Pages
+- **My Profile:** View and update your profile information.
+- **Submit / Edit Report:** Create or edit your weekly report.
+- **Saved Reports Archive:** Access all duty analyses, staff recognition, and weekly summaries.
+- **User Manual:** Access this guide anytime.
+- **Supervisor/Admin Pages:** Supervisors and admins have additional dashboard and team summary pages.
+
+---
+
+### 6. Privacy & Security
+- **Row-Level Security:** You only see reports and recognition you are permitted to view.
+- **Director Concerns:** Only visible to the report owner and admins/directors.
+- **Supervisors:** Can view finalized reports for their direct reports only.
+- **Admins/Directors:** Have access to all reports and summaries.
+
+---
+
+### 7. Troubleshooting & Tips
+- If the app shows unexpected behavior, restart and check Streamlit logs for errors.
+- If you can't see a report, confirm it is finalized and your supervisor_id is set correctly in your profile.
+- If AI summary fails, simplify your entries and retry.
+- For help, contact your supervisor or admin.
+
+---
+
+**Thank you for using the UND Housing Leadership Reporting Tool!**
+""", unsafe_allow_html=False)
 
 # --- MAIN APPLICATION LOGIC ---
 def main():
