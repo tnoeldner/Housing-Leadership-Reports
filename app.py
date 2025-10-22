@@ -129,31 +129,33 @@ def calculate_deadline_info(now):
             # If string parsing fails, fall back to current time
             now = datetime.now(ZoneInfo("America/Chicago"))
     
-    # Calculate the active week ending Saturday and deadline
+    # Calculate the current week's Saturday
     current_weekday = now.weekday()  # Monday is 0, Sunday is 6
-    
-    # Find the active Saturday (end of reporting week)
-    if current_weekday < deadline_day or (current_weekday == deadline_day and now.hour < deadline_hour + grace_hours):
-        # Still in current reporting week
-        days_to_saturday = 5 - current_weekday
-        active_saturday = now.date() + timedelta(days=days_to_saturday)
-    else:
-        # Move to next reporting week
-        days_to_next_saturday = (5 - current_weekday) + 7
-        active_saturday = now.date() + timedelta(days=days_to_next_saturday)
-    
-    # Calculate actual deadline (day after Saturday at specified time)
-    deadline_date = active_saturday + timedelta(days=(deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0))
+    days_to_saturday = 5 - current_weekday
+    this_saturday = now.date() + timedelta(days=days_to_saturday)
+
+    # Calculate deadline for this week
+    deadline_date = this_saturday + timedelta(days=(deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0))
     deadline_datetime = datetime.combine(deadline_date, datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute))
     deadline_datetime = deadline_datetime.replace(tzinfo=ZoneInfo("America/Chicago"))
-    
-    # Grace period end
     grace_end = deadline_datetime + timedelta(hours=grace_hours)
-    
-    # Check status
-    is_grace_period = deadline_datetime <= now <= grace_end
-    deadline_passed = now > grace_end
-    
+
+    # If current time is after grace period, advance to next Saturday
+    if now > grace_end:
+        # Next Saturday
+        active_saturday = this_saturday + timedelta(days=7)
+        # Recalculate deadline for next week
+        deadline_date = active_saturday + timedelta(days=(deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0))
+        deadline_datetime = datetime.combine(deadline_date, datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute))
+        deadline_datetime = deadline_datetime.replace(tzinfo=ZoneInfo("America/Chicago"))
+        grace_end = deadline_datetime + timedelta(hours=grace_hours)
+        is_grace_period = False
+        deadline_passed = True
+    else:
+        active_saturday = this_saturday
+        is_grace_period = deadline_datetime <= now <= grace_end
+        deadline_passed = now > grace_end
+
     return {
         "active_saturday": active_saturday,
         "deadline_datetime": deadline_datetime,
@@ -1741,25 +1743,8 @@ def summarize_form_submissions(selected_forms, max_forms=10):
                 
                 if field_response and str(field_response).strip():
                     forms_text += f"**{field_label}:** {field_response}\n"
-            
-            forms_text += "\n" + "="*50 + "\n"
-        
         # Create AI prompt for summarization
         prompt = f"""
-You are analyzing form submissions from residence life staff for supervisory review. Please create a comprehensive summary that helps supervisors understand key themes, concerns, and insights from the submitted forms.
-
-FORM DATA:
-{forms_text}
-
-Please provide a summary that includes:
-
-1. **Executive Overview**: Brief summary of the number and types of forms analyzed
-2. **Key Themes**: Major patterns, recurring topics, or common themes across submissions  
-3. **Notable Items**: Specific incidents, achievements, or concerns that require supervisory attention
-4. **Staff Insights**: Observations about staff performance, challenges, or successes mentioned in the forms
-5. **Action Items**: Recommendations for follow-up actions or areas requiring supervisory intervention
-6. **Trending Issues**: Any patterns that might indicate systemic issues or positive developments
-
 Format the response in clear markdown with headers and bullet points. Focus on actionable insights that help supervisors make informed decisions about their teams and operations.
 """
 
@@ -1772,7 +1757,7 @@ Format the response in clear markdown with headers and bullet points. Focus on a
                 st.info("Prompt sent to AI:")
                 st.code(prompt)
                 st.info("Input data summary:")
-                st.code(reports_text)
+                st.code(forms_text)
                 return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
             return result.text
             
@@ -2032,19 +2017,45 @@ def store_duty_report_data(selected_forms, start_date, end_date, generated_by_us
             }
         
         stored_records = []
-            
-        # Parse date
-        report_date = None
-        if date_str:
-            try:
-                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                report_date = form_datetime.date()
-            except:
-                report_date = None
-            
-            # Extract hall/building info
+        for form in selected_forms:
+            current_revision = form.get('current_revision', {})
+            date_str = current_revision.get('date', '')
+            report_date = None
+            if date_str:
+                try:
+                    form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    report_date = form_datetime.date()
+                except:
+                    report_date = None
             hall_name = "Unknown Hall"
             responses = current_revision.get('responses', [])
+            # First pass: find hall/building
+            for response in responses:
+                field_label = response.get('field_label', '').lower()
+                field_response = str(response.get('response', '')).strip()
+                if any(word in field_label for word in ['building', 'hall', 'location', 'area']):
+                    if field_response and field_response not in ['None', '']:
+                        hall_name = field_response
+                        break
+            # Second pass: extract incidents and create records
+            report_text = ""
+            for response in responses:
+                field_response = str(response.get('response', '')).strip().lower()
+                report_text += field_response + " "
+            author = current_revision.get('author', 'Unknown')
+            form_name = form.get('form_template_name', 'Unknown Form')
+            base_record = {
+                'report_date': report_date.isoformat() if report_date else None,
+                'hall_name': hall_name,
+                'staff_author': author,
+                'form_type': form_name,
+                'generated_by_user_id': generated_by_user_id,
+                'created_at': datetime.now().isoformat(),
+                'date_range_start': start_date.isoformat(),
+                'date_range_end': end_date.isoformat()
+            }
+            # Create incident records based on detected patterns
+            incidents_found = []
             
             # First pass: find hall/building
             for response in responses:
@@ -8372,7 +8383,7 @@ def main():
     if st.session_state.get("role") == "admin":
         pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
         pages["Admin Settings"] = admin_settings_page
-        pages["Weekly Summaries (Email)"] = admin_summaries_page
+    # pages["Weekly Summaries (Email)"] = admin_summaries_page
         pages["📚 Saved Reports Archive"] = saved_reports_page
         pages["Supervisors Section"] = supervisors_section_page
     
