@@ -3,7 +3,8 @@ import pandas as pd
 import json
 from datetime import datetime, timedelta, date, time as dt_time
 from supabase import create_client, Client
-import google.generativeai as genai
+from src.ai import init_ai, get_gemini_models, gemini_test_prompt
+
 try:
     from zoneinfo import ZoneInfo  # Python 3.9+
 except ImportError:

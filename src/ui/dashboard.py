@@ -8,7 +8,7 @@ try:
 except ImportError:
     from datetime import timezone as ZoneInfo
 
-import google.generativeai as genai
+from google import genai
 
 from src.database import supabase, safe_db_query, get_admin_client
 admin_supabase = get_admin_client()
@@ -587,8 +587,15 @@ STAFF REPORTS DATA:
 
 {engagement_reports_section}
 """
-                    model = genai.GenerativeModel("models/gemini-2.5-pro")
-                    ai_response = model.generate_content(prompt)
+                    api_key = st.secrets.get("GOOGLE_API_KEY") or st.session_state.get("GOOGLE_API_KEY")
+                    if not api_key:
+                        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+                        st.stop()
+                    client = genai.Client(api_key=api_key)
+                    ai_response = client.models.generate_content(
+                        model="gemini-2.5-pro",
+                        contents=prompt
+                    )
                     
                     # Clean up the response by removing unwanted intro text
                     cleaned_text = clean_summary_response(ai_response.text)

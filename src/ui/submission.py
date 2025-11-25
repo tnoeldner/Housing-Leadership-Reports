@@ -8,7 +8,7 @@ try:
 except ImportError:
     from datetime import timezone as ZoneInfo
 
-import google.generativeai as genai
+from google import genai
 
 from src.database import supabase
 from src.config import CORE_SECTIONS, ASCEND_VALUES, NORTH_VALUES
@@ -105,7 +105,9 @@ def submit_and_edit_page():
         selected_report = next((r for r in user_reports if r.get('week_ending_date') == selected_week), None)
         if selected_report:
             status = (selected_report.get("status") or "draft").capitalize()
-            st.markdown(f"### Report for week ending {selected_report.get('week_ending_date','Unknown')} (Status: {status})")
+            from src.config import get_secret
+            api_key = get_secret("GOOGLE_API_KEY")
+            client = genai.Client(api_key=api_key)
             if selected_report.get("individual_summary"):
                 st.info(f"**Your AI-Generated Summary:**\n\n{clean_summary_response(selected_report.get('individual_summary'))}")
             report_body = selected_report.get("report_body") or {}
@@ -144,7 +146,10 @@ def submit_and_edit_page():
 
             if status.lower() != "finalized":
                 if st.button("Edit This Report", key=f"edit_{selected_report.get('id')}", use_container_width=True):
-                    st.session_state["report_to_edit"] = selected_report
+                    response = client.models.generate_content(
+                        model="gemini-2.5-pro",
+                        contents=prompt
+                    )
                     st.rerun()
 
     @st.cache_data

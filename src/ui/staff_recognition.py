@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 import pandas as pd
 import io
-import google.generativeai as genai
+from google import genai
 from src.database import save_staff_recognition, save_staff_performance_scores, supabase
 try:
     from zoneinfo import ZoneInfo
@@ -42,7 +42,13 @@ def evaluate_staff_performance(weekly_reports, rubrics):
     if not weekly_reports or not rubrics:
         return None
     
-    model = genai.GenerativeModel("models/gemini-2.5-pro")
+        from src.config import get_secret
+        api_key = get_secret("GOOGLE_API_KEY")
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=prompt
+        )
     
     # Build staff performance data
     staff_data = []
@@ -81,13 +87,6 @@ Staff Performance Data:
 {staff_json}
 
 CRITICAL INSTRUCTIONS FOR SCORING:
-- You MUST use ONLY the 1-4 scale defined in the rubrics above
-- DO NOT use a 1-10 scale or any other scale
-- The ONLY valid scores are: 1, 2, 3, or 4
-- 1 = Needs Improvement
-- 2 = Meets Expectations  
-- 3 = Exceeds Expectations
-- 4 = Outstanding
 
 IMPORTANT: You must provide TWO outputs:
 1. Top performers (one for ASCEND, one for NORTH)
@@ -128,12 +127,16 @@ Return JSON in this EXACT format with scores between 1-4 ONLY:
 }}
 
 REMINDER: 
-- Scores must be 1, 2, 3, or 4 ONLY. Do not use 5, 6, 7, 8, 9, or 10.
-- Only include categories where the staff member has activities. Skip categories with no activities.
 """
 
     try:
-        response = model.generate_content(prompt)
+        from src.config import get_secret
+        api_key = get_secret("GOOGLE_API_KEY")
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=prompt
+        )
         
         # Debug: Show prompt and raw response
         with st.expander("🕵️ Debug: AI Input & Output"):

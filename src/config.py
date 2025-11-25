@@ -23,17 +23,9 @@ def get_secret(key, default=None):
     value = os.getenv(key)
     if value:
         return value
-    
-    # Try Streamlit secrets
+
+    # Try Streamlit secrets (case-sensitive)
     try:
-        # Handle nested keys if needed (e.g. "supabase.url") - simplified for now
-        if key.lower() == "supabase_url":
-            return st.secrets.get("supabase_url")
-        elif key.lower() == "supabase_key":
-            return st.secrets.get("supabase_key")
-        elif key.lower() == "google_api_key":
-            return st.secrets.get("google_api_key")
-        
         return st.secrets.get(key, default)
     except FileNotFoundError:
         return default

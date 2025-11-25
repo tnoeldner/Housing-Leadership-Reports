@@ -1,5 +1,5 @@
 from collections import defaultdict
-import google.generativeai as genai
+from google import genai
 import streamlit as st
 from datetime import datetime
 
@@ -110,13 +110,6 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             total_incidents = data['lockouts'] + data['maintenance'] + data['policy_violations'] + data['safety_concerns']
             reports_text += f"**{hall}** ({data['total_reports']} reports, {total_incidents} total incidents):\n"
             reports_text += f"  • Lockouts: {data['lockouts']}\n"
-            reports_text += f"  • Maintenance: {data['maintenance']}\n"  
-            reports_text += f"  • Policy Violations: {data['policy_violations']}\n"
-            reports_text += f"  • Safety Concerns: {data['safety_concerns']}\n"
-            reports_text += f"  • Staff Responses: {data['staff_responses']}\n\n"
-
-        reports_text += "\n=== WEEKLY ACTIVITY SUMMARY ===\n"
-        for week, data in sorted(weekly_data.items()):
             reports_text += f"\n**{week}:**\n"
             reports_text += f"- Total Reports: {data['total_reports']}\n"
             reports_text += f"- Incident Reports: {data['incident_count']}\n"
@@ -128,7 +121,13 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
         for i, form in enumerate(selected_forms, 1):
             current_revision = form.get('current_revision', {})
             form_name = form.get('form_template_name', 'Unknown Form')
-            author = current_revision.get('author', 'Unknown')
+            from src.config import get_secret
+            api_key = get_secret("GOOGLE_API_KEY")
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
             date = current_revision.get('date', 'Unknown date')
 
             reports_text += f"\n--- REPORT {i}: {form_name} ---\n"

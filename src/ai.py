@@ -1,25 +1,51 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import streamlit as st
 import re
 from src.config import get_secret
 
+client = None
+
+# Initialize Google Gemini AI using google-genai SDK
 def init_ai():
-    """Initialize Google Gemini AI"""
+    global client
     api_key = get_secret("GOOGLE_API_KEY")
-    
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
-    
     try:
-        genai.configure(api_key=api_key)
-        # Quick test to validate the API key works
-        # Don't actually call the API, just configure it
+        client = genai.Client(api_key=api_key)
         return True
     except Exception as e:
         st.error(f"❌ Google AI API key configuration failed: {e}")
         st.info("Please update your Google AI API key in secrets or environment variables.")
         st.stop()
+
+
+# Return a list of available Gemini models
+def get_gemini_models():
+    global client
+    if client is None:
+        init_ai()
+    try:
+        models = list(client.models.list())
+        return models
+    except Exception as e:
+        return f"Error listing models: {e}"
+
+# Send a test prompt to Gemini and return the response or error
+def gemini_test_prompt(prompt="Hello Gemini, are you working?", model_name="gemini-2.5-pro"):
+    global client
+    if client is None:
+        init_ai()
+    try:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt
+        )
+        return getattr(response, "text", str(response))
+    except Exception as e:
+        return f"Gemini model error: {e}"
 
 def clean_summary_response(text):
     """Remove unwanted introductory text from AI-generated summaries"""
@@ -292,13 +318,18 @@ Please provide a comprehensive supervisory analysis:
 """
 
         # Use Gemini 2.5 Flash for better quota efficiency  
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-        
+        global client
+        if client is None:
+            init_ai()
         with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
-            result = model.generate_content(prompt)
-            if not result or not getattr(result, 'text', None) or not result.text.strip():
+            result = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            response_text = getattr(result, "text", None)
+            if not response_text or not response_text.strip():
                 return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return result.text
+            return response_text
             
     except Exception as e:
         error_msg = str(e)
@@ -346,17 +377,22 @@ Format the response in clear markdown with headers and bullet points. Focus on a
 """
 
         # Use the same AI configuration as the rest of the app
-        model = genai.GenerativeModel("models/gemini-2.5-pro")
-        
+        global client
+        if client is None:
+            init_ai()
         with st.spinner("AI is analyzing form submissions..."):
-            result = model.generate_content(prompt)
-            if not result or not getattr(result, 'text', None) or not result.text.strip():
+            result = client.models.generate_content(
+                model="gemini-2.5-pro",
+                contents=prompt
+            )
+            response_text = getattr(result, "text", None)
+            if not response_text or not response_text.strip():
                 st.info("Prompt sent to AI:")
                 st.code(prompt)
                 st.info("Input data summary:")
                 st.code(forms_text)
                 return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return result.text
+            return response_text
             
     except Exception as e:
         return f"Error generating AI summary: {str(e)}"
