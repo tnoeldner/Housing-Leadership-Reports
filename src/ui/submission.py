@@ -6,7 +6,16 @@ from datetime import datetime, timedelta
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    from datetime import timezone as ZoneInfo
+    from datetime import timezone
+    class ZoneInfo:
+        def __init__(self, tz):
+            self.tz = tz
+        def utcoffset(self, dt):
+            return timezone.utc.utcoffset(dt)
+        def dst(self, dt):
+            return timezone.utc.dst(dt)
+        def tzname(self, dt):
+            return "UTC"
 
 from google import genai
 
@@ -16,6 +25,59 @@ from src.utils import calculate_deadline_info, clear_form_state
 from src.ai import clean_summary_response
 
 def submit_and_edit_page():
+        def dynamic_entry_section(section_key, section_label, report_data):
+            st.subheader(section_label)
+            # Special handling for events section
+            if section_key == "events":
+                if "events_count" not in st.session_state:
+                    existing_events = report_data.get("events", {}).get("successes", [])
+                    st.session_state["events_count"] = len(existing_events) if existing_events else 1
+                for i in range(st.session_state["events_count"]):
+                    col1, col2 = st.columns([2, 1])
+                    default_event_name = ""
+                    default_event_date = datetime.now().date()
+                    existing_events = report_data.get("events", {}).get("successes", [])
+                    if i < len(existing_events):
+                        event_text = existing_events[i].get("text", "")
+                        if " on " in event_text:
+                            parts = event_text.rsplit(" on ", 1)
+                            default_event_name = parts[0]
+                            try:
+                                default_event_date = pd.to_datetime(parts[1]).date()
+                            except:
+                                default_event_date = datetime.now().date()
+                        else:
+                            default_event_name = event_text
+                    with col1:
+                        st.text_input(f"Event/Committee Name", value=default_event_name, key=f"event_name_{i}", placeholder="Enter event or committee name")
+                    with col2:
+                        st.date_input(f"Event Date", value=default_event_date, key=f"event_date_{i}")
+            else:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("##### Successes")
+                    s_key = f"{section_key}_success_count"
+                    if s_key not in st.session_state:
+                        st.session_state[s_key] = len(report_data.get(section_key, {}).get("successes", [])) or 1
+                    for i in range(st.session_state[s_key]):
+                        default = (
+                            report_data.get(section_key, {}).get("successes", [{}])[i].get("text", "")
+                            if i < len(report_data.get(section_key, {}).get("successes", []))
+                            else ""
+                        )
+                        st.text_area("Success", value=default, key=f"{section_key}_success_{i}", label_visibility="collapsed", placeholder=f"Success #{i+1}")
+                with col2:
+                    st.markdown("##### Challenges")
+                    c_key = f"{section_key}_challenge_count"
+                    if c_key not in st.session_state:
+                        st.session_state[c_key] = len(report_data.get(section_key, {}).get("challenges", [])) or 1
+                    for i in range(st.session_state[c_key]):
+                        default = (
+                            report_data.get(section_key, {}).get("challenges", [{}])[i].get("text", "")
+                            if i < len(report_data.get(section_key, {}).get("challenges", []))
+                            else ""
+                        )
+                        st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
     st.title("Submit / Edit Report")
 
     from src.database import get_user_client
@@ -84,14 +146,15 @@ def submit_and_edit_page():
         with col2:
             if st.button("📝 Create Previous Week Report", use_container_width=True, key=f"prev_week_btn_{active_saturday.strftime('%Y-%m-%d') if active_saturday else 'unknown'}"):
                 # Calculate previous Saturdays as options
-                previous_saturday_1 = active_saturday - timedelta(days=7)
-                previous_saturday_2 = active_saturday - timedelta(days=14) 
-                previous_saturday_3 = active_saturday - timedelta(days=21)
-                clear_form_state()
-                st.session_state["report_to_edit"] = {
-                    "week_ending_date": previous_saturday_1.strftime("%Y-%m-%d")  # Default to last week
-                }
-                st.rerun()
+                if active_saturday is not None:
+                    previous_saturday_1 = active_saturday - timedelta(days=7)
+                    previous_saturday_2 = active_saturday - timedelta(days=14)
+                    previous_saturday_3 = active_saturday - timedelta(days=21)
+                    clear_form_state()
+                    st.session_state["report_to_edit"] = {
+                        "week_ending_date": previous_saturday_1.strftime("%Y-%m-%d")  # Default to last week
+                    }
+                    st.rerun()
 
         st.divider()
         if not user_reports:
@@ -182,6 +245,8 @@ def submit_and_edit_page():
 
     def show_submission_form():
         report_data = st.session_state["report_to_edit"]
+        from src.database import get_user_client
+        user_client = get_user_client()
         is_new_report = not bool(report_data.get("id"))
         st.subheader("Editing Report" if not is_new_report else "Creating New Report")
         with st.form(key="weekly_report_form"):
@@ -484,10 +549,12 @@ def submit_and_edit_page():
                     "individual_summary": st.session_state.get("review_summary", ""),
                     "director_concerns": st.session_state.get("review_director_concerns", ""),
                     "status": "finalized",
-                    "submitted_at": datetime.now(ZoneInfo("America/Chicago")).isoformat(),
+                    "submitted_at": datetime.now().isoformat(),
                 }
 
                 try:
+                    from src.database import get_user_client
+                    user_client = get_user_client()
                     user_client.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
                     st.success("✅ Your final report has been saved successfully!")
                     is_update = bool(draft.get("report_id"))
