@@ -4,9 +4,13 @@ import json
 import time
 from datetime import datetime, timedelta
 try:
-    from zoneinfo import ZoneInfo
+    from zoneinfo import ZoneInfo as _ZoneInfo
+    def get_central_tz():
+        return _ZoneInfo('America/Chicago')
 except ImportError:
-    from datetime import timezone as ZoneInfo
+    import pytz
+    def get_central_tz():
+        return pytz.timezone('America/Chicago')
 
 from google import genai
 
@@ -18,6 +22,9 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
+    # Defensive: always assign all_reports and all_staff as lists of dicts
+    all_reports = []
+    all_staff = []
     if "user" not in st.session_state:
         st.warning("You must be logged in to view this page.")
         st.stop()
@@ -34,12 +41,14 @@ def dashboard_page(supervisor_mode=False):
 
         # Get the direct reports (defensive)
         direct_reports_response = supabase.table("profiles").select("id, full_name, title").eq("supervisor_id", current_user_id).execute()
-        direct_reports = getattr(direct_reports_response, "data", None) or []
-        direct_report_ids = [u.get("id") for u in direct_reports if u.get("id")]
+        direct_reports = getattr(direct_reports_response, "data", None)
+        if not isinstance(direct_reports, list):
+            direct_reports = []
+        direct_report_ids = [u.get("id") for u in direct_reports if isinstance(u, dict) and u.get("id")]
 
         st.caption(f"Found {len(direct_report_ids)} direct report(s).")
         if direct_reports:
-            names = ", ".join([dr.get("full_name") or dr.get("title") or dr.get("id") for dr in direct_reports])
+            names = ", ".join([str(dr.get("full_name") or dr.get("title") or dr.get("id") or "") for dr in direct_reports if isinstance(dr, dict)])
             st.write("Direct reports:", names)
 
         if not direct_report_ids:
@@ -48,20 +57,33 @@ def dashboard_page(supervisor_mode=False):
 
         # Use RPC to fetch finalized reports for this supervisor (works with RLS)
         rpc_resp = supabase.rpc('get_finalized_reports_for_supervisor', {'sup_id': current_user_id}).execute()
-        all_reports = rpc_resp.data or []
+        rpc_data = getattr(rpc_resp, 'data', None)
+        if not isinstance(rpc_data, list):
+            rpc_data = []
+        all_reports = [r for r in rpc_data if isinstance(r, dict)]
 
         st.caption(f"Found {len(all_reports)} finalized report(s) for your direct reports.")
 
         # Get staff records for display (only the supervisor's direct reports)
         all_staff_response = supabase.table('profiles').select('*').in_('id', direct_report_ids).execute()
-        all_staff = getattr(all_staff_response, "data", None) or []
+        staff_data = getattr(all_staff_response, "data", None)
+        if not isinstance(staff_data, list):
+            staff_data = []
+        all_staff = [s for s in staff_data if isinstance(s, dict)]
 
     else:
         # Only show admin dashboard content when explicitly called, not at the top of every page
-        reports_response = admin_supabase.table("reports").select("*").eq("status", "finalized").order("created_at", desc=True).execute()
-        all_reports = reports_response.data if hasattr(reports_response, 'data') and isinstance(reports_response.data, list) else []
+        # Fetch both finalized and draft reports for admin dashboard
+        reports_response = admin_supabase.table("reports").select("*").order("created_at", desc=True).execute()
+        raw_reports = getattr(reports_response, 'data', None)
+        if not isinstance(raw_reports, list):
+            raw_reports = []
+        all_reports = [r for r in raw_reports if isinstance(r, dict)]
         all_staff_response = admin_supabase.rpc("get_all_staff_profiles").execute()
-        all_staff = all_staff_response.data if hasattr(all_staff_response, 'data') and isinstance(all_staff_response.data, list) else []
+        raw_staff = getattr(all_staff_response, 'data', None)
+        if not isinstance(raw_staff, list):
+            raw_staff = []
+        all_staff = [s for s in raw_staff if isinstance(s, dict)]
 
     if not all_reports:
         # Do not show any info message; just return
@@ -70,9 +92,14 @@ def dashboard_page(supervisor_mode=False):
     # Normalize week_ending_date values to ISO 'YYYY-MM-DD' so comparisons are consistent
     normalized_reports = []
     for r in all_reports:
+        if not isinstance(r, dict):
+            continue
         raw_week = r.get('week_ending_date')
         try:
-            norm_week = pd.to_datetime(raw_week).date().isoformat()
+            if raw_week:
+                norm_week = pd.to_datetime(str(raw_week)).date().isoformat()
+            else:
+                norm_week = ''
         except Exception:
             norm_week = str(raw_week)
         r['_normalized_week'] = norm_week
@@ -84,33 +111,45 @@ def dashboard_page(supervisor_mode=False):
     unique_dates = sorted(list(set(all_dates)), reverse=True)
 
     st.divider()
-    st.subheader("Weekly Submission Status (Finalized Reports)")
+    st.subheader("Weekly Submission Status (Finalized & Draft Reports)")
     selected_date_for_status = st.selectbox("Select a week to check status:", options=unique_dates)
     if selected_date_for_status and all_staff_response.data:
-        # If supervisor_mode, use the reports we already fetched (RPC) to avoid RLS blocking a direct query.
-        if supervisor_mode:
-            submitted_user_ids = {r['user_id'] for r in normalized_reports if r.get('_normalized_week') == selected_date_for_status}
-        else:
-            submitted_response = admin_supabase.table('reports').select('user_id').eq('week_ending_date', selected_date_for_status).eq('status', 'finalized').execute()
-            submitted_user_ids = {item['user_id'] for item in submitted_response.data} if hasattr(submitted_response, 'data') and isinstance(submitted_response.data, list) else set()
-        all_staff = all_staff_response.data; submitted_staff, missing_staff = [], []
+        # Get all reports for the selected week
+        week_reports = [r for r in normalized_reports if r.get('_normalized_week') == selected_date_for_status]
+        finalized_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'finalized'}
+        draft_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'draft'}
+        unlocked_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'unlocked'}
+        all_staff = all_staff_response.data
+        finalized_staff, draft_staff, unlocked_staff, missing_staff = [], [], [], []
         for staff_member in all_staff:
             name = staff_member.get("full_name") or staff_member.get("email") or staff_member.get("id")
             title = staff_member.get("title")
             display_info = f"{name} ({title})" if title else name
-            if staff_member.get("id") in submitted_user_ids:
-                submitted_staff.append(display_info)
+            uid = staff_member.get("id")
+            if uid in finalized_user_ids:
+                finalized_staff.append(display_info)
+            elif uid in draft_user_ids:
+                draft_staff.append(display_info)
+            elif uid in unlocked_user_ids:
+                unlocked_staff.append(display_info)
             else:
                 missing_staff.append(display_info)
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f"#### ✅ Submitted ({len(submitted_staff)})")
-            for person in sorted(submitted_staff):
+            st.markdown(f"#### ✅ Finalized ({len(finalized_staff)})")
+            for person in sorted(finalized_staff):
                 st.markdown(f"- {person}")
         with col2:
-            st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
-            for person in sorted(missing_staff):
+            st.markdown(f"#### 📝 Draft ({len(draft_staff)})")
+            for person in sorted(draft_staff):
                 st.markdown(f"- {person}")
+        with col3:
+            st.markdown(f"#### ⏰ Unlocked ({len(unlocked_staff)})")
+            for person in sorted(unlocked_staff):
+                st.markdown(f"- {person}")
+        st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
+        for person in sorted(missing_staff):
+            st.markdown(f"- {person}")
 
     st.divider()
     # Fetch saved summaries including creator info
@@ -263,7 +302,7 @@ def dashboard_page(supervisor_mode=False):
                                     # Change status to "unlocked" which bypasses deadline check
                                     supabase.table("reports").update({
                                         "status": "unlocked",
-                                        "admin_note": f"Submission enabled by administrator after deadline. Enabled on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                        "admin_note": f"Submission enabled by administrator after deadline. Enabled on {datetime.now().astimezone(get_central_tz()).strftime('%Y-%m-%d %H:%M:%S')}"
                                     }).eq("id", report.get('id')).execute()
                                     st.success(f"Submission enabled for {report.get('team_member')}! They can now finalize their report.")
                                     time.sleep(1)
@@ -283,7 +322,7 @@ def dashboard_page(supervisor_mode=False):
                                 # Enable submission for all draft reports for this week
                                 supabase.table("reports").update({
                                     "status": "unlocked",
-                                    "admin_note": f"Submission enabled by administrator after deadline. Bulk enabled on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                    "admin_note": f"Submission enabled by administrator after deadline. Bulk enabled on {datetime.now().astimezone(get_central_tz()).strftime('%Y-%m-%d %H:%M:%S')}"
                                 }).eq("week_ending_date", draft_unlock_week).eq("status", "draft").execute()
                                 st.success(f"Submission enabled for all {len(draft_reports)} draft reports for week ending {draft_unlock_week}!")
                                 time.sleep(1)
@@ -305,7 +344,7 @@ def dashboard_page(supervisor_mode=False):
         
         # Get all unique dates from all reports for missed deadline management
         all_report_dates = [r.get("week_ending_date") for r in all_reports if isinstance(r, dict) and r.get("week_ending_date")]
-        all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
+        all_unique_dates = sorted([d for d in set(all_report_dates) if d is not None], reverse=True)
         missed_week = st.selectbox("Select week with missed deadlines:", options=all_unique_dates, key="missed_deadline_week")
         if missed_week:
             # Get all profiles to check against
@@ -354,7 +393,7 @@ def dashboard_page(supervisor_mode=False):
                                 "director_concerns": "",
                                 "status": "draft",
                                 "created_by_admin": st.session_state["user"].id,
-                                "admin_note": f"Report created by administrator due to missed deadline. Created on {datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M:%S')}"
+                                "admin_note": f"Report created by administrator due to missed deadline. Created on {datetime.now().astimezone(get_central_tz()).strftime('%Y-%m-%d %H:%M:%S')}"
                             }
                             bulk_reports.append(empty_report)
                         if bulk_reports:
@@ -377,12 +416,13 @@ def dashboard_page(supervisor_mode=False):
 
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
-                weekly_reports = [r for r in all_reports if r.get("week_ending_date") == selected_date_for_summary]
+                weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
                 if not weekly_reports:
                     st.warning("No reports found for the selected week.")
                 else:
-                    well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
-                    average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
+                    well_being_scores = [r.get("well_being_rating") for r in weekly_reports if isinstance(r, dict) and isinstance(r.get("well_being_rating"), (int, float))]
+                    valid_scores = [score for score in well_being_scores if isinstance(score, (int, float))]
+                    average_score = round(sum(valid_scores) / len(valid_scores), 1) if valid_scores else "N/A"
                     reports_text = ""
                     all_events_summary = []  # Collect all events for admin summary
                     
