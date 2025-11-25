@@ -226,46 +226,14 @@ def submit_and_edit_page():
                         # Add default categories for missing items
                         for missing_id in missing_ids:
                             missing_item = next(item for item in items_to_categorize if item["id"] == missing_id)
-                            default_category = {
-                                "id": missing_id,
-                                "ascend_category": "Development",  # Safe default
-                                "north_category": "Nurturing Student Success & Development"  # Safe default
-                            }
-                            result["categorized_items"].append(default_category)
-                        
-                        try:
-                            from src.config import get_secret
-                            api_key = get_secret("GOOGLE_API_KEY")
-                            client = genai.Client(api_key=api_key)
-                            ascend_list = ", ".join(ASCEND_VALUES)
-                            north_list = ", ".join(NORTH_VALUES)
-                            items_json = json.dumps(items_to_categorize)
-                            prompt = f"""
-                            You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities including campus events and committee participation:
-                            1. Categorize each activity with one ASCEND and one Guiding NORTH category.
-                            2. Generate a concise 2-4 sentence individual summary that includes mention of campus engagement and its alignment with frameworks.
-            
-                            ASCEND Categories: {ascend_list}
-                            Guiding NORTH Categories: {north_list}
-
-                            For campus events/committee participation, consider how attendance demonstrates:
-                            - Community engagement and service (Community, Service)
-                            - Professional development and learning (Development, Excellence)
-                            #...
-                            """
-
-                            # Try up to 3 times with different strategies
-                            for attempt in range(3):
-                                try:
-                                    response = client.models.generate_content(
-                                        model="gemini-2.5-pro",
-                                        contents=prompt
-                                    )
-                                    clean_response = response.text.strip().replace("```json", "").replace("```", "")
-                                    result = json.loads(clean_response)
-
-                                    # Validate the response
-                                    if (result and 
+                            try:
+                                from src.config import get_secret
+                                api_key = get_secret("GOOGLE_API_KEY")
+                                client = genai.Client(api_key=api_key)
+                                ascend_list = ", ".join(ASCEND_VALUES)
+                                north_list = ", ".join(NORTH_VALUES)
+                                items_json = json.dumps(items_to_categorize)
+                                prompt = f"""
                                         "categorized_items" in result and 
                                         "individual_summary" in result and
                                         isinstance(result["categorized_items"], list) and
@@ -274,10 +242,26 @@ def submit_and_edit_page():
                                         # Ensure we have categories for all items
                                         #...
         # Special handling for events section
-        if section_key == "events":
-            # Initialize events count if not exists
             if "events_count" not in st.session_state:
                 existing_events = report_data.get("events", {}).get("successes", [])
+                                # Try up to 3 times with different strategies
+                                for attempt in range(3):
+                                    try:
+                                        response = client.models.generate_content(
+                                            model="gemini-2.5-pro",
+                                            contents=prompt
+                                        )
+                                        clean_response = response.text.strip().replace("```json", "").replace("```", "")
+                                        result = json.loads(clean_response)
+
+                                        # Validate the response
+                                        if (result and 
+                                            "categorized_items" in result and 
+                                            "individual_summary" in result and
+                                            isinstance(result["categorized_items"], list) and
+                                            len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
+                                            # Ensure we have categories for all items
+                                            #...
                 st.session_state["events_count"] = len(existing_events) if existing_events else 1
             
             # Display event entry fields
