@@ -22,12 +22,17 @@ def get_secret(key, default=None):
     # Try environment variable first
     value = os.getenv(key)
     if value:
+        print(f"[DEBUG] get_secret: Found environment variable '{key}' with value: {value}")
         return value
 
     # Try Streamlit secrets (case-sensitive)
     try:
-        return st.secrets.get(key, default)
+        secret_value = st.secrets.get(key, default)
+        print(f"[DEBUG] get_secret: Found Streamlit secret '{key}' with value: {secret_value}")
+        return secret_value
     except FileNotFoundError:
+        print(f"[DEBUG] get_secret: FileNotFoundError for key '{key}'")
         return default
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] get_secret: Exception for key '{key}': {e}")
         return default

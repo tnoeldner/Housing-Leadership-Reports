@@ -146,10 +146,21 @@ def submit_and_edit_page():
 
             if status.lower() != "finalized":
                 if st.button("Edit This Report", key=f"edit_{selected_report.get('id')}", use_container_width=True):
-                    response = client.models.generate_content(
-                        model="gemini-2.5-pro",
-                        contents=prompt
-                    )
+                    # Gather items for AI processing
+                    items_to_categorize = []
+                    for section_key, section_data in report_body.items():
+                        for item_type in ["successes", "challenges"]:
+                            for item in section_data.get(item_type, []):
+                                items_to_categorize.append({
+                                    "id": len(items_to_categorize),
+                                    "text": item,
+                                    "section": section_key,
+                                    "type": item_type
+                                })
+                    # Use the same AI processing as submission
+                    ai_results = process_report_with_ai(items_to_categorize)
+                    if ai_results and "individual_summary" in ai_results:
+                        st.info(f"**AI-Generated Summary:**\n\n{ai_results['individual_summary']}")
                     st.rerun()
 
     @st.cache_data
