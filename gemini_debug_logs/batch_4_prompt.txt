@@ -1,0 +1,61 @@
+
+                You are analyzing residence life duty reports for a weekly administrative summary. Your goal is to produce a concise, actionable, and easy-to-read report for leadership. Please:
+
+                - Summarize the week's overall activity and key trends in 3-5 bullet points.
+                - Highlight the most important incidents, challenges, or successes that require attention. Use bullet points for each item.
+                - Provide a quantitative breakdown (number of reports, incidents by type, hall-by-hall summary) in a clear, readable format.
+                - For each hall, create a dedicated section with the hall name as the header. The individual halls are: Swanson, West, McVey, Brannon, Noren, Selke, Johnstone, Smith, University Place. Under each hall, list the key items, incidents, challenges, successes, and any notable staff actions for that hall as bullet points. Do not group halls together; each hall should have its own section, even if some halls have no incidents or items to report.
+                - List specific action items or recommendations for staff or administration. Make these actionable and direct.
+                - Note any staff performance highlights or concerns.
+                - If relevant, mention any policy, facility, or safety issues that need follow-up.
+
+                Do NOT include a separate "Recurring Issues" section. Instead, ensure hall-specific issues are included under each hall's section.
+
+                Format your response in markdown with clear headers and bullet points. Focus on actionable insights and brevity. Do not include unnecessary narrative or filler text.
+
+                DUTY REPORTS DATA:
+                
+=== WEEKLY DUTY REPORTS ANALYSIS (BATCH 4) ===
+Date Range: 2025-11-16 to 2025-11-16
+Batch Reports: 1
+
+=== DETAILED REPORTS ===
+
+--- REPORT 1: Resident Assistant Duty Report ---
+Staff: Allie Carlsrud
+Date: 2025-11-17T05:38:57Z
+**Hall:** Selke Hall, University Place, Brannon Hall, Swanson Hall, Smith Hall, Johnstone Hall
+**Duty Partner:** None
+**Date:** 2025-11-16T00:00:00Z
+**I started my first round at:** 17:04:00
+**I ended my first round at:** 17:38:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** Outside: 510, 506, 415, 401, 310, 306* windows open, okay temp but knocked on doors as a preventative measure
+Basement: N/A
+1: Eli, Evan, Aiklie, Shaun, and others in common area
+2: Pacey &amp; Saylor playing chess with Jean and Guest as spectators, Trevor and friends making Jerk Chicken, Shou studying with whiteboard
+3: Bryce 318 in common area 
+4: talked with Ethan 418 in laundry room; removed outdated poster
+5: talked with Jacob 511 who was in common area &amp; pre-heating oven 
+**just got real chatty lol
+*did not answer 
+**I started my second round at:** 22:28:00
+**I ended my second round at:** 22:55:00
+**Round Checklist: While on my second round, I completed the following:** I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas
+**Round Summary: While on my second round, the following occurred:** Basement: N/A
+1: Eli, Hugo, Evan, and Danny in common area
+2: talked with Saylor 215 in common area
+3: Daisuke 315 in common area, Ryan 318 in kitchen
+4: two residents sat in common area, Eric 405 cleaning dishes in kitchen
+5: Matthew 508 in common room, talked with RA Naa and Rafi 504 in kitchen
+**I started my third round at (Weekends Only):** None
+**I ended my third round at (Weekends Only):** None
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** None
+**Round Summary: While on my third round, the following occurred (Weekends Only):** None
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** N/A
+
+==================================================
+
+
+                Generate the weekly duty analysis summary below:
+                

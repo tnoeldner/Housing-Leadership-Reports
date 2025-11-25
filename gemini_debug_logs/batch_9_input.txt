@@ -1,0 +1,54 @@
+
+=== WEEKLY DUTY REPORTS ANALYSIS (BATCH 9) ===
+Date Range: 2025-11-10 to 2025-11-16
+Batch Reports: 1
+
+=== DETAILED REPORTS ===
+
+--- REPORT 1: Resident Assistant Duty Report ---
+Staff: Natalie Valiga
+Date: 2025-11-16T22:17:45Z
+
+**Hall:** [{'tag_id': 'bngpVX', 'tag_name': 'West Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7eY2Vm', 'tag_name': 'Brannon Hall', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'lAX1r6v', 'tag_name': 'Alexander Her', 'tag_type': 'STAFF'}, {'tag_id': 'zdj6Oy3', 'tag_name': 'Katharine Rhyner', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 16:30:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Summary: While on my first round, the following occurred:** Alexander, and Natalie completed the first round inside and outside, talked with afew passing residents and took down some old posters.
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:30:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Summary: While on my second round, the following occurred:** During the second round we walked around West and had no policy violations to note.
+**I started my third round at (Weekends Only):** 23:30:00
+**I ended my third round at (Weekends Only):** 23:59:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'oleaGN'}]
+**Round Summary: While on my third round, the following occurred (Weekends Only):** Completed the round and there was nothing to note
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At approximately 3:40 pm on November 16, 2025 the West Hall fire alarms went off. This was caused by cooking in the kitchen where butter in a hot pan set the alarms off.  Operations was called at 3:45 pm to confirm that they got the call by RA Natalie Valiga.  The alarms turned off at approximately 3:50 pm, and RA's received the all clear for residents to go back into the hall.  The report number is 1150 given by Tyler Montgomery.
+
+==================================================

@@ -1,8 +1,9 @@
 [theme]
-primaryColor = "#FF6B35"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
+# UND Official Brand Colors
+primaryColor = "#009A44"           # UND Green (official)
+backgroundColor = "#FFFFFF"         # White
+secondaryBackgroundColor = "#F5F5F5"  # Light gray
+textColor = "#1A1A1A"              # Near black
 font = "sans serif"
 
 [server]

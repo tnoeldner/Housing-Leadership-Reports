@@ -1,0 +1,29 @@
+
+=== WEEKLY DUTY REPORTS ANALYSIS (BATCH 6) ===
+Date Range: 2025-11-10 to 2025-11-16
+Batch Reports: 1
+
+=== DETAILED REPORTS ===
+
+--- REPORT 1: Resident Assistant Duty Report ---
+Staff: Faith Carey
+Date: 2025-11-17T05:05:10Z
+
+**Hall:** [{'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': '7eY2Vm', 'tag_name': 'Brannon Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}]
+**Date:** 2025-11-16T00:00:00Z
+**I started my first round at:** 16:40:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** All floors in both in both east and west buildings were checked. Entrances were secure. An outside round was completed. Residents were greeted throughout. Nothing else to report
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:17:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Summary: While on my second round, the following occurred:** All floors in east and west buildings were checked. All entrances are secure. Residents were greeted throughout. Elf bronzing drops were found in the skywalk on the west side it is in the office now. Nothing else to report.
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** 7pm Bree Brandt checked out Vacuum #5 also bringing up that more blinds had fallen down in 464A and the living room work order was filed #3007.
+
+==================================================

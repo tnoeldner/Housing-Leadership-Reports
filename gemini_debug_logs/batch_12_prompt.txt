@@ -1,0 +1,415 @@
+
+                You are analyzing residence life duty reports for a weekly administrative summary. Your goal is to produce a concise, actionable, and easy-to-read report for leadership. Please:
+
+                - Summarize the week's overall activity and key trends in 3-5 bullet points.
+                - Highlight the most important incidents, challenges, or successes that require attention. Use bullet points for each item.
+                - Provide a quantitative breakdown (number of reports, incidents by type, hall-by-hall summary) in a clear, readable format.
+                - For each hall, create a dedicated section with the hall name as the header. The individual halls are: Swanson, West, McVey, Brannon, Noren, Selke, Johnstone, Smith, University Place. Under each hall, list the key items, incidents, challenges, successes, and any notable staff actions for that hall as bullet points. Do not group halls together; each hall should have its own section, even if some halls have no incidents or items to report.
+                - List specific action items or recommendations for staff or administration. Make these actionable and direct.
+                - Note any staff performance highlights or concerns.
+                - If relevant, mention any policy, facility, or safety issues that need follow-up.
+
+                Do NOT include a separate "Recurring Issues" section. Instead, ensure hall-specific issues are included under each hall's section.
+
+                Format your response in markdown with clear headers and bullet points. Focus on actionable insights and brevity. Do not include unnecessary narrative or filler text.
+
+                DUTY REPORTS DATA:
+                
+=== WEEKLY DUTY REPORTS ANALYSIS (BATCH 12) ===
+Date Range: 2025-11-10 to 2025-11-16
+Batch Reports: 8
+
+=== DETAILED REPORTS ===
+
+--- REPORT 1: Resident Assistant Duty Report ---
+Staff: Alberta Ampah
+Date: 2025-11-16T22:12:38Z
+
+**Hall:** [{'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'L1zD6e', 'tag_name': 'McVey Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}]
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 18:00:00
+**I ended my first round at:** 18:13:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** 
+Floor 5: RA Naa spoke with resident Jason.
+Floor 4: RA Naa said hi to resident Anthony.
+Floor 3: RA Naa said hi to resident Annabelle.
+Floor 2: RA Naa spoke with resident Kaitlyn. RA Naa said  hi to residents Abby and Asma.
+Floor 1: Nothing to note.
+Basement: Nothing to note.
+
+**I started my second round at:** 22:45:00
+**I ended my second round at:** 23:10:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Summary: While on my second round, the following occurred:** 
+Floor 5: RA Naa said hi to resident Natalie.
+Floor 4: Nothing to note.
+Floor 3: Nothing to note.
+Floor 2: RA Naa said hi to residents Trevor and Zack.
+Floor 1: RA Naa said hi to resident Lovette.
+Basement: Nothing to note.
+Outside: RA Naa noticed that the window of the residents in room 313 was opened. RA Naa went to that room and asked for resident Jean to keep it closed as the weather was below freezing. RA Naa also informed resident Jean to either let an RA know if resident Jean feels like the room is significantly hot. Maxient Report Number 00004873
+
+**I started my third round at (Weekends Only):** 00:32:00
+**I ended my third round at (Weekends Only):** 00:42:00
+**Round Summary: While on my third round, the following occurred (Weekends Only):** 
+Floor 5: Nothing to note.
+Floor 4: RA Naa said hi to residents Joseph and Barbara.
+Floor 3: Nothing to note.
+Floor 2: RA Naa said hi to resident Trevor.
+Floor 1: Nothing to note.
+Basement: Nothing to note.
+
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At 3:18 pm on Sunday, RA Naa received a call from a resident cooking in the kitchenette on the 3rd floor. The resident explained that the sink was  leaking. Upon further investigation RA Naa found that the leak had spread through the wall to the hallway. RA Naa called the CA on duty - CA Samantha and explained the situation. CA Samantha arrived promptly. CA Samantha attempted to shut the water but couldn't. CA Samantha called JCI. JCI arrived shortly after and fixed the leak.
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At 3:46 pm on Sunday, RA Naa received a call from resident Eli in room 116 that he accidentally locked himself out of his room. RA Naa unlocked the room using the master key. Master key log form was filed.
+
+==================================================
+
+--- REPORT 2: Resident Assistant Duty Report ---
+Staff: Brendan Lindsay
+Date: 2025-11-16T06:40:23Z
+
+**Hall:** [{'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'L1zD6e', 'tag_name': 'McVey Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'AeOgOOG', 'tag_name': 'Wesley Dolton', 'tag_type': 'STAFF'}, {'tag_id': 'jYXldKP', 'tag_name': 'Luis Swanson', 'tag_type': 'STAFF'}, {'tag_id': 'G1OpM2g', 'tag_name': 'Faith Carey', 'tag_type': 'STAFF'}, {'tag_id': None, 'tag_name': 'NONE', 'tag_type': None}, {'tag_id': 'v5j6jln', 'tag_name': 'Reed Hanson', 'tag_type': 'STAFF'}, {'tag_id': 'pvXD8XJ', 'tag_name': 'Meris Lindsay', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 16:30:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** During the round saw 1 resident in the 2nd floor east lounge studying. Noticed that one of RA Faiths Door Decs had peen placed on the 2nd floor west Trash room door. Filled Maxient Report #00004872. Also Noticed that one of the picture frames had been cracked on the 3rd floor east buildings south side common area. Filled Maxient Report #0004871 Everything else was in order. 
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:30:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Summary: While on my second round, the following occurred:** During the Round Noticed 1 student in the 3rd floor west lounge studying. Picked up small pieces of trash from the hallway. Everything else was in order. 
+**I started my third round at (Weekends Only):** 00:00:00
+**I ended my third round at (Weekends Only):** 00:30:00
+**Round Summary: While on my third round, the following occurred (Weekends Only):** During the round saw 3 residents palling billiards in the 1st floor west lounge. Noticed that the the gate that leads down to the boiler room was open. Made sure the boiler room door was closed and closed the gate. Everything else was in order.
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** No Call while on Duty. 
+
+==================================================
+
+--- REPORT 3: Resident Assistant Duty Report ---
+Staff: Katierae Fiemeyer
+Date: 2025-11-16T01:31:52Z
+
+**Hall:** [{'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'L1zD6e', 'tag_name': 'McVey Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'AeOgOOG', 'tag_name': 'Wesley Dolton', 'tag_type': 'STAFF'}, {'tag_id': 'jYXldKP', 'tag_name': 'Luis Swanson', 'tag_type': 'STAFF'}, {'tag_id': 'G1OpM2g', 'tag_name': 'Faith Carey', 'tag_type': 'STAFF'}, {'tag_id': None, 'tag_name': 'NONE', 'tag_type': None}, {'tag_id': 'v5j6jln', 'tag_name': 'Reed Hanson', 'tag_type': 'STAFF'}, {'tag_id': 'pvXD8XJ', 'tag_name': 'Meris Lindsay', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-14T00:00:00Z
+**I started my first round at:** 18:45:00
+**I ended my first round at:** 19:00:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** 4th floor- Nothing to report 
+3rd floor- Nothing to report 
+2nd floor- Nothing to report 
+1st floor- Nothing to report 
+Outside- Found a parking sign on the ground. Called UPD and they took care of it #00004869
+Landing Zone- Nothing to report 
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:15:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Summary: While on my second round, the following occurred:** 4th floor- Nothing to report
+3rd floor- Nothing to report
+2nd floor- Nothing to report
+1st floor- Nothing to report
+**I started my third round at (Weekends Only):** 00:00:00
+**I ended my third round at (Weekends Only):** 00:15:00
+**Round Summary: While on my third round, the following occurred (Weekends Only):** 4th floor- Nothing to report
+3rd floor- Nothing to report
+2nd floor- Nothing to report
+1st floor- Nothing to report
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** Call at 5:33 pm for RA Jermey lock out 
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** Call at 3:15 for lock out on 4th floor
+Called back at 3:17 saying roommate let them in
+
+==================================================
+
+--- REPORT 4: Resident Assistant Duty Report ---
+Staff: Philip Kim
+Date: 2025-11-17T17:06:56Z
+
+**Hall:** [{'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'L1zD6e', 'tag_name': 'McVey Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}]
+**Hall:** [{'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'L1zD6e', 'tag_name': 'McVey Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'AeOgOOG', 'tag_name': 'Wesley Dolton', 'tag_type': 'STAFF'}, {'tag_id': 'jYXldKP', 'tag_name': 'Luis Swanson', 'tag_type': 'STAFF'}, {'tag_id': 'G1OpM2g', 'tag_name': 'Faith Carey', 'tag_type': 'STAFF'}, {'tag_id': None, 'tag_name': 'NONE', 'tag_type': None}, {'tag_id': 'v5j6jln', 'tag_name': 'Reed Hanson', 'tag_type': 'STAFF'}, {'tag_id': 'pvXD8XJ', 'tag_name': 'Meris Lindsay', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 18:00:00
+**I ended my first round at:** 18:30:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** Smith Lobby: interacted with RA Victoria
+Smith 1: saw a resident walking by
+Smith 2: found trash scattered throughout the hallway. Talked with a resident
+Smith 3: closed an open window
+Smith LL: pile of clothes still in the laundry room; bagged clothes and brought them into the office. Saw a resident studying
+Johnstone LL: saw a resident on the phone
+Johnstone 1: nothing of interest
+Johnstone 2: discovered a clogged toilet in stall G. Used a plunger to unclog it
+Johnstone 3: nothing of interest
+Outside: saw a few residents walking
+**I started my second round at:** 23:15:00
+**I ended my second round at:** 23:30:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I completed an inside round', 'option_id': 'P9DyN8'}]
+**Round Summary: While on my second round, the following occurred:** Smith Lobby: keyed in a locked out resident
+Smith 1: nothing of interest
+Smith 2: found paper towels in sink; disposed of
+Smith 3: talked to a few residents decorating their doors
+Smith LL: residents talking and studying in the study rooms
+Johnstone LL: nothing of interest
+Johnstone 1: nothing of interest
+Johnstone 2: noticed the guest bathroom was locked, but it was locked the previous round; no response or sound from the bathroom after initial knocks--will check again on third round and if still no response, will determine if a welfare check is needed
+Johnstone 3: threw away an empty drink bottle in the study room
+**I started my third round at (Weekends Only):** 01:00:00
+**I ended my third round at (Weekends Only):** 01:20:00
+**Round Summary: While on my third round, the following occurred (Weekends Only):** Smith Lobby: nothing of interest
+Smith 1: nothing of interest
+Smith 2: found a resident lying on the bathroom floor. Resident immediately responded to verbal stimuli and walked away after saying he was very tired. Found the same resident in the other bathroom but was able to respond and walk away again. Resident was not found again, which led us to believe he went back into his room. 
+Smith 3: saw several residents playing card games in the common room
+Johnstone Lobby: nothing of interest
+Johnstone 1: threw away garbage in the guest bathroom
+Johnstone 2: noticed the guest bathroom was still closed. Knocked on the door hard and asked if anyone was in there. Door opened after the knocks, leading us to believe the handle was just sticky. 
+Johnstone 3: nothing of interest
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At 7:02 AM on Sunday, a resident called about being locked out of the building. Let the resident in after verifying he lived in the building.
+
+==================================================
+
+--- REPORT 5: Resident Assistant Duty Report ---
+Staff: Alexander Her
+Date: 2025-11-15T21:57:09Z
+
+**Hall:** [{'tag_id': 'bngpVX', 'tag_name': 'West Hall', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'G1OpMj8', 'tag_name': 'Natalie Valiga', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-14T00:00:00Z
+**I started my first round at:** 16:30:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'eZQnN9'}]
+**Round Summary: While on my first round, the following occurred:** Nothing happened
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:30:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)', 'option_id': 'm2YRG4'}]
+**Round Summary: While on my second round, the following occurred:** Nothing happened on my second round
+**I started my third round at (Weekends Only):** 23:30:00
+**I ended my third round at (Weekends Only):** 00:00:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I removed any out of date posters/hung new posters up', 'option_id': 'NvDe1J'}]
+**Round Summary: While on my third round, the following occurred (Weekends Only):** While on my third run, nothing happened 
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** There was no major calls besides lock outs
+
+==================================================
+
+--- REPORT 6: Resident Assistant Duty Report ---
+Staff: Lorelyn Nelson
+Date: 2025-11-15T18:40:53Z
+
+**Hall:** [{'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'bngpVX', 'tag_name': 'West Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7eY2Vm', 'tag_name': 'Brannon Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'JdOgJKZ', 'tag_name': 'Thien Thang', 'tag_type': 'STAFF'}, {'tag_id': 'YrXpVa2', 'tag_name': 'Brooke Wenner', 'tag_type': 'STAFF'}, {'tag_id': 'gJXG8N4', 'tag_name': 'Jobi Smith', 'tag_type': 'STAFF'}, {'tag_id': None, 'tag_name': 'NONE', 'tag_type': None}, {'tag_id': 'WAXdWK4', 'tag_name': 'Cydney Pathammavong', 'tag_type': 'STAFF'}, {'tag_id': 'BDO9G5o', 'tag_name': 'Brendan Lindsay', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-14T00:00:00Z
+**I started my first round at:** 16:30:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** RA Lorelyn and RA Brendan started on the east building with the fourth floor, then going making their way down to the first floor. Everything looked appropriate in the East building on the inside round. RA Lorelyn and RA Brendan then went to the west building starting on the fourth floor and working down. Everything looked proper in the west building and then moved on to the outside round. No incidences were found on the outside inspection.
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:00:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Summary: While on my second round, the following occurred:** RA Lorelyn and RA Brendan began their second round of inspections on the East first floor. They then went up to the fourth floor and began walking down to the second floor. They then took the skywalk over to the West Building. RA Lorelyn and RA Brendan then went to the first floor of the West Building. Residents were playing pool in the first-floor lounge. RA Lorelyn and Brendan then went up to the fourth floor and then walked to the third floor. No incidents to report. 
+**I started my third round at (Weekends Only):** 00:00:00
+**I ended my third round at (Weekends Only):** 00:30:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Summary: While on my third round, the following occurred (Weekends Only):** RA Lorelyn and RA Brendan began their final round on the West fourth floor. They made their way down to the first floor, seeing residents in the first and third floor lounges. They then went to the East Building and began their inspections again on the fourth floor. Residents were studying together in the fourth-floor lounge. No other incidents to report. 
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** During Desk hours at 7:12pm the Fire Alarm in the West Building went off. RA Brendan was in the University Place Lounge investigating a buzzing noise when the fire alarm went off. RA Brendan went outside and could not see any flames or smoke. CA on Duty was called at 7:13 pm. The CA on duty called Operations at 7:16 pm. UND Police Office Jake Loomis arrived at 7:16pm and entered the building. Shortly after, the Fire Department arrived and entered the building. RA Brendan Notified the RD on duty of the fire call and that first responders had arrived at 7:20 pm. The Fire Department let residents back into the building at 7:31 PM. RA Brendan received the Police Report Number from UND Police Office Jake Loomis. Report #25301145. Submitted Maxient Form #00004870. Filled out Fire Call Report form and emailed to UND Safety. 
+ 
+
+==================================================
+
+--- REPORT 7: Resident Assistant Duty Report ---
+Staff: Katharine Rhyner
+Date: 2025-11-15T17:41:32Z
+
+**Hall:** [{'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'bngpVX', 'tag_name': 'West Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7eY2Vm', 'tag_name': 'Brannon Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}]
+**Duty Partner:** [{'tag_id': 'JdOgJKZ', 'tag_name': 'Thien Thang', 'tag_type': 'STAFF'}, {'tag_id': 'YrXpVa2', 'tag_name': 'Brooke Wenner', 'tag_type': 'STAFF'}, {'tag_id': 'gJXG8N4', 'tag_name': 'Jobi Smith', 'tag_type': 'STAFF'}, {'tag_id': None, 'tag_name': 'NONE', 'tag_type': None}, {'tag_id': 'WAXdWK4', 'tag_name': 'Cydney Pathammavong', 'tag_type': 'STAFF'}, {'tag_id': 'BDO9G5o', 'tag_name': 'Brendan Lindsay', 'tag_type': 'STAFF'}]
+**Date:** 2025-11-14T00:00:00Z
+**I started my first round at:** 16:30:00
+**I ended my first round at:** 16:45:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** 4 west: clean, quiet
+4 east: residents studying
+3 east: clean, ate a cupcake, talked to resident, residents in study room
+3 west: loud hype music coming from a room, wreath hanging from one door
+2 west: lots of residents, someone has a trombone
+2 east: three residents
+1 east: quiet
+1 west: quiet
+ground: clean, noticed residents laundry sitting on the table
+outside: quiet
+**I started my second round at:** 22:05:00
+**I ended my second round at:** 22:20:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Summary: While on my second round, the following occurred:** 4 east: residents watching a movie
+4 west: quiet
+3 west: quiet
+3 east: residents out and about
+2 east: residents, arranged chairs
+2 west: lots going on, lots of things out
+1 west: residents in study room
+1 east: movie playing, arranged chairs
+ground: noticed the same residents laundry still on the table, put it in the office
+
+**I started my third round at (Weekends Only):** 00:00:00
+**I ended my third round at (Weekends Only):** 00:15:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Summary: While on my third round, the following occurred (Weekends Only):** 4 east: residents hanging out, one of them burnt the popcorn. 
+4 west: Pretty clean, arranged some chairs
+3 west: quiet
+3 east: three residents, one of them has a fire christmas sweater on
+2 east: residents playing a game, they asked us about storing bikes, someone in the simulator room
+2 west: people playing guitar very well
+1 west: resident in study room
+1 east: clean, arranged chairs
+Ground: clean
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At 5:33pm I got a call for Ben asking to borrow one of the blue bins to move out his stuff. Later on during desk duty he said he was all moved out so I checked his room, took his key, and checked him out in THD. 
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At 10:08pm I got a call from Alexis checking if was all good to move into the emergency room when she got to the dorms. Since we weren't aware of this we called the RD on duty to check if she was supposed to and what we were supposed to do. She arrived around 10:30 and we gave her the keys and showed her the room. 
+
+==================================================
+
+--- REPORT 8: Resident Assistant Duty Report ---
+Staff: Alberta Ampah
+Date: 2025-11-15T07:51:19Z
+
+**Hall:** [{'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'LdejGj', 'tag_name': 'Noren Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'bngpVX', 'tag_name': 'West Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7eY2Vm', 'tag_name': 'Brannon Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}]
+**Date:** 2025-11-14T00:00:00Z
+**I started my first round at:** 18:28:00
+**I ended my first round at:** 18:44:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** 
+Floor 5: RA Naa said hi to resident Evelyn.
+Floor 4: RA Naa took down a poster.
+Floor 3: Nothing to note.
+Floor 2: RA Naa took down a poster.
+Floor 1: RA Naa took down some posters. RA Naa said hi to RA Myanna.
+Basement: Nothing to note.
+Outside: Nothing to note.
+
+**I started my second round at:** 22:01:00
+**I ended my second round at:** 22:20:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I talked with residents', 'option_id': 'kdVZn0'}]
+**Round Summary: While on my second round, the following occurred:** 
+Floor 5: RA Naa said hi to resident Ryan.
+Floor 4: RA Naa turned the stove off.
+Floor 3: RA Naa said hi to resident Jean. RA Naa spoke to RA Allie and some other residents.
+Floor 2: Nothing to note.
+Floor 1: RA Naa noticed that the ceiling was leaking again. Enough water had leaked out to fill the dustbin. RA Naa emptied the dustbin full of water.
+Basement: Nothing to note.
+
+
+**I started my third round at (Weekends Only):** 01:34:00
+**I ended my third round at (Weekends Only):** 01:44:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** [{'option': 'I organized lounge furniture that was out of place', 'option_id': 'qMWAnr'}]
+**Round Summary: While on my third round, the following occurred (Weekends Only):** 
+Floor 5: Nothing to note.
+Floor 4: Nothing to note.
+Floor 3: RA Naa rearranged furniture.
+Floor 2: RA Naa said hi to residents Nick, Abby and Asma in the common area.
+Floor 1: Nothing to note.
+Basement: Nothing to note.
+
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** Nothing to note.
+
+==================================================
+
+
+                Generate the weekly duty analysis summary below:
+                

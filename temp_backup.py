@@ -10,7 +10,7 @@ except ImportError:
     # Fallback for older Python versions
     from datetime import timezone
     def ZoneInfo(tz):
-        if tz == "US/Central" or tz == "America/Chicago":
+        if tz == "US/Central":
             return timezone.utc  # Simplified fallback
         return timezone.utc
 import time
@@ -24,98 +24,37 @@ import base64
 import os
 import requests
 
-from src.ui.dashboard import dashboard_page
-from src.ui.supervisor import supervisors_section_page, supervisor_summaries_page
-from src.ui.profile import profile_page
-from src.ui.user_manual import user_manual_page
-from src.ui.saved_reports import saved_reports_page
-from src.ui.admin_settings import admin_settings_page
-from src.ui.submission import submit_and_edit_page
-from src.ui.staff_recognition import staff_recognition_page
-
-
-
+# --- Page Configuration ---
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
-
-# --- Authentication Check ---
-if "user" not in st.session_state:
-    st.title("Login Required")
-    st.info("Please log in to access the Weekly Impact Report system.")
-    # Optionally, add login form or instructions here
-else:
-        # Ensure user profile exists in Supabase
-        from src.database import get_user_client
-        user_client = get_user_client()
-        user_id = getattr(st.session_state["user"], "id", None)
-        user_email = getattr(st.session_state["user"], "email", None)
-        if user_id and user_email:
-            profile_response = user_client.table("profiles").select("id").eq("id", user_id).execute()
-            profile_exists = bool(profile_response.data and isinstance(profile_response.data, list) and len(profile_response.data) > 0)
-            if not profile_exists:
-                # Create new profile with default role 'user'
-                user_client.table("profiles").insert({
-                    "id": user_id,
-                    "email": user_email,
-                    "role": "user",
-                    "full_name": st.session_state.get("full_name", ""),
-                    "title": st.session_state.get("title", "")
-                }).execute()
-        # Ensure new users have a default role
-        if "role" not in st.session_state or not st.session_state["role"]:
-            st.session_state["role"] = "staff"
-        # --- Sidebar Navigation (single instance, after login) ---
-        st.sidebar.title("Navigation")
-        st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
-        st.sidebar.write(f"Role: {st.session_state.get('role', 'staff').title()}")
-        if st.sidebar.button("Logout", key="sidebar_logout"):
-            # You may need to implement the logout() function
-            st.session_state.clear()
-            st.rerun()
-
-        # Build pages based on user role
-        pages = {
-            "My Profile": profile_page,
-            "Submit / Edit Report": submit_and_edit_page,
-            "User Manual": user_manual_page,
-            "Saved Reports": saved_reports_page,
-            "Staff Recognition": staff_recognition_page,
-            "Supervisor Summaries": supervisor_summaries_page,
-            "Supervisors": supervisors_section_page,
-            "Admin Settings": admin_settings_page,
-            "Dashboard": dashboard_page,
-        }
-        # Add role-specific pages
-        if st.session_state.get("role") == "admin":
-            pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
-            pages["Admin Settings"] = admin_settings_page
-        if st.session_state.get("is_supervisor"):
-            pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
-            pages["My Team Summaries"] = supervisor_summaries_page
-        selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
-        pages[selected_page]()
 
 # --- Connections ---
 @st.cache_resource
 def init_connection():
     url = os.getenv("SUPABASE_URL") or st.secrets.get("supabase_url")
-    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or st.secrets.get("supabase_service_role_key")
-    key = service_role_key or os.getenv("SUPABASE_KEY") or st.secrets.get("supabase_key")
+    key = os.getenv("SUPABASE_KEY") or st.secrets.get("supabase_key")
     api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("google_api_key")
+    
     # Validate required keys exist
     if not url or not key:
         st.error("❌ Missing Supabase configuration. Please check your secrets or environment variables.")
         st.stop()
+    
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
+    
+    # Test Google AI API key validity
     try:
-        # If you need to test Google API key, use genai.configure(api_key=api_key) only
-        # test_model = genai.GenerativeModel("models/gemini-2.5-pro")  # Remove if not needed
-        return create_client(url, key)
+        genai.configure(api_key=api_key)
+        # Quick test to validate the API key works
+        test_model = genai.GenerativeModel("models/gemini-2.5-pro")
+        # Don't actually call the API, just configure it
     except Exception as e:
         st.error(f"❌ Google AI API key configuration failed: {e}")
         st.info("Please update your Google AI API key in secrets or environment variables.")
         st.stop()
+    
+    return create_client(url, key)
 
 supabase: Client = init_connection()
 
@@ -139,9 +78,8 @@ def get_deadline_settings():
         # Try to get from database first (when table exists)
         settings_response = supabase.table("admin_settings").select("*").eq("setting_name", "report_deadline").execute()
         if settings_response.data:
-            first_item = settings_response.data[0]
-            if isinstance(first_item, dict) and "setting_value" in first_item:
-                return first_item["setting_value"]
+            # JSONB is already parsed as dict, no need for json.loads
+            return settings_response.data[0]["setting_value"]
     except Exception as e:
         # If there's an error, we'll use fallback
         print(f"Database settings error: {e}")  # For debugging
@@ -4169,21 +4107,12 @@ def login_form():
             try:
                 user_session = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 if getattr(user_session, "user", None):
-                    # Store user object and access token separately
                     st.session_state["user"] = user_session.user
-                    st.session_state["access_token"] = getattr(getattr(user_session, "session", None), "access_token", None)
-                    # Fetch profile info and set in session_state
-                    user_id = user_session.user.id
-                    profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
-                    profile_data = profile_response.data[0] if profile_response.data else {}
-                    st.session_state["role"] = profile_data.get("role", "N/A")
-                    st.session_state["full_name"] = profile_data.get("full_name", "")
-                    st.session_state["title"] = profile_data.get("title", "")
                     st.rerun()
                 else:
                     st.error("Login failed. Please check your credentials.")
-            except Exception as e:
-                st.error(f"Login failed: {e}")
+            except Exception:
+                st.error("Login failed: Invalid login credentials or unconfirmed email.")
 
 
 def signup_form():
@@ -4250,16 +4179,14 @@ def submit_and_edit_page():
         user_id = st.session_state["user"].id
         user_reports_response = supabase.table("reports").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         user_reports = getattr(user_reports_response, "data", None) or []
-
-        # ...existing code...
-
+        
         # Check for any draft reports that were previously finalized (unlocked by admin)
         unlocked_reports = [r for r in user_reports if r.get("status") == "draft" and r.get("individual_summary")]
         admin_created_reports = [r for r in user_reports if r.get("status") == "admin_created"]
-
+        
         if unlocked_reports:
             st.info(f"📢 **Notice:** {len(unlocked_reports)} of your previously submitted reports have been unlocked by an administrator for editing. You can now make changes and resubmit them.")
-
+        
         if admin_created_reports:
             st.warning(f"⏰ **Missed Deadline:** {len(admin_created_reports)} report(s) were created by an administrator because you missed the deadline. Please complete and submit them as soon as possible.")
 
@@ -4923,8 +4850,6 @@ def dashboard_page(supervisor_mode=False):
     # Normalize week_ending_date values to ISO 'YYYY-MM-DD' so comparisons are consistent
     normalized_reports = []
     for r in all_reports:
-        if not isinstance(r, dict):
-            continue
         raw_week = r.get('week_ending_date')
         try:
             norm_week = pd.to_datetime(raw_week).date().isoformat()
@@ -4970,10 +4895,8 @@ def dashboard_page(supervisor_mode=False):
     st.divider()
     # Fetch saved summaries including creator info
     summaries_response = supabase.table('weekly_summaries').select('week_ending_date, summary_text, created_by').execute()
-   
-
     # Map week -> (text, created_by)
-    saved_summaries_raw = {s['week_ending_date']: (s['summary_text'], s.get('created_by')) for s in (summaries_response.data or []) if isinstance(s, dict) and 'week_ending_date' in s and 'summary_text' in s}
+    saved_summaries_raw = {s['week_ending_date']: (s['summary_text'], s.get('created_by')) for s in (summaries_response.data or [])}
 
     # If in supervisor mode, only show summaries that were created_by this supervisor (exclude admin/all-staff archived summaries)
     if supervisor_mode:
@@ -4981,7 +4904,7 @@ def dashboard_page(supervisor_mode=False):
     else:
         # Admin/Director sees all saved summaries
         saved_summaries = {week: text for week, (text, creator) in saved_summaries_raw.items()}
-
+    
     # If in supervisor mode, restrict visible saved summaries to weeks that include at least one direct-report report
     if supervisor_mode:
         saved_summaries = {
@@ -5003,13 +4926,13 @@ def dashboard_page(supervisor_mode=False):
         all_reports_comprehensive = getattr(all_reports_response, "data", None) or []
         
         # Use all report dates, not just those visible in current view
-        all_report_dates = [r.get("week_ending_date") for r in all_reports_comprehensive if isinstance(r, dict) and r.get("week_ending_date")]
+        all_report_dates = [r.get("week_ending_date") for r in all_reports_comprehensive if r.get("week_ending_date")]
         all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
         unlock_week = st.selectbox("Select week to unlock reports:", options=all_unique_dates, key="unlock_week_select")
         
         if unlock_week:
             # Get finalized reports for this week
-            finalized_reports = [r for r in all_reports_comprehensive if isinstance(r, dict) and r.get("week_ending_date") == unlock_week and r.get("status") == "finalized"]
+            finalized_reports = [r for r in all_reports_comprehensive if r.get("week_ending_date") == unlock_week and r.get("status") == "finalized"]
             
             if finalized_reports:
                 st.write(f"Found {len(finalized_reports)} finalized report(s) for week ending {unlock_week}:")
@@ -5065,11 +4988,11 @@ def dashboard_page(supervisor_mode=False):
         st.caption(f"Debug: Found {len(all_reports_including_drafts)} total reports (all statuses)")
         
         # Get all unique dates from ALL reports (not just finalized ones)
-        all_report_dates = [r.get("week_ending_date") for r in all_reports_including_drafts if isinstance(r, dict) and r.get("week_ending_date")]
+        all_report_dates = [r.get("week_ending_date") for r in all_reports_including_drafts if r.get("week_ending_date")]
         all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
         
         # Show summary of draft reports
-        draft_reports_total = [r for r in all_reports_including_drafts if isinstance(r, dict) and r.get("status") == "draft"]
+        draft_reports_total = [r for r in all_reports_including_drafts if r.get("status") == "draft"]
         if draft_reports_total:
             draft_weeks = {}
             for report in draft_reports_total:
@@ -5090,7 +5013,7 @@ def dashboard_page(supervisor_mode=False):
             deadline_passed = deadline_info["deadline_passed"]
             
             # Get draft reports for this week
-            draft_reports = [r for r in all_reports_including_drafts if isinstance(r, dict) and r.get("week_ending_date") == draft_unlock_week and r.get("status") == "draft"]
+            draft_reports = [r for r in all_reports_including_drafts if r.get("week_ending_date") == draft_unlock_week and r.get("status") == "draft"]
             
             if draft_reports:
                 st.write(f"Found {len(draft_reports)} draft report(s) for week ending {draft_unlock_week}:")
@@ -5158,13 +5081,13 @@ def dashboard_page(supervisor_mode=False):
         deadline_config = get_deadline_settings()
         
         # Get all unique dates from all reports for missed deadline management
-        all_report_dates = [r.get("week_ending_date") for r in all_reports if isinstance(r, dict) and r.get("week_ending_date")]
+        all_report_dates = [r.get("week_ending_date") for r in all_reports if r.get("week_ending_date")]
         all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
         missed_week = st.selectbox("Select week with missed deadlines:", options=all_unique_dates, key="missed_deadline_week")
         
         if missed_week:
             # Get all staff and check who hasn't submitted or has non-finalized reports
-            all_staff_ids = [staff.get("id") for staff in all_staff if isinstance(staff, dict)]
+            all_staff_ids = [staff.get("id") for staff in all_staff]
             # Check for any existing reports (not just finalized ones)
             success, reports_data, error = safe_db_query(
                 supabase.table("reports").select("user_id, status").eq("week_ending_date", missed_week),
@@ -5172,15 +5095,15 @@ def dashboard_page(supervisor_mode=False):
             )
             
             if success:
-                existing_user_ids = {r['user_id'] for r in reports_data if isinstance(r, dict) and 'user_id' in r}
-                finalized_user_ids = {r['user_id'] for r in reports_data if isinstance(r, dict) and r.get('status') == 'finalized' and 'user_id' in r}
+                existing_user_ids = {r['user_id'] for r in reports_data}
+                finalized_user_ids = {r['user_id'] for r in reports_data if r.get('status') == 'finalized'}
             else:
                 st.error(f"❌ {error}")
                 st.info("🔄 Please refresh the page and try again.")
                 return  # Exit the function if we can't get the data
             
             # Staff who need attention: no report at all OR have non-finalized reports
-            missing_staff = [staff for staff in all_staff if isinstance(staff, dict) and staff.get("id") not in finalized_user_ids]
+            missing_staff = [staff for staff in all_staff if staff.get("id") not in finalized_user_ids]
             
             if missing_staff:
                 finalized_count = len(finalized_user_ids)
@@ -5258,8 +5181,6 @@ def dashboard_page(supervisor_mode=False):
                 # Bulk create option
                 truly_missing_staff = []
                 for staff in missing_staff:
-                    if not isinstance(staff, dict):
-                        continue
                     existing_check = supabase.table("reports").select("id").eq("user_id", staff.get("id")).eq("week_ending_date", missed_week).execute()
                     if not existing_check.data:
                         truly_missing_staff.append(staff)
@@ -5370,12 +5291,6 @@ def dashboard_page(supervisor_mode=False):
 """
 
                     # Check for saved weekly duty reports to integrate
-                    # Debug: Query and show raw duty analyses from Supabase
-                    duty_analyses_response = supabase.table('saved_duty_analyses').select('*').execute()
-                    st.info(f"[DEBUG] Raw saved_duty_analyses response: {type(duty_analyses_response.data)}")
-                    st.write("[DEBUG] saved_duty_analyses data:")
-                    st.json(duty_analyses_response.data)
-
                     duty_reports_section = ""
                     if 'weekly_duty_reports' in st.session_state and st.session_state['weekly_duty_reports']:
                         st.info("🛡️ **Including Weekly Duty Reports:** Found saved duty analysis reports to integrate into this summary.")
@@ -5572,6 +5487,116 @@ STAFF REPORTS DATA:
                     except Exception as e:
                         st.error(f"Failed to save summary: {e}")
 
+    if not supervisor_mode:  # Only for admin dashboard
+        st.divider()
+        st.subheader("🏆 Weekly Staff Recognition")
+        
+        if st.button("Generate Staff Recognition"):
+            with st.spinner("🤖 Evaluating staff performance against ASCEND and NORTH criteria..."):
+                weekly_reports = [r for r in all_reports if r.get("week_ending_date") == selected_date_for_summary]
+                if weekly_reports:
+                    rubrics = load_rubrics()
+                    if rubrics:
+                        recognition = evaluate_staff_performance(weekly_reports, rubrics)
+                        if recognition:
+                            st.session_state['staff_recognition'] = {
+                                "date": selected_date_for_summary,
+                                "data": recognition
+                            }
+                            st.rerun()
+
+        # Display recognition results
+        if "staff_recognition" in st.session_state:
+            recognition_data = st.session_state["staff_recognition"]
+            if recognition_data.get("date") == selected_date_for_summary:
+                st.markdown("### Staff Recognition Results")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    ascend_rec = recognition_data["data"].get("ascend_recognition", {})
+                    if ascend_rec:
+                        st.markdown("#### 🌟 ASCEND Recognition")
+                        st.success(f"**{ascend_rec.get('staff_member')}** - {ascend_rec.get('category')}")
+                        st.write(f"**Reasoning:** {ascend_rec.get('reasoning')}")
+                        st.metric("Performance Score", f"{ascend_rec.get('score', 0)}/10")
+                
+                with col2:
+                    north_rec = recognition_data["data"].get("north_recognition", {})
+                    if north_rec:
+                        st.markdown("#### 🧭 NORTH Recognition")
+                        st.success(f"**{north_rec.get('staff_member')}** - {north_rec.get('category')}")
+                        st.write(f"**Reasoning:** {north_rec.get('reasoning')}")
+                        st.metric("Performance Score", f"{north_rec.get('score', 0)}/10")
+                
+                # Add save and download options for staff recognition
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Create download data for staff recognition
+                    recognition_download_data = f"""# Weekly Staff Recognition Report
+
+**Week Ending:** {selected_date_for_summary}
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## 🌟 ASCEND Recognition
+"""
+                    if ascend_rec:
+                        recognition_download_data += f"""**Recipient:** {ascend_rec.get('staff_member', 'Unknown')}
+**Category:** {ascend_rec.get('category', 'Unknown')}
+**Performance Score:** {ascend_rec.get('score', 0)}/10
+**Reasoning:** {ascend_rec.get('reasoning', 'No reasoning provided')}
+
+"""
+                    else:
+                        recognition_download_data += "No ASCEND recognition awarded this week.\n\n"
+                    
+                    recognition_download_data += """## 🧭 NORTH Recognition
+"""
+                    if north_rec:
+                        recognition_download_data += f"""**Recipient:** {north_rec.get('staff_member', 'Unknown')}
+**Category:** {north_rec.get('category', 'Unknown')}
+**Performance Score:** {north_rec.get('score', 0)}/10
+**Reasoning:** {north_rec.get('reasoning', 'No reasoning provided')}
+
+"""
+                    else:
+                        recognition_download_data += "No NORTH recognition awarded this week.\n\n"
+                    
+                    recognition_download_data += """---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Staff Recognition System"""
+                    
+                    st.download_button(
+                        label="📄 Download Recognition",
+                        data=recognition_download_data,
+                        file_name=f"staff_recognition_{selected_date_for_summary}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help="Download the staff recognition report as a markdown file",
+                        key="download_staff_recognition"
+                    )
+                
+                with col2:
+                    # Save staff recognition button
+                    if st.button("💾 Save Recognition", type="primary", key="save_staff_recognition", 
+                               help="Save this staff recognition report to the database for permanent access"):
+                        
+                        user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                        
+                        with st.spinner("Saving staff recognition..."):
+                            save_result = save_staff_recognition(recognition_data["data"], selected_date_for_summary, user_id)
+                        
+                        if save_result["success"]:
+                            st.success(f"✅ {save_result['message']}")
+                        else:
+                            st.error(f"❌ Save failed: {save_result['message']}")
+                
+                with col3:
+                    # Clear recognition button
+                    if st.button("🗑️ Clear Recognition", type="secondary", key="clear_staff_recognition", 
+                               help="Clear the displayed recognition results"):
+                        del st.session_state['staff_recognition']
+                        st.rerun()
 
 @st.cache_data
 def load_rubrics():
@@ -5657,6 +5682,2221 @@ Return JSON with:
         st.error(f"AI evaluation error: {e}")
         return None
 
+def supervisor_summaries_page():
+    st.title("My Saved Team Summaries")
+    st.write("Saved summaries you've generated for your team.")
+    try:
+        resp = supabase.rpc('get_supervisor_summaries', {'p_super': st.session_state['user'].id}).execute()
+        summaries = resp.data or []
+        if not summaries:
+            st.info("You have no saved team summaries yet.")
+            return
+        for s in summaries:
+            with st.expander(f"Week Ending {s['week_ending_date']} — Saved {s['created_at']}"):
+                st.markdown(clean_summary_response(s['summary_text']))
+    except Exception as e:
+        st.error(f"Failed to fetch supervisor summaries: {e}")
+
+def supervisors_section_page():
+    """Page for supervisors to view and analyze Roompact form submissions"""
+    st.title("📋 Supervisors Section - Form Analysis")
+    st.markdown("""
+    This section provides specialized analysis tools for reviewing form submissions 
+    and generating AI-powered summaries with actionable insights.
+    """)
+    
+    # Create tabs for the analysis sections
+    tab1, tab2 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis"])
+    
+    with tab1:
+        duty_analysis_section()
+    
+    with tab2:
+        general_form_analysis_section()
+
+def duty_analysis_section():
+    """Specialized section for duty report analysis"""
+    st.subheader("🛡️ Duty Analysis")
+    st.markdown("""
+    **Focus:** Analyze specific duty reports from Resident Assistants, Community Assistants, RDs, and RMs.  
+    **Purpose:** Monitor daily operations, incidents, and staff performance during duty shifts.
+    """)
+    
+    # Predefined duty form types
+    DUTY_FORM_TYPES = [
+        "Resident Assistant Duty Report",
+        "Community Assistant Duty Report", 
+        "RD Duty Report",
+        "RM Duty Report"
+    ]
+    
+    # Date range selection for duty analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        duty_start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=30),
+            help="Analyze duty reports from this date forward",
+            key="duty_start_date"
+        )
+    
+    with col2:
+        duty_end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Analyze duty reports up to this date",
+            key="duty_end_date"
+        )
+    
+    st.info(f"📊 **Target Analysis:** {', '.join(DUTY_FORM_TYPES)} from {duty_start_date} to {duty_end_date}")
+    
+    # Fetch duty reports button
+    if st.button("🔄 Fetch Duty Reports", type="primary", key="fetch_duty_reports"):
+        with st.spinner("Fetching duty reports from Roompact..."):
+            # Calculate page limit based on realistic data patterns
+            # Assumption: ~10 duty reports per day, ~10 forms per API page
+            # For historical data, we need aggressive page limits to reach back far enough
+            days_back = (datetime.now().date() - duty_start_date).days
+            
+            # Use generous page limits based on date range (always ensure sufficient pages)
+            if days_back > 90:
+                max_pages = 1000  # 3+ months - maximum pages
+            elif days_back > 60:
+                max_pages = 800   # 2+ months - high page limit
+            elif days_back > 30:
+                max_pages = 600   # 1+ months - moderate page limit  
+            elif days_back > 14:
+                max_pages = 400   # 2+ weeks - sufficient pages
+            else:
+                max_pages = 200   # Recent data - conservative but adequate
+            
+            st.info(f"📊 Searching up to {max_pages} pages for duty reports going back {days_back} days to {duty_start_date}")
+            st.info(f"📈 **Estimate:** ~{days_back * 10} duty reports expected (10 per day × {days_back} days)")
+            
+            # Show expanded search warning for very old dates
+            if days_back > 30:
+                minutes_estimate = max(2, days_back // 20)  # Rough estimate: 1 minute per 20 days
+                st.warning(f"⏳ **Extended Search:** Searching {max_pages} pages may take {minutes_estimate}-{minutes_estimate + 1} minutes to complete.")
+            
+            progress_placeholder = st.empty()
+            
+            def show_duty_progress(page_num, total_forms, oldest_date, reached_target):
+                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                if oldest_date != "Unknown":
+                    status += f" | Oldest: {oldest_date}"
+                if reached_target:
+                    status += f" | ✅ Reached {duty_start_date}"
+                progress_placeholder.info(status)
+            
+            all_forms, error = fetch_roompact_forms(
+                max_pages=max_pages,
+                target_start_date=duty_start_date,
+                progress_callback=show_duty_progress
+            )
+            
+            if error:
+                st.error(error)
+                return
+            
+            if not all_forms:
+                st.warning("No forms found.")
+                return
+            
+            # Filter for duty reports only
+            duty_forms, filter_error = filter_forms_by_date_and_type(
+                all_forms, duty_start_date, duty_end_date, DUTY_FORM_TYPES
+            )
+            
+            if filter_error:
+                st.error(f"Error filtering duty reports: {filter_error}")
+                return
+            
+            # Show actual date range of retrieved forms
+            if all_forms:
+                form_dates = []
+                for form in all_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_dates.append(form_datetime)
+                        except:
+                            pass
+                
+                if form_dates:
+                    oldest_retrieved = min(form_dates).strftime('%Y-%m-%d')
+                    newest_retrieved = max(form_dates).strftime('%Y-%m-%d')
+                    st.info(f"📅 **Retrieved data range:** {oldest_retrieved} to {newest_retrieved}")
+                    
+                    if datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() > duty_start_date:
+                        days_missing = (datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() - duty_start_date).days
+                        st.warning(f"⚠️ **Missing {days_missing} days of data** - oldest form found is {oldest_retrieved}, but you requested back to {duty_start_date}")
+            
+            # Store duty forms in session state
+            st.session_state['duty_forms'] = duty_forms
+            st.session_state['duty_filter_info'] = {
+                'start_date': duty_start_date,
+                'end_date': duty_end_date,
+                'form_types': DUTY_FORM_TYPES,
+                'total_fetched': len(all_forms),
+                'filtered_count': len(duty_forms)
+            }
+            
+            if duty_forms:
+                st.success(f"✅ Found {len(duty_forms)} duty reports (from {len(all_forms)} total forms)")
+            else:
+                st.warning(f"No duty reports found in the date range {duty_start_date} to {duty_end_date}")
+    
+    # Display duty reports if available
+    if 'duty_forms' in st.session_state and st.session_state['duty_forms']:
+        duty_forms = st.session_state['duty_forms']
+        filter_info = st.session_state.get('duty_filter_info', {})
+        
+        st.subheader(f"🛡️ Duty Reports Found ({len(duty_forms)} reports)")
+        
+        # Show filter summary
+        if filter_info:
+            st.info(f"""
+            📊 **Analysis Ready:** {filter_info['filtered_count']} duty reports (from {filter_info['total_fetched']} total forms)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Report Types:** {', '.join(DUTY_FORM_TYPES)}
+            """)
+        
+        # Form selection and analysis
+        col_select, col_analyze = st.columns([2, 1])
+        
+        with col_select:
+            st.markdown("**Select duty reports to analyze:**")
+            
+            # Group duty reports by type
+            duty_by_type = {}
+            for form in duty_forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name not in duty_by_type:
+                    duty_by_type[template_name] = []
+                duty_by_type[template_name].append(form)
+            
+            selected_duty_forms = []
+            
+            for form_type, type_forms in duty_by_type.items():
+                st.markdown(f"**{form_type}** ({len(type_forms)} reports)")
+                
+                # Select all checkbox for this type
+                select_all_key = f"select_all_duty_{form_type.replace(' ', '_')}"
+                if st.checkbox(f"Select all {form_type}", key=select_all_key):
+                    selected_duty_forms.extend(type_forms)
+                else:
+                    # Individual report checkboxes (show first 15 per type)
+                    for i, form in enumerate(type_forms[:15]):
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Format date for display
+                        try:
+                            if date_str:
+                                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                display_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                display_date = 'Unknown date'
+                        except:
+                            display_date = date_str or 'Unknown date'
+                        
+                        form_key = f"duty_form_{form_type}_{i}"
+                        if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
+                            selected_duty_forms.append(form)
+                
+                st.write("---")
+        
+        with col_analyze:
+            st.markdown("**Analysis Options:**")
+            
+            # Report type selection
+            report_type = st.radio(
+                "Report Type:",
+                ["📊 Standard Analysis", "📅 Weekly Summary Report"],
+                help="Choose between comprehensive analysis or weekly admin summary format"
+            )
+            
+            max_duty_forms = st.slider("Max reports to analyze", 
+                                min_value=1, 
+                                max_value=1000, 
+                                value=500,
+                                help="Set high limit to analyze all reports (AI can handle large datasets)",
+                                key="max_duty_forms")
+            
+            if len(selected_duty_forms) > 0:
+                st.success(f"✅ {len(selected_duty_forms)} duty reports selected")
+                
+                # Show helpful message for large datasets
+                if len(selected_duty_forms) > 100:
+                    st.info(f"💪 **Large Dataset Ready:** You can analyze all {len(selected_duty_forms)} reports! Set the slider to {len(selected_duty_forms)} or higher.")
+                
+                if st.button("🤖 Generate Duty Analysis", type="primary", key="analyze_duty"):
+                    reports_to_analyze = min(len(selected_duty_forms), max_duty_forms)
+                    
+                    if reports_to_analyze > 100:
+                        st.info(f"📊 **Large Dataset Processing:** Analyzing {reports_to_analyze} reports...")
+                        st.info("💡 **Batch Processing:** For very large datasets, reports are processed in manageable chunks to respect API limits.")
+                    
+                    if len(selected_duty_forms) > max_duty_forms:
+                        st.warning(f"⚠️ Analyzing first {max_duty_forms} of {len(selected_duty_forms)} selected reports.")
+                    
+                    # Choose analysis type based on selection
+                    if report_type == "📅 Weekly Summary Report":
+                        summary = create_weekly_duty_report_summary(
+                            selected_duty_forms[:max_duty_forms], 
+                            filter_info['start_date'], 
+                            filter_info['end_date']
+                        )
+                        report_label = "Weekly Duty Summary"
+                        file_prefix = "weekly_duty_summary"
+                        
+                        # Immediately store weekly report in session state for admin integration
+                        if 'weekly_duty_reports' not in st.session_state:
+                            st.session_state['weekly_duty_reports'] = []
+                        
+                        weekly_report_data = {
+                            'date_generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'date_range': f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}",
+                            'reports_analyzed': min(len(selected_duty_forms), max_duty_forms),
+                            'total_selected': len(selected_duty_forms),
+                            'summary': summary
+                        }
+                        
+                        st.session_state['weekly_duty_reports'].append(weekly_report_data)
+                        
+                    else:
+                        summary = create_duty_report_summary(
+                            selected_duty_forms[:max_duty_forms], 
+                            filter_info['start_date'], 
+                            filter_info['end_date']
+                        )
+                        report_label = "Duty Analysis"
+                        file_prefix = "duty_analysis"
+                    
+                    # Store the current analysis in session state to persist after button clicks
+                    st.session_state['last_duty_analysis'] = {
+                        'summary': summary,
+                        'report_label': report_label,
+                        'file_prefix': file_prefix,
+                        'report_type': report_type,
+                        'selected_forms': selected_duty_forms[:max_duty_forms],
+                        'filter_info': filter_info,
+                        'max_forms': max_duty_forms,
+                        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    
+                    # Display results
+                    st.subheader(f"📊 {report_label} Results")
+                    st.markdown(summary)
+                    
+                    # Historical Data Storage Option
+                    st.markdown("---")
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        st.markdown("**📈 Historical Data Storage**")
+                        st.info("Store incident data for historical analysis, trending, and graphing by hall, incident type, and date.")
+                    
+                    with col2:
+                        # Get current user ID if available
+                        user_id = None
+                        if 'user' in st.session_state and st.session_state['user']:
+                            user_id = st.session_state['user'].id
+                        
+                        # Store new data button
+                        if st.button("💾 Store Data", type="secondary", key="store_duty_data", 
+                                   help="Store individual incident records in database for future analysis and graphing"):
+                            
+                            with st.spinner("Checking for existing data..."):
+                                storage_result = store_duty_report_data(
+                                    selected_duty_forms[:max_duty_forms],
+                                    filter_info['start_date'],
+                                    filter_info['end_date'],
+                                    user_id
+                                )
+                            
+                            if storage_result["success"]:
+                                st.success(f"✅ {storage_result['message']}")
+                                st.info(f"📊 **Stored:** {storage_result.get('records_stored', 0)} incident records from {storage_result.get('reports_processed', 0)} reports")
+                            elif storage_result.get("duplicate_detected"):
+                                st.warning(f"⚠️ {storage_result['message']}")
+                                st.info(f"📊 Found {storage_result.get('existing_count', 0)} existing records for this analysis period.")
+                            else:
+                                st.error(f"❌ Storage failed: {storage_result['message']}")
+                        
+                        # Replace existing data button (only show if duplicates might exist)
+                        if st.button("🔄 Replace Existing Data", type="secondary", key="replace_duty_data",
+                                   help="Delete existing records for this analysis period and store new data"):
+                            
+                            with st.spinner("Replacing existing incident data..."):
+                                replace_result = replace_duty_report_data(
+                                    selected_duty_forms[:max_duty_forms],
+                                    filter_info['start_date'],
+                                    filter_info['end_date'],
+                                    user_id
+                                )
+                            
+                            if replace_result["success"]:
+                                st.success(f"✅ {replace_result['message']}")
+                                st.info(f"📊 **Updated:** {replace_result.get('records_stored', 0)} incident records from {replace_result.get('reports_processed', 0)} reports")
+                            else:
+                                st.error(f"❌ Replacement failed: {replace_result['message']}")
+                    
+                    st.markdown("---")
+                    
+                    # Show success message for weekly reports (already saved above)
+                    if report_type == "📅 Weekly Summary Report":
+                        st.success("✅ **Weekly report saved!** This report is now available in the Admin Summary section for integration.")
+                    
+                    # Download option
+                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                    
+                    if report_type == "📅 Weekly Summary Report":
+                        summary_data = f"""# Weekly Duty Summary Report
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {min(len(selected_duty_forms), max_duty_forms)} of {len(selected_duty_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Weekly Duty Analysis
+Integration ready for Admin Weekly Summaries
+"""
+                    else:
+                        summary_data = f"""# Duty Reports Analysis Summary
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {min(len(selected_duty_forms), max_duty_forms)} of {len(selected_duty_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Duty Analysis Section
+"""
+                    
+                    st.download_button(
+                        label=f"📄 Download {report_label} Report",
+                        data=summary_data,
+                        file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help=f"Download the {report_label.lower()} as a markdown file",
+                        key="download_duty_analysis"
+                    )
+            else:
+                st.info("Select duty reports above to enable analysis")
+    
+    # Display previously generated analysis if available (persists after button clicks)
+    if 'last_duty_analysis' in st.session_state:
+        analysis_data = st.session_state['last_duty_analysis']
+        
+        st.markdown("---")
+        st.subheader("📋 Previously Generated Analysis")
+        st.info(f"**{analysis_data['report_label']}** generated at {analysis_data['generated_at']} | **{analysis_data['filter_info'].get('start_date', 'N/A')} to {analysis_data['filter_info'].get('end_date', 'N/A')}** | **{len(analysis_data['selected_forms'])} reports analyzed**")
+        
+        # Show the analysis in an expander to save space
+        with st.expander("📊 View Analysis Results", expanded=True):
+            st.markdown(analysis_data['summary'])
+        
+        # Recreate the storage and download options for the persisted analysis
+        st.markdown("**📈 Historical Data Storage**")
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.info("Store incident data from this analysis for historical trending and graphing.")
+        
+        with col2:
+            # Get current user ID if available
+            user_id = None
+            if 'user' in st.session_state and st.session_state['user']:
+                user_id = st.session_state['user'].id
+            
+            # Store new data button
+            if st.button("💾 Store Data", type="secondary", key="store_persisted_duty_data", 
+                       help="Store individual incident records from this analysis in database"):
+                
+                with st.spinner("Checking for existing data..."):
+                    storage_result = store_duty_report_data(
+                        analysis_data['selected_forms'],
+                        analysis_data['filter_info']['start_date'],
+                        analysis_data['filter_info']['end_date'],
+                        user_id
+                    )
+                
+                if storage_result["success"]:
+                    st.success(f"✅ {storage_result['message']}")
+                    st.info(f"📊 **Stored:** {storage_result.get('records_stored', 0)} incident records from {storage_result.get('reports_processed', 0)} reports")
+                elif storage_result.get("duplicate_detected"):
+                    st.warning(f"⚠️ {storage_result['message']}")
+                    st.info(f"📊 Found {storage_result.get('existing_count', 0)} existing records for this analysis period.")
+                else:
+                    st.error(f"❌ Storage failed: {storage_result['message']}")
+            
+            # Replace existing data button
+            if st.button("🔄 Replace Existing Data", type="secondary", key="replace_persisted_duty_data",
+                       help="Delete existing records for this analysis period and store new data"):
+                
+                with st.spinner("Replacing existing incident data..."):
+                    replace_result = replace_duty_report_data(
+                        analysis_data['selected_forms'],
+                        analysis_data['filter_info']['start_date'],
+                        analysis_data['filter_info']['end_date'],
+                        user_id
+                    )
+                
+                if replace_result["success"]:
+                    st.success(f"✅ {replace_result['message']}")
+                    st.info(f"📊 **Updated:** {replace_result.get('records_stored', 0)} incident records from {replace_result.get('reports_processed', 0)} reports")
+                else:
+                    st.error(f"❌ Replacement failed: {replace_result['message']}")
+        
+        # Download option for persisted analysis
+        date_range = f"{analysis_data['filter_info'].get('start_date', 'N/A')} to {analysis_data['filter_info'].get('end_date', 'N/A')}"
+        
+        if analysis_data['report_type'] == "📅 Weekly Summary Report":
+            summary_data = f"""# Weekly Duty Summary Report
+
+**Generated:** {analysis_data['generated_at']}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {len(analysis_data['selected_forms'])} selected  
+
+{analysis_data['summary']}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Weekly Duty Analysis
+Integration ready for Admin Weekly Summaries
+"""
+        else:
+            summary_data = f"""# Duty Reports Analysis Summary
+
+**Generated:** {analysis_data['generated_at']}  
+**Report Types:** {', '.join(DUTY_FORM_TYPES)}  
+**Date Range:** {date_range}  
+**Reports Analyzed:** {len(analysis_data['selected_forms'])} selected  
+
+{analysis_data['summary']}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - Duty Analysis Section
+"""
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.download_button(
+                label=f"📄 Download Report",
+                data=summary_data,
+                file_name=f"{analysis_data['file_prefix']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                mime="text/markdown",
+                help=f"Download the {analysis_data['report_label'].lower()} as a markdown file",
+                key="download_persisted_duty_analysis"
+            )
+        
+        with col2:
+            # Save analysis button
+            if st.button("💾 Save Analysis", type="primary", key="save_duty_analysis", 
+                       help="Save this analysis report to the database for permanent access"):
+                
+                # Calculate week ending date from the analysis date range
+                end_date = analysis_data['filter_info']['end_date']
+                
+                # Handle both date objects and strings
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                # Find the next Sunday (week ending date)
+                days_ahead = 6 - end_date.weekday()  # 6 = Sunday
+                if days_ahead < 0:  # Target day already happened this week
+                    days_ahead += 7
+                week_ending = end_date + timedelta(days=days_ahead)
+                
+                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                
+                with st.spinner("Saving duty analysis..."):
+                    save_result = save_duty_analysis(analysis_data, week_ending.isoformat(), user_id)
+                
+                if save_result["success"]:
+                    st.success(f"✅ {save_result['message']}")
+                else:
+                    st.error(f"❌ Save failed: {save_result['message']}")
+        
+        with col3:
+            # Clear analysis button
+            if st.button("🗑️ Clear Analysis", type="secondary", key="clear_duty_analysis", help="Clear the displayed analysis"):
+                del st.session_state['last_duty_analysis']
+                st.rerun()
+    
+    else:
+        st.info("👆 Click 'Fetch Duty Reports' to load reports from the four duty report types")
+
+def engagement_analysis_section():
+    """Specialized section for Residence Life Event Submission analysis - Full Semester Management"""
+    st.subheader("🎉 Engagement Analysis - Fall Semester")
+    st.markdown("""
+    **Focus:** Complete Fall semester event lifecycle management (Aug 22 - Dec 31, 2024)  
+    **Purpose:** Track all event submissions from proposal to completion with status updates and weekly analysis.
+    **Data Management:** Fetches ALL event submissions and updates existing records as events progress through approval/completion.
+    """)
+    
+    # Predefined engagement form type
+    ENGAGEMENT_FORM_TYPE = "Residence Life Event Submission"
+    
+    # Academic year info display
+    st.info("🏫 **Academic Year Management:** Event submissions from August 1, 2025 onward will be fetched and synchronized with the engagement database. Events are tracked uniquely throughout their lifecycle from proposal to completion.")
+    
+    # Fetch ALL engagement forms button (with August 1, 2025 target date)
+    if st.button("🔄 Fetch All Event Submissions", type="primary", key="fetch_all_engagement_forms"):
+        with st.spinner("Fetching event submissions from Roompact since August 1, 2025..."):
+            # Use comprehensive page limit for academic year data
+            max_pages = 1200  # Generous limit to capture academic year
+            # Set target date to August 1, 2025 to limit how far back we go
+            target_start_date = datetime(2025, 8, 1).date()
+            
+            st.info(f"📊 **Academic Year Sync:** Fetching event submissions from August 1, 2025 to present (up to {max_pages} pages)")
+            st.warning(f"⏳ **Comprehensive Search:** This may take 2-4 minutes to fetch and process event submissions")
+            
+            progress_placeholder = st.empty()
+            
+            def show_engagement_progress(page_num, total_forms, oldest_date, reached_target):
+                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                if oldest_date != "Unknown":
+                    status += f" | Oldest: {oldest_date}"
+                if reached_target:
+                    status += " | ✅ August 1, 2025 reached"
+                progress_placeholder.info(status)
+            
+            # Fetch forms with August 1, 2025 as target start date
+            all_forms, error = fetch_roompact_forms(
+                max_pages=max_pages,
+                target_start_date=target_start_date,  # Stop at August 1, 2025
+                progress_callback=show_engagement_progress
+            )
+            
+            if error:
+                st.error(error)
+                return
+            
+            if not all_forms:
+                st.warning("No forms found.")
+                return
+            
+            # Filter for engagement forms only (no date filtering)
+            engagement_forms = []
+            for form in all_forms:
+                if form.get('form_template_name') == ENGAGEMENT_FORM_TYPE:
+                    engagement_forms.append(form)
+            
+            # Show comprehensive data statistics
+            if all_forms:
+                form_dates = []
+                engagement_dates = []
+                
+                for form in engagement_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            engagement_dates.append(form_datetime)
+                        except:
+                            pass
+                
+                if engagement_dates:
+                    oldest_engagement = min(engagement_dates).strftime('%Y-%m-%d')
+                    newest_engagement = max(engagement_dates).strftime('%Y-%m-%d')
+                    st.success(f"📅 **Event Submissions Range:** {oldest_engagement} to {newest_engagement}")
+                else:
+                    st.info("📅 **No date information** available in retrieved forms")
+            
+            # Store engagement forms in session state
+            st.session_state['engagement_forms'] = engagement_forms
+            st.session_state['engagement_filter_info'] = {
+                'start_date': datetime(2025, 8, 1).date(),  # Academic year start (Aug 1, 2025)
+                'end_date': datetime.now().date(),   # Current date (latest submissions)
+                'form_type': ENGAGEMENT_FORM_TYPE,
+                'total_fetched': len(all_forms),
+                'filtered_count': len(engagement_forms),
+                'semester': 'Academic Year 2025-2026',
+                'management_mode': 'academic_year'
+            }
+            
+            if engagement_forms:
+                st.success(f"✅ Found {len(engagement_forms)} event submissions since August 1, 2025 (from {len(all_forms)} total forms)")
+                
+                # Automatically save/update all forms to database for semester-long management
+                with st.spinner("🔄 Synchronizing all event submissions to engagement database..."):
+                    # Create analysis data structure for saving
+                    sync_analysis_data = {
+                        'selected_forms': engagement_forms,
+                        'filter_info': st.session_state['engagement_filter_info']
+                    }
+                    
+                    # Get current user ID for tracking
+                    user_id = st.session_state.get('user_id', None)
+                    
+                    # Save all events to database
+                    sync_result = save_engagement_data(sync_analysis_data, user_id)
+                    
+                    if sync_result['success']:
+                        created = sync_result.get('records_created', 0)
+                        updated = sync_result.get('records_updated', 0)
+                        skipped = sync_result.get('records_skipped', 0)
+                        
+                        sync_message = f"✅ **Database Sync Complete:** "
+                        if created > 0:
+                            sync_message += f"{created} new events created"
+                        if updated > 0:
+                            if created > 0:
+                                sync_message += f", {updated} events updated"
+                            else:
+                                sync_message += f"{updated} events updated"
+                        if skipped > 0:
+                            if created > 0 or updated > 0:
+                                sync_message += f", {skipped} duplicates skipped"
+                            else:
+                                sync_message += f"{skipped} records already current"
+                        
+                        st.success(sync_message)
+                        
+                        # Show academic year statistics
+                        if 'semester_statistics' in sync_result:
+                            stats = sync_result['semester_statistics']
+                            st.info(f"📊 **Academic Year Status:** {stats.get('approved_events', 0)} approved events | {stats.get('pending_events', 0)} pending approval | {stats.get('cancelled_events', 0)} cancelled")
+                    else:
+                        sync_error_msg = sync_result.get('message', 'Database sync encountered issues')
+                        error_details = sync_result.get('error_details', '')
+                        errors = sync_result.get('errors', [])
+                        
+                        st.error(f"⚠️ **Sync Issue:** {sync_error_msg}")
+                        
+                        # Show detailed error information for debugging
+                        with st.expander("🔍 **Error Details** (Click to view)", expanded=False):
+                            if error_details:
+                                st.code(f"Technical Error: {error_details}")
+                            if errors:
+                                st.write("**Individual Event Errors:**")
+                                for error in errors[:10]:  # Show first 10 errors
+                                    st.write(f"• {error}")
+                                if len(errors) > 10:
+                                    st.write(f"... and {len(errors) - 10} more errors")
+                        
+                        # Add database connectivity test button
+                        if st.button("🔧 Test Database Connection", key="test_db_connection"):
+                            with st.spinner("Testing database connection..."):
+                                try:
+                                    # Test basic connection
+                                    test_result = supabase.table("engagement_report_data").select("id").limit(1).execute()
+                                    if test_result.data is not None:
+                                        st.success("✅ Database connection successful")
+                                        
+                                        # Test table structure
+                                        try:
+                                            schema_test = supabase.table("engagement_report_data").select(
+                                                "form_submission_id, event_name, event_approval, hall, semester"
+                                            ).limit(1).execute()
+                                            st.success("✅ Table structure is accessible")
+                                        except Exception as schema_error:
+                                            st.error(f"❌ Table structure issue: {str(schema_error)}")
+                                            
+                                            # Check if it's a "table doesn't exist" error
+                                            if "does not exist" in str(schema_error).lower() or "relation" in str(schema_error).lower():
+                                                st.info("💡 **Solution:** The `engagement_report_data` table needs to be created in your Supabase database.")
+                                                st.info("📝 **Next Steps:**")
+                                                st.code("""
+1. Open your Supabase Dashboard
+2. Go to SQL Editor
+3. Copy and paste the ENHANCED_ENGAGEMENT_SCHEMA_FIXED.sql file content
+4. Run the SQL to create the table
+5. Come back and try the sync again
+                                                """)
+                                                
+                                                with st.expander("📄 **Quick SQL Reference**", expanded=False):
+                                                    st.info("Use the ENHANCED_ENGAGEMENT_SCHEMA_FIXED.sql file in your project to create the table.")
+                                                    st.info("The file contains the complete schema with all required columns and constraints.")
+                                    else:
+                                        st.error("❌ Database connection failed - no data returned")
+                                except Exception as db_error:
+                                    error_str = str(db_error).lower()
+                                    if "does not exist" in error_str or "relation" in error_str:
+                                        st.error(f"❌ Database table missing: {str(db_error)}")
+                                        st.info("💡 **The engagement_report_data table doesn't exist in your database.**")
+                                        st.info("🔧 **To fix this:** Run the ENHANCED_ENGAGEMENT_SCHEMA_FIXED.sql script in your Supabase SQL Editor.")
+                                    else:
+                                        st.error(f"❌ Database connection error: {str(db_error)}")
+            else:
+                st.warning(f"No {ENGAGEMENT_FORM_TYPE} forms found in the system")
+    
+    # Display engagement forms if available
+    if 'engagement_forms' in st.session_state and st.session_state['engagement_forms']:
+        engagement_forms = st.session_state['engagement_forms']
+        filter_info = st.session_state.get('engagement_filter_info', {})
+        
+        st.subheader(f"🎉 Event Submissions Found ({len(engagement_forms)} submissions)")
+        
+        # Show academic year management summary
+        if filter_info:
+            st.info(f"""
+            🏫 **Academic Year Management:** {filter_info['filtered_count']} event submissions loaded (from {filter_info['total_fetched']} total forms)  
+            📅 **Time Period:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Type:** {ENGAGEMENT_FORM_TYPE}  
+            🔄 **Management Mode:** {filter_info.get('management_mode', 'academic_year')}
+            """)
+        
+        # Form selection and analysis
+        col_select, col_analyze = st.columns([2, 1])
+        
+        with col_select:
+            st.markdown("**Select event submissions to analyze:**")
+            
+            # Group submissions by month for better organization
+            submissions_by_month = {}
+            for form in engagement_forms:
+                current_revision = form.get('current_revision', {})
+                date_str = current_revision.get('date', '')
+                
+                if date_str:
+                    try:
+                        form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        month_key = form_datetime.strftime('%Y-%m (%B)')
+                    except:
+                        month_key = "Unknown Month"
+                else:
+                    month_key = "Unknown Month"
+                    
+                if month_key not in submissions_by_month:
+                    submissions_by_month[month_key] = []
+                submissions_by_month[month_key].append(form)
+            
+            selected_engagement_forms = []
+            
+            for month, month_forms in sorted(submissions_by_month.items()):
+                st.markdown(f"**{month}** ({len(month_forms)} submissions)")
+                
+                # Select all checkbox for this month
+                select_all_key = f"select_all_engagement_{month.replace(' ', '_').replace('(', '').replace(')', '')}"
+                if st.checkbox(f"Select all {month}", key=select_all_key):
+                    selected_engagement_forms.extend(month_forms)
+                else:
+                    # Individual form selection with better display
+                    for i, form in enumerate(month_forms):
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Extract event title from responses if available
+                        event_title = "Event"
+                        responses = current_revision.get('responses', [])
+                        for response in responses:
+                            field_label = response.get('field_label', '').lower()
+                            if any(word in field_label for word in ['title', 'name', 'event']):
+                                event_title = str(response.get('response', 'Event'))[:50]
+                                break
+                        
+                        form_date = "Unknown Date"
+                        if date_str:
+                            try:
+                                form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                form_date = form_datetime.strftime('%m/%d/%Y')
+                            except:
+                                pass
+                        
+                        form_key = f"engagement_form_{month}_{i}"
+                        if st.checkbox(f"{event_title} - {author} ({form_date})", key=form_key):
+                            selected_engagement_forms.append(form)
+        
+        with col_analyze:
+            st.markdown("**Analysis Options:**")
+            
+            if selected_engagement_forms:
+                st.success(f"🎯 **Selected:** {len(selected_engagement_forms)} submissions")
+                
+                # Report type selection
+                engagement_report_type = st.selectbox(
+                    "📋 Report Type",
+                    ["📊 Standard Analysis", "📅 Weekly Summary Report"],
+                    help="Choose the type of analysis to generate",
+                    key="engagement_report_type"
+                )
+                
+                # Database-based analysis option
+                if st.button("🔍 Check Database Event Status", type="secondary", key="db_analysis"):
+                    st.write("---")
+                    create_db_based_engagement_analysis()
+                
+                if st.button("🤖 Generate Engagement Analysis", type="primary", key="analyze_engagement"):
+                    with st.spinner("🧠 Analyzing event submissions with AI..."):
+                        engagement_analysis_result = analyze_engagement_forms_with_ai(
+                            selected_engagement_forms, 
+                            engagement_report_type,
+                            filter_info
+                        )
+                        
+                        if engagement_analysis_result:
+                            # Store the analysis
+                            st.session_state['last_engagement_analysis'] = engagement_analysis_result
+                            
+                            # If this is a weekly report, also store it for admin summaries integration
+                            if engagement_report_type == "📅 Weekly Summary Report":
+                                if 'weekly_engagement_reports' not in st.session_state:
+                                    st.session_state['weekly_engagement_reports'] = []
+                                
+                                weekly_engagement_data = {
+                                    'date_generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                    'date_range': f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}",
+                                    'events_analyzed': len(selected_engagement_forms),
+                                    'total_selected': len(selected_engagement_forms),
+                                    'summary': engagement_analysis_result['summary'],
+                                    'upcoming_events': extract_upcoming_events(selected_engagement_forms)
+                                }
+                                
+                                st.session_state['weekly_engagement_reports'].append(weekly_engagement_data)
+                            
+                            st.success("✅ Analysis complete!")
+                        else:
+                            st.error("❌ Analysis failed. Please try again.")
+            else:
+                st.info("👆 Select event submissions to analyze")
+    
+    # Display last analysis if available
+    if 'last_engagement_analysis' in st.session_state:
+        analysis_data = st.session_state['last_engagement_analysis']
+        
+        st.subheader("🎉 Engagement Analysis Results")
+        
+        # Display the analysis content
+        st.markdown(analysis_data['summary'])
+        
+        # Show data extraction debug info
+        with st.expander("🔍 Data Extraction Debug (Click to View)", expanded=False):
+            try:
+                quantitative_data = extract_engagement_quantitative_data(analysis_data['selected_forms'])
+                if quantitative_data['success']:
+                    events_data = quantitative_data.get('events_data', [])
+                    st.write(f"**Successfully extracted data from {len(events_data)} events:**")
+            except Exception as e:
+                st.warning(f"⚠️ **Debug Info Error:** {str(e)} - This may be due to cached data. Try clearing analysis and regenerating.")
+                quantitative_data = {'success': False}
+                events_data = []
+            
+            if quantitative_data.get('success', False):
+                
+                for i, event in enumerate(events_data[:5]):  # Show first 5 events
+                    st.write(f"**Event {i+1}:**")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.write(f"- **Title:** {event.get('event_title', 'N/A')}")
+                        st.write(f"- **Type:** {event.get('event_type', 'N/A')}")
+                        st.write(f"- **Date:** {event.get('event_date', 'N/A')}")
+                        st.write(f"- **Hall:** {event.get('location_hall', 'N/A')}")
+                    with col_b:
+                        st.write(f"- **Estimated Attendance:** {event.get('estimated_attendance', 'N/A')}")
+                        st.write(f"- **Budget:** ${event.get('budget_amount', 0)}")
+                        st.write(f"- **Status:** {event.get('event_status', 'N/A')}")
+                        st.write(f"- **Form ID:** {event.get('form_submission_id', 'N/A')}")
+                    
+                    # Show form structure debug info
+                    if event.get('_debug_form_structure'):
+                        with st.expander(f"Form Structure Debug (Event {i+1})", expanded=False):
+                            debug_info = event['_debug_form_structure']
+                            st.write(f"**Form Keys Available:** {debug_info.get('form_keys', [])}")
+                            st.write(f"**Form ID Found:** {debug_info.get('form_id_found', 'None')}")
+                            st.write(f"**Revision Keys:** {debug_info.get('revision_keys', [])}")
+                    
+                    # Show original field labels for debugging
+                    if event.get('_debug_fields'):
+                        with st.expander(f"Original Form Fields (Event {i+1})", expanded=False):
+                            for field_info in event['_debug_fields']:
+                                st.text(field_info)
+                    st.write("---")
+                
+                if len(events_data) > 5:
+                    st.write(f"... and {len(events_data) - 5} more events")
+            else:
+                error_msg = quantitative_data.get('message', 'Unknown error occurred')
+                st.error(f"Failed to extract data: {error_msg}")
+        
+        # Auto-save notification
+        st.info("ℹ️ **Auto-Save:** Event data was automatically synchronized to the database when forms were fetched. Use Re-sync if you need to update database records.")
+        
+        # Analysis action buttons
+        col1, col2, col3, col4 = st.columns(4)
+        
+        report_label = "Engagement Analysis"
+        if analysis_data['report_type'] == "📅 Weekly Summary Report":
+            report_label = "Weekly Engagement Summary"
+        
+        with col1:
+            # Download button
+            st.download_button(
+                "📥 Download Analysis",
+                data=analysis_data['summary'],
+                file_name=f"engagement_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                mime="text/markdown",
+                help="Download this engagement analysis as a markdown file",
+                key="download_engagement_analysis"
+            )
+        
+        with col2:
+            # Re-sync database button (since data is auto-saved during fetch)
+            if st.button("� Re-sync Database", key="resync_engagement_data", 
+                        help="Re-synchronize event data with database (data is automatically saved during fetch)"):
+                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                
+                with st.spinner("Re-synchronizing engagement data..."):
+                    save_result = save_engagement_data(analysis_data, user_id)
+                
+                if save_result["success"]:
+                    created = save_result.get('records_created', 0)
+                    updated = save_result.get('records_updated', 0) 
+                    skipped = save_result.get('records_skipped', 0)
+                    
+                    if created == 0 and updated == 0:
+                        st.info("✅ Database already synchronized - no changes needed")
+                    else:
+                        st.success(f"✅ Re-sync complete: {created} created, {updated} updated, {skipped} skipped")
+                else:
+                    st.error(f"❌ Re-sync failed: {save_result['message']}")
+        
+        with col3:
+            # Save weekly analysis button  
+            if st.button("📋 Save Weekly Analysis", key="save_engagement_analysis",
+                        help="Save this analysis report for future reference"):
+                # Calculate week ending date from analysis period
+                end_date = analysis_data['filter_info']['end_date']
+                
+                # Handle both date objects and strings
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                # Find the next Sunday (week ending date)
+                days_ahead = 6 - end_date.weekday()  # 6 = Sunday
+                if days_ahead < 0:  # Target day already happened this week
+                    days_ahead += 7
+                week_ending = end_date + timedelta(days=days_ahead)
+                
+                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                
+                with st.spinner("Saving engagement analysis..."):
+                    save_result = save_engagement_analysis(analysis_data, week_ending.isoformat(), user_id)
+                
+                if save_result["success"]:
+                    st.success(f"✅ {save_result['message']}")
+                else:
+                    st.error(f"❌ Save failed: {save_result['message']}")
+        
+        with col4:
+            # Clear analysis button
+            if st.button("🗑️ Clear Analysis", type="secondary", key="clear_engagement_analysis", help="Clear the displayed analysis"):
+                del st.session_state['last_engagement_analysis']
+                st.rerun()
+    
+    else:
+        st.info("👆 Click 'Fetch Event Submissions' to load Residence Life Event Submission forms")
+
+def general_form_analysis_section():
+    """General form analysis section for any form type with automatic discovery"""
+    st.subheader("📊 General Form Analysis - Custom Report Generation")
+    st.markdown("""
+    **Focus:** Analyze ANY form type available in Roompact - automatically discover and select from available forms  
+    **Purpose:** Generate custom AI reports for any combination of form types and date ranges  
+    **Flexibility:** Choose specific forms, date ranges, and get tailored AI analysis
+    """)
+    
+    # Date range selection for general analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        general_start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=14),
+            help="Discover forms from this date forward",
+            key="general_start_date"
+        )
+    
+    with col2:
+        general_end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Discover forms up to this date",
+            key="general_end_date"
+        )
+    
+    # Form discovery section
+    st.subheader("🔍 Discover Available Forms")
+    
+    if st.button("🔄 Discover Forms", type="primary", key="discover_general_forms"):
+        # Calculate page limit for general forms (more forms than just duty reports)
+        days_back = (datetime.now().date() - general_start_date).days
+        
+        # Use generous page limits to ensure we reach historical data
+        if days_back > 90:
+            max_pages = 1200  # 3+ months - maximum pages for all form types
+        elif days_back > 60:
+            max_pages = 900   # 2+ months - high page limit
+        elif days_back > 30:
+            max_pages = 600   # 1+ months - moderate page limit  
+        elif days_back > 14:
+            max_pages = 400   # 2+ weeks - sufficient pages
+        else:
+            max_pages = 200   # Recent data - conservative but adequate
+        
+        st.info(f"🔍 Discovering forms (up to {max_pages} pages) going back {days_back} days to {general_start_date}")
+        st.info(f"📈 **Estimate:** ~{days_back * 15} total forms expected (15 per day × {days_back} days)")
+        
+        # Show extended search warning for very old dates
+        if days_back > 30:
+            minutes_estimate = max(2, days_back // 15)  # Rough estimate: 1 minute per 15 days
+            st.warning(f"⏳ **Extended Search:** Searching {max_pages} pages may take {minutes_estimate}-{minutes_estimate + 2} minutes to complete.")
+        
+        progress_placeholder = st.empty()
+        
+        def show_general_progress(page_num, total_forms, oldest_date, reached_target):
+            status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+            if oldest_date != "Unknown":
+                status += f" | Oldest: {oldest_date}" 
+            if reached_target:
+                status += f" | ✅ Reached {general_start_date}"
+            progress_placeholder.info(status)
+        
+        # Discover available form types
+        form_types_info, error = discover_form_types(
+            max_pages=max_pages,
+            target_start_date=general_start_date,
+            progress_callback=show_general_progress
+        )
+        
+        if form_types_info is None or error:
+            st.error(f"Failed to discover forms: {error or 'Unknown error'}")
+            return
+        
+        # Store discovered forms in session state
+        st.session_state['general_form_types'] = form_types_info
+        st.session_state['general_discovery_date'] = general_start_date
+        
+        if form_types_info:
+            st.success(f"✅ Discovered {len(form_types_info)} different form types")
+        else:
+            st.warning("No forms found in the specified date range")
+    
+    # Display discovered form types
+    if 'general_form_types' in st.session_state:
+        form_types_info = st.session_state['general_form_types']
+        discovery_date = st.session_state.get('general_discovery_date')
+        
+        st.subheader(f"📋 Available Form Types (since {discovery_date})")
+        
+        if form_types_info:
+            # Create multiselect for form type selection
+            form_type_options = []
+            form_type_details = {}
+            
+            for form_info in form_types_info:
+                display_name = form_info['display_name']
+                template_name = form_info['template_name']
+                form_type_options.append(display_name)
+                form_type_details[display_name] = template_name
+            
+            selected_form_labels = st.multiselect(
+                "Select form types to analyze:",
+                form_type_options,
+                help="Choose which form types to include in your analysis",
+                key="selected_general_form_types"
+            )
+            
+            # Convert labels back to form type names
+            selected_form_types = [form_type_details[label] for label in selected_form_labels]
+            
+            if selected_form_types:
+                st.info(f"📊 **Selected for analysis:** {', '.join(selected_form_types)}")
+                
+                # Fetch forms button
+                if st.button("📥 Fetch Selected Forms", type="primary", key="fetch_general_forms"):
+                    with st.spinner("Fetching selected forms from Roompact..."):
+                        # Calculate page limit for fetching selected general forms
+                        days_back = (datetime.now().date() - general_start_date).days
+                        
+                        # Use same generous limits as discovery phase
+                        if days_back > 90:
+                            max_pages = 1200  # 3+ months
+                        elif days_back > 60:
+                            max_pages = 900   # 2+ months
+                        elif days_back > 30:
+                            max_pages = 600   # 1+ months  
+                        elif days_back > 14:
+                            max_pages = 400   # 2+ weeks
+                        else:
+                            max_pages = 200   # Recent data
+                        
+                        # Show extended search warning
+                        if days_back > 60:
+                            st.info(f"⏳ **Extended Search:** Going back {days_back} days requires searching up to {max_pages} pages. This may take 1-2 minutes.")
+                        
+                        progress_placeholder = st.empty()
+                        
+                        def show_fetch_progress(page_num, total_forms, oldest_date, reached_target):
+                            status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                            if oldest_date != "Unknown":
+                                status += f" | Oldest: {oldest_date}"
+                            if reached_target:
+                                status += f" | ✅ Reached {general_start_date}"
+                            progress_placeholder.info(status)
+                        
+                        all_forms, error = fetch_roompact_forms(
+                            max_pages=max_pages,
+                            target_start_date=general_start_date,
+                            progress_callback=show_fetch_progress
+                        )
+                        
+                        if error:
+                            st.error(error)
+                            return
+                        
+                        if not all_forms:
+                            st.warning("No forms found.")
+                            return
+                        
+                        # Filter for selected form types
+                        filtered_forms, filter_error = filter_forms_by_date_and_type(
+                            all_forms, general_start_date, general_end_date, selected_form_types
+                        )
+                        
+                        if filter_error:
+                            st.error(f"Error filtering forms: {filter_error}")
+                            return
+                        
+                        # Store filtered forms in session state
+                        st.session_state['general_filtered_forms'] = filtered_forms
+                        st.session_state['general_filter_info'] = {
+                            'start_date': general_start_date,
+                            'end_date': general_end_date,
+                            'form_types': selected_form_types,
+                            'total_fetched': len(all_forms),
+                            'filtered_count': len(filtered_forms)
+                        }
+                        
+                        if filtered_forms:
+                            st.success(f"✅ Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)")
+                        else:
+                            st.warning(f"No forms found matching your criteria in the date range {general_start_date} to {general_end_date}")
+        
+        else:
+            st.info("No forms discovered. Try expanding your date range or check your API connection.")
+    
+    # Display and analyze filtered forms
+    if 'general_filtered_forms' in st.session_state and st.session_state['general_filtered_forms']:
+        filtered_forms = st.session_state['general_filtered_forms']
+        filter_info = st.session_state.get('general_filter_info', {})
+        
+        st.subheader(f"📊 Forms Ready for Analysis ({len(filtered_forms)} forms)")
+        
+        # Show filter summary
+        if filter_info:
+            st.info(f"""
+            📊 **Analysis Ready:** {filter_info['filtered_count']} forms (from {filter_info['total_fetched']} total forms)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Types:** {', '.join(filter_info['form_types'])}
+            """)
+        
+        # Form selection and analysis
+        col_select, col_analyze = st.columns([2, 1])
+        
+        with col_select:
+            st.markdown("**Select forms to analyze:**")
+            
+            # Group forms by type
+            forms_by_type = {}
+            for form in filtered_forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name not in forms_by_type:
+                    forms_by_type[template_name] = []
+                forms_by_type[template_name].append(form)
+            
+            selected_general_forms = []
+            
+            for form_type, type_forms in forms_by_type.items():
+                st.markdown(f"**{form_type}** ({len(type_forms)} forms)")
+                
+                # Select all checkbox for this type
+                select_all_key = f"select_all_general_{form_type.replace(' ', '_')}"
+                if st.checkbox(f"Select all {form_type}", key=select_all_key):
+                    selected_general_forms.extend(type_forms)
+                else:
+                    # Individual form checkboxes (show first 15 per type)
+                    for i, form in enumerate(type_forms[:15]):
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Format date for display
+                        try:
+                            if date_str:
+                                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                display_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                display_date = 'Unknown date'
+                        except:
+                            display_date = date_str or 'Unknown date'
+                        
+                        form_key = f"general_form_{form_type}_{i}"
+                        if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
+                            selected_general_forms.append(form)
+                
+                st.write("---")
+        
+        with col_analyze:
+            st.markdown("**Analysis Options:**")
+            
+            max_general_forms = st.slider("Max forms to analyze", 
+                                min_value=1, 
+                                max_value=1000, 
+                                value=500,
+                                help="Set high limit to analyze all forms (AI can handle large datasets)",
+                                key="max_general_forms")
+            
+            if len(selected_general_forms) > 0:
+                st.success(f"✅ {len(selected_general_forms)} forms selected")
+                
+                # Show helpful message for large datasets
+                if len(selected_general_forms) > 100:
+                    st.info(f"💪 **Large Dataset Ready:** You can analyze all {len(selected_general_forms)} forms! Set the slider to {len(selected_general_forms)} or higher.")
+                
+                if st.button("🤖 Generate Analysis", type="primary", key="analyze_general"):
+                    if len(selected_general_forms) > max_general_forms:
+                        st.warning(f"⚠️ Too many forms selected. Analyzing first {max_general_forms} forms.")
+                    
+                    # Use general form summary
+                    summary = summarize_form_submissions(
+                        selected_general_forms[:max_general_forms], 
+                        max_general_forms
+                    )
+                    
+                    # Display results
+                    st.subheader("📊 General Analysis Results")
+                    st.markdown(summary)
+                    
+                    # Download option
+                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                    
+                    summary_data = f"""# General Form Analysis Summary
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Form Types:** {', '.join(filter_info.get('form_types', []))}  
+**Date Range:** {date_range}  
+**Forms Analyzed:** {min(len(selected_general_forms), max_general_forms)} of {len(selected_general_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analysis Section
+"""
+                    
+                    st.download_button(
+                        label=f"📄 Download Analysis Report",
+                        data=summary_data,
+                        file_name=f"general_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help="Download the analysis as a markdown file",
+                        key="download_general_analysis"
+                    )
+            else:
+                st.info("Select forms above to enable analysis")
+    
+    else:
+        st.info("👆 First discover available form types, then select and fetch the forms you want to analyze")
+
+    # Test API connectivity first
+    with st.expander("🔧 API Connection Status", expanded=False):
+        config, error = get_roompact_config()
+        if error:
+            st.error(error)
+            st.markdown("""
+            **Setup Instructions:**
+            1. Contact your system administrator to obtain a Roompact API token
+            2. Add the token to your Streamlit secrets under the key `roompact_api_token`
+            3. Refresh this page to test the connection
+            """)
+            return
+        else:
+            st.success("✅ Roompact API token configured successfully")
+            
+            # Test API connection
+            with st.spinner("Testing API connection..."):
+                test_data, test_error = make_roompact_request("forms", {"cursor": ""})
+                if test_error:
+                    st.error(f"API connection test failed: {test_error}")
+                    return
+                else:
+                    st.success("✅ API connection successful")
+                    total_forms = test_data.get('total_records', 0)
+                    st.info(f"📊 Total forms available: {total_forms}")
+    
+    st.divider()
+    
+    # Main form analysis interface
+    st.subheader("📝 Form Submissions Analysis")
+    
+    # Date range and filtering options
+    col_date1, col_date2, col_discover = st.columns([1, 1, 1])
+    
+    with col_date1:
+        start_date = st.date_input(
+            "📅 Start Date",
+            value=datetime.now().date() - timedelta(days=90),  # Extended to 90 days
+            help="Filter forms submitted on or after this date"
+        )
+    
+    with col_date2:
+        end_date = st.date_input(
+            "📅 End Date", 
+            value=datetime.now().date(),
+            help="Filter forms submitted on or before this date"
+        )
+    
+    with col_discover:
+        if st.button("🔍 Discover Form Types", help="Scan available forms to see what types exist"):
+            # Calculate intelligent page limit based on date range
+            days_back = (datetime.now().date() - start_date).days
+            if days_back > 90:
+                max_pages = 300
+            elif days_back > 60:
+                max_pages = 200  
+            elif days_back > 30:
+                max_pages = 100
+            else:
+                max_pages = 50
+            
+            st.info(f"🔍 Scanning for forms (up to {max_pages} pages) going back {days_back} days to {start_date.strftime('%Y-%m-%d')}...")
+            
+            # Show extended search warning for very old dates
+            if days_back > 60:
+                st.warning(f"⏳ **Extended Search:** Going back {days_back} days requires searching many pages. This may take 1-2 minutes.")
+            
+            form_types, error = discover_form_types(
+                max_pages=max_pages, 
+                target_start_date=start_date
+            )
+            
+            if error:
+                st.error(f"Error discovering forms: {error}")
+            elif form_types:
+                st.session_state['discovered_form_types'] = form_types
+                st.session_state['discovery_date_range'] = {
+                    'start_date': start_date,
+                    'end_date': end_date
+                }
+                st.success(f"✅ Found {len(form_types)} different form types going back to {start_date}!")
+            else:
+                st.warning("No forms found to discover types from")
+    
+    # Form type selection
+    if 'discovered_form_types' in st.session_state:
+        form_options = st.session_state['discovered_form_types']
+        
+        st.subheader("📋 Select Form Types to Analyze")
+        
+        # Add "All Form Types" option
+        all_option = {"display_name": "All Form Types", "template_name": "All Form Types", "count": sum(f['count'] for f in form_options)}
+        display_options = [all_option] + form_options
+        
+        # Create multiselect with form type options
+        selected_displays = st.multiselect(
+            "Choose specific form types:",
+            options=[opt['display_name'] for opt in display_options],
+            default=["All Form Types"],
+            help="Select one or more form types to analyze. Default is all forms."
+        )
+        
+        # Convert display names back to template names
+        selected_form_types = []
+        for display_name in selected_displays:
+            for opt in display_options:
+                if opt['display_name'] == display_name:
+                    selected_form_types.append(opt['template_name'])
+                    break
+        
+        # Show selection summary
+        if selected_form_types and "All Form Types" not in selected_form_types:
+            total_count = sum(opt['count'] for opt in form_options if opt['template_name'] in selected_form_types)
+            st.info(f"📊 Selected {len(selected_form_types)} form type(s) with approximately {total_count} submissions")
+    
+    else:
+        st.info("👆 Click 'Discover Form Types' to see available form types and make specific selections")
+        selected_form_types = ["All Form Types"]  # Default fallback
+    
+    st.divider()
+    
+    # Fetch and display forms
+    if st.button("🔄 Fetch Forms in Date Range", type="primary"):
+        if not ('discovered_form_types' in st.session_state and selected_form_types):
+            st.warning("Please discover form types and make selections first!")
+            return
+            
+        with st.spinner("Fetching forms from Roompact..."):
+            # Calculate page limit based on date range for original supervisors section
+            days_back = (datetime.now().date() - start_date).days
+            
+            # Use generous page limits to ensure historical data access
+            if days_back > 90:
+                max_pages = 1000  # 3+ months
+            elif days_back > 60:
+                max_pages = 800   # 2+ months
+            elif days_back > 30:
+                max_pages = 600   # 1+ months  
+            elif days_back > 14:
+                max_pages = 400   # 2+ weeks
+            else:
+                max_pages = 200   # Recent data
+            
+            st.info(f"📊 Fetching up to {max_pages} pages of data going back {days_back} days to {start_date}")
+            
+            # Show extended search warning for very old dates
+            if days_back > 30:
+                st.warning(f"⏳ **Extended Search:** Going back {days_back} days requires searching many pages. This may take 2-3 minutes.")
+            
+            progress_placeholder = st.empty()
+            
+            def show_fetch_progress(page_num, total_forms, oldest_date, reached_target):
+                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                if oldest_date != "Unknown":
+                    status += f" | Oldest: {oldest_date}"
+                if reached_target:
+                    status += f" | ✅ Reached {start_date}"
+                progress_placeholder.info(status)
+            
+            all_forms, error = fetch_roompact_forms(
+                max_pages=max_pages,
+                target_start_date=start_date,
+                progress_callback=show_fetch_progress
+            )
+            
+            if error:
+                st.error(error)
+                return
+            
+            if not all_forms:
+                st.warning("No forms found.")
+                return
+            
+            # Filter forms by date range and selected types
+            filtered_forms, filter_error = filter_forms_by_date_and_type(
+                all_forms, start_date, end_date, selected_form_types
+            )
+            
+            if filter_error:
+                st.error(f"Error filtering forms: {filter_error}")
+                return
+            
+            # Store filtered forms in session state
+            st.session_state['roompact_forms'] = filtered_forms
+            st.session_state['filter_info'] = {
+                'start_date': start_date,
+                'end_date': end_date,
+                'form_types': selected_form_types,
+                'total_fetched': len(all_forms),
+                'filtered_count': len(filtered_forms)
+            }
+            
+            # Show actual date range of retrieved forms for debugging
+            if all_forms:
+                form_dates = []
+                for form in all_forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            form_dates.append(form_datetime)
+                        except:
+                            pass
+                
+                if form_dates:
+                    oldest_retrieved = min(form_dates).strftime('%Y-%m-%d')
+                    newest_retrieved = max(form_dates).strftime('%Y-%m-%d')
+                    st.info(f"📅 **Retrieved data range:** {oldest_retrieved} to {newest_retrieved}")
+                    
+                    if datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() > start_date:
+                        days_missing = (datetime.strptime(oldest_retrieved, '%Y-%m-%d').date() - start_date).days
+                        st.warning(f"⚠️ **Missing {days_missing} days of data** - oldest form found is {oldest_retrieved}, but you requested back to {start_date}. Try increasing page limits or check if forms exist for that period.")
+            
+            if filtered_forms:
+                st.success(f"✅ Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)")
+            else:
+                form_type_text = ", ".join(selected_form_types) if len(selected_form_types) <= 3 else f"{len(selected_form_types)} selected form types"
+                st.warning(f"No forms found in the date range {start_date} to {end_date} matching: {form_type_text}")
+    
+    # Display forms if available
+    if 'roompact_forms' in st.session_state and st.session_state['roompact_forms']:
+        forms = st.session_state['roompact_forms']
+        filter_info = st.session_state.get('filter_info', {})
+        
+        # Show filter summary
+        if filter_info:
+            form_types_display = filter_info.get('form_types', [])
+            if len(form_types_display) <= 3:
+                form_types_text = ", ".join(form_types_display)
+            else:
+                form_types_text = f"{len(form_types_display)} selected form types"
+                
+            st.info(f"""
+            📊 **Filter Results:** {filter_info['filtered_count']} forms found (from {filter_info['total_fetched']} total)  
+            📅 **Date Range:** {filter_info['start_date']} to {filter_info['end_date']}  
+            📋 **Form Types:** {form_types_text}
+            """)
+        
+        st.subheader(f"📋 Filtered Forms ({len(forms)} submissions)")
+        
+        # Create form selection interface
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("**Select forms to analyze:**")
+            
+            # Group forms by template name for better organization
+            forms_by_template = {}
+            for form in forms:
+                template_name = form.get('form_template_name', 'Unknown Form')
+                if template_name not in forms_by_template:
+                    forms_by_template[template_name] = []
+                forms_by_template[template_name].append(form)
+            
+            selected_forms = []
+            
+            # Show forms grouped by template
+            for template_name, template_forms in forms_by_template.items():
+                st.markdown(f"**{template_name}** ({len(template_forms)} submissions)")
+                
+                # Select all checkbox for this template
+                select_all_key = f"select_all_{template_name.replace(' ', '_')}"
+                if st.checkbox(f"Select all {template_name}", key=select_all_key):
+                    selected_forms.extend(template_forms)
+                else:
+                    # Individual form checkboxes
+                    for i, form in enumerate(template_forms[:10]):  # Limit display to first 10 per template
+                        current_revision = form.get('current_revision', {})
+                        author = current_revision.get('author', 'Unknown')
+                        date_str = current_revision.get('date', '')
+                        
+                        # Format date for display
+                        try:
+                            if date_str:
+                                date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                display_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                display_date = 'Unknown date'
+                        except:
+                            display_date = date_str or 'Unknown date'
+                        
+                        form_key = f"form_{template_name}_{i}"
+                        if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
+                            selected_forms.append(form)
+                
+                st.write("---")
+        
+        with col2:
+            st.markdown("**Analysis Options:**")
+            
+            max_forms = st.slider("Max forms to analyze", 
+                                min_value=1, 
+                                max_value=1000, 
+                                value=500,
+                                help="Set high limit to analyze all forms (AI can handle large datasets)")
+            
+            if len(selected_forms) > 0:
+                st.success(f"✅ {len(selected_forms)} forms selected")
+                
+                if st.button("🤖 Generate AI Summary", type="primary"):
+                    if len(selected_forms) > max_forms:
+                        st.warning(f"⚠️ Too many forms selected. Analyzing first {max_forms} forms.")
+                    
+                    # Check if focusing on duty reports for specialized analysis
+                    filter_info = st.session_state.get('filter_info', {})
+                    form_types = filter_info.get('form_types', [])
+                    
+                    # Use specialized duty report analysis if only duty-related forms are selected
+                    is_duty_focused = (
+                        len(form_types) == 1 and 
+                        any('duty' in form_type.lower() for form_type in form_types)
+                    ) or (
+                        len([ft for ft in form_types if 'duty' in ft.lower()]) > 0 and
+                        len([ft for ft in form_types if 'duty' not in ft.lower()]) == 0
+                    )
+                    
+                    if is_duty_focused and 'All Form Types' not in form_types:
+                        summary = create_duty_report_summary(
+                            selected_forms[:max_forms], 
+                            filter_info['start_date'], 
+                            filter_info['end_date']
+                        )
+                    else:
+                        # Use general form analysis
+                        summary = summarize_form_submissions(selected_forms, max_forms)
+                    
+                    # Display results
+                    st.subheader("📊 AI Analysis Results")
+                    st.markdown(summary)
+                    
+                    # Offer download option
+                    filter_info = st.session_state.get('filter_info', {})
+                    form_types = filter_info.get('form_types', ['Forms'])
+                    
+                    # Determine analysis type for filename and label
+                    if len(form_types) == 1 and 'duty' in form_types[0].lower():
+                        analysis_type = "Duty Reports"
+                        file_prefix = "duty_reports"
+                    elif len(form_types) <= 3:
+                        analysis_type = " & ".join(form_types)
+                        file_prefix = "forms_analysis"
+                    else:
+                        analysis_type = f"{len(form_types)} Form Types"
+                        file_prefix = "multi_forms_analysis"
+                    
+                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                    form_types_text = ", ".join(form_types) if len(form_types) <= 5 else f"{len(form_types)} selected form types"
+                    
+                    summary_data = f"""# Roompact Forms Analysis Summary
+
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Form Types:** {form_types_text}  
+**Date Range:** {date_range}  
+**Forms Analyzed:** {min(len(selected_forms), max_forms)} of {len(selected_forms)} selected  
+
+{summary}
+
+---
+Generated by UND Housing & Residence Life Weekly Reporting Tool
+"""
+                    
+                    st.download_button(
+                        label=f"📄 Download Analysis Report",
+                        data=summary_data,
+                        file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                        mime="text/markdown",
+                        help="Download the forms analysis as a markdown file"
+                    )
+            else:
+                st.info("Select forms above to enable AI analysis")
+    
+    else:
+        st.info("👆 Click 'Fetch Latest Forms' to load form submissions from Roompact")
+
+
+def admin_settings_page():
+    st.title("Administrator Settings")
+    st.write("Configure system settings and deadlines.")
+    
+    tab1, tab2, tab3 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration"])
+    
+    with tab1:
+        st.subheader("Weekly Report Deadline Configuration")
+        
+        # Get current deadline settings using the proper function
+        deadline_config = get_deadline_settings()
+        current_day = deadline_config.get("day_of_week", 0)  # 0 = Monday
+        current_hour = deadline_config.get("hour", 16)  # 4 PM
+        current_minute = deadline_config.get("minute", 0)
+        current_grace = deadline_config.get("grace_hours", 16)
+        
+        st.info(f"**Current Settings:** Reports due every **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][current_day]}** at **{current_hour:02d}:{current_minute:02d}** with **{current_grace}** hour grace period")
+        
+        with st.form("deadline_settings"):
+            st.write("Set when weekly reports are due:")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                deadline_day = st.selectbox(
+                    "Day of Week",
+                    options=[0, 1, 2, 3, 4, 5, 6],
+                    format_func=lambda x: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][x],
+                    index=current_day
+                )
+            
+            with col2:
+                deadline_hour = st.selectbox(
+                    "Hour (24-hour format)",
+                    options=list(range(24)),
+                    format_func=lambda x: f"{x:02d}:00",
+                    index=current_hour
+                )
+            
+            with col3:
+                deadline_minute = st.selectbox(
+                    "Minute",
+                    options=[0, 15, 30, 45],
+                    format_func=lambda x: f"{x:02d}",
+                    index=[0, 15, 30, 45].index(current_minute) if current_minute in [0, 15, 30, 45] else 0
+                )
+            
+            grace_period = st.number_input(
+                "Grace Period (hours after deadline for editing)",
+                min_value=0,
+                max_value=72,
+                value=current_grace,
+                help="How many hours after the deadline staff can still edit their reports"
+            )
+            
+            st.info(f"Current setting: Reports due every **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][deadline_day]}** at **{deadline_hour:02d}:{deadline_minute:02d}** with **{grace_period}** hour grace period")
+            
+            if st.form_submit_button("Save Deadline Settings", type="primary"):
+                try:
+                    new_settings = {
+                        "day_of_week": deadline_day,
+                        "hour": deadline_hour,
+                        "minute": deadline_minute,
+                        "grace_hours": grace_period
+                    }
+                    
+                    admin_user_id = st.session_state["user"].id
+                    
+                    with st.spinner("Saving settings to database..."):
+                        # Save to admin_settings table in database
+                        result = supabase.table("admin_settings").upsert({
+                            "setting_name": "report_deadline",
+                            "setting_value": new_settings,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        
+                        st.write(f"Debug: Database response: {result}")  # Debug info
+                    
+                    # Also update session state for immediate use
+                    st.session_state["admin_deadline_settings"] = new_settings
+                    
+                    st.success("✅ Deadline settings saved successfully to database!")
+                    st.info(f"Saved: Reports due **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][deadline_day]}** at **{deadline_hour:02d}:{deadline_minute:02d}** with **{grace_period}** hour grace period")
+                    time.sleep(2)
+                    st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"Failed to save settings: {e}")
+    
+    with tab2:
+        st.subheader("Submission Tracking Dashboard")
+        st.write("Track when reports are submitted and identify late submissions.")
+        
+        # Get recent submissions with timing data
+        try:
+            recent_reports = supabase.table("reports").select("*").eq("status", "finalized").order("submitted_at", desc=True).limit(50).execute()
+            if recent_reports.data:
+                
+                # Get current deadline settings for analysis using helper function
+                deadline_config = get_deadline_settings()
+                
+                # Create submission analysis
+                submission_data = []
+                for report in recent_reports.data:
+                    submitted_at = report.get("submitted_at")
+                    if submitted_at:
+                        submission_time = pd.to_datetime(submitted_at)
+                        
+                        # Calculate if submission was on time based on deadline settings
+                        week_ending = pd.to_datetime(report.get("week_ending_date"))
+                        # Calculate deadline for that week
+                        deadline_day = deadline_config["day_of_week"]
+                        deadline_hour = deadline_config["hour"] 
+                        deadline_minute = deadline_config["minute"]
+                        
+                        # Deadline is typically the Monday after the Saturday week ending
+                        days_after_saturday = (deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0)
+                        deadline_date = week_ending + timedelta(days=days_after_saturday)
+                        deadline_datetime = datetime.combine(deadline_date.date(), 
+                                                           datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute))
+                        deadline_datetime = deadline_datetime.replace(tzinfo=ZoneInfo("America/Chicago"))
+                        
+                        # Compare submission time to deadline
+                        was_on_time = submission_time <= deadline_datetime
+                        was_in_grace = submission_time <= (deadline_datetime + timedelta(hours=deadline_config["grace_hours"]))
+                        
+                        if was_on_time:
+                            status = "✅ On Time"
+                        elif was_in_grace:
+                            status = "⚠️ Grace Period"
+                        else:
+                            status = "❌ Late"
+                        
+                        submission_data.append({
+                            "Staff Member": report.get("team_member", "Unknown"),
+                            "Week Ending": report.get("week_ending_date", "Unknown"), 
+                            "Submitted": submission_time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "Day of Week": submission_time.strftime("%A"),
+                            "Time": submission_time.strftime("%H:%M"),
+                            "Deadline": deadline_datetime.strftime("%Y-%m-%d %H:%M"),
+                            "Status": status,
+                            "Admin Created": "Yes" if report.get("status") == "admin_created" or report.get("created_by_admin") else "No"
+                        })
+                
+                if submission_data:
+                    df = pd.DataFrame(submission_data)
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Summary stats
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        on_time = len([s for s in submission_data if s["Status"] == "✅ On Time"])
+                        st.metric("On Time", on_time)
+                    with col2:
+                        grace = len([s for s in submission_data if s["Status"] == "⚠️ Grace Period"])
+                        st.metric("Grace Period", grace)
+                    with col3:
+                        late = len([s for s in submission_data if s["Status"] == "❌ Late"])
+                        st.metric("Late", late)
+                    with col4:
+                        if submission_data:
+                            rate = (on_time / len(submission_data)) * 100
+                            st.metric("On-Time Rate", f"{rate:.1f}%")
+                else:
+                    st.info("No submission data available yet.")
+            else:
+                st.info("No reports found.")
+        except Exception as e:
+            st.error(f"Error loading submission data: {e}")
+    
+    with tab3:
+        st.subheader("Email Configuration")
+        st.write("Configure email settings for sending UND LEADS summaries.")
+        
+        st.info("""
+        **Email Setup Instructions:**
+        
+        To enable email functionality, you need to configure email settings in your Streamlit secrets.
+        
+        **FOR GMAIL (Recommended):**
+        
+        1. **Enable 2-Step Verification** on your Gmail account:
+           - Go to myaccount.google.com → Security → 2-Step Verification
+           - Follow the setup process
+        
+        2. **Generate an App Password**:
+           - Go to myaccount.google.com → Security → 2-Step Verification → App passwords
+           - Select "Mail" and your device
+           - Copy the 16-digit password (e.g., "abcd efgh ijkl mnop")
+        
+        3. **Update your secrets.toml**:
+        ```toml
+        EMAIL_ADDRESS = "your-gmail@gmail.com"
+        EMAIL_PASSWORD = "abcd efgh ijkl mnop"  # 16-digit app password
+        SMTP_SERVER = "smtp.gmail.com"
+        ```
+        
+        **FOR UND/Office 365 Email:**
+        ```toml
+        EMAIL_ADDRESS = "your-email@und.edu"
+        EMAIL_PASSWORD = "your-regular-password"
+        SMTP_SERVER = "smtp.office365.com"
+        ```
+        
+        **IMPORTANT:** 
+        - Never use your regular Gmail password - only use App Passwords
+        - Restart Streamlit after updating secrets.toml
+        - Never commit secrets.toml to version control!
+        """)
+        
+        # Test email configuration
+        st.subheader("Test Email Configuration")
+        
+        with st.form("test_email"):
+            test_email = st.text_input("Send test email to:", placeholder="your-email@und.edu")
+            
+            if st.form_submit_button("📧 Send Test Email"):
+                if test_email:
+                    test_subject = "UND Housing Reports - Email Test"
+                    test_body = """This is a test email from the UND Housing Leadership Reports system.
+
+If you received this email, your email configuration is working correctly!
+
+Test sent at: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    with st.spinner("Sending test email..."):
+                        success = send_email(test_email, test_subject, test_body)
+                        if success:
+                            st.success(f"✅ Test email sent successfully to {test_email}")
+                        else:
+                            st.error("❌ Failed to send test email. Please check your configuration.")
+                else:
+                    st.error("Please enter an email address for testing.")
+        
+        # Display current email configuration status
+        st.subheader("Configuration Status")
+        
+        try:
+            # More detailed debugging
+            st.write("🔍 **Debug Information:**")
+            
+            # Show secrets file location
+            import os
+            current_dir = os.getcwd()
+            secrets_path = os.path.join(current_dir, ".streamlit", "secrets.toml")
+            st.info(f"**Secrets file location:** `{secrets_path}`")
+            st.info(f"**File exists:** {os.path.exists(secrets_path)}")
+            
+            # Check if secrets exist at all
+            try:
+                secrets_keys = list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else []
+                st.write(f"Available secrets keys: {secrets_keys}")
+            except Exception as e:
+                st.write(f"Error accessing secrets keys: {e}")
+            
+            # Check each configuration item
+            try:
+                email_address = st.secrets["EMAIL_ADDRESS"]
+                if email_address.startswith("your-") or "placeholder" in email_address.lower():
+                    st.error(f"❌ EMAIL_ADDRESS still contains placeholder: {email_address}")
+                    st.warning("Please update your .streamlit/secrets.toml with your real Gmail address")
+                else:
+                    st.success("✅ Email Address Found")
+                    st.text(f"From: {email_address}")
+            except KeyError:
+                st.error("❌ EMAIL_ADDRESS key not found in secrets")
+            except Exception as e:
+                st.error(f"❌ Error accessing EMAIL_ADDRESS: {e}")
+            
+            try:
+                email_password = st.secrets["EMAIL_PASSWORD"]
+                if email_password.startswith("your-") or "placeholder" in email_password.lower() or len(email_password) != 16:
+                    st.error(f"❌ EMAIL_PASSWORD appears to be placeholder or wrong length (should be 16 chars)")
+                    st.warning("Please update your .streamlit/secrets.toml with your real Gmail App Password")
+                else:
+                    st.success("✅ Email Password Found")
+                    st.text("Password: [HIDDEN - 16 characters detected]")
+            except KeyError:
+                st.error("❌ EMAIL_PASSWORD key not found in secrets")
+            except Exception as e:
+                st.error(f"❌ Error accessing EMAIL_PASSWORD: {e}")
+            
+            try:
+                smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
+                st.success("✅ SMTP Server Available")
+                st.text(f"Server: {smtp_server}")
+            except Exception as e:
+                st.error(f"❌ Error accessing SMTP_SERVER: {e}")
+                
+        except Exception as e:
+            st.error(f"Error checking configuration: {e}")
+            
+        # Instructions for common issues
+        st.subheader("Troubleshooting")
+        st.warning("""
+        **Common Issues:**
+        
+        1. **File Location**: Make sure `.streamlit/secrets.toml` is in your project root directory
+        2. **File Format**: Ensure the file uses TOML format with quotes around values
+        3. **Restart Required**: Restart Streamlit after modifying secrets.toml
+        4. **File Permissions**: Check that the secrets file is readable
+        
+        **Example secrets.toml:**
+        ```toml
+        EMAIL_ADDRESS = "your-email@und.edu"
+        EMAIL_PASSWORD = "your-password"
+        SMTP_SERVER = "smtp.office365.com"
+        ```
+        """)
+
+def saved_reports_page():
+    """View saved duty analyses, staff recognition reports, and weekly summaries"""
+    st.title("Saved Reports Archive")
+    st.write("View all saved reports: duty analyses, staff recognition, and weekly summaries.")
+    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
+    with tab1:
+        st.subheader("Saved Duty Analyses")
+        try:
+            analyses_response = supabase.table('saved_duty_analyses').select('*').order('week_ending_date', desc=True).execute()
+            analyses = analyses_response.data or []
+            if not analyses:
+                st.info("No saved duty analyses yet.")
+            else:
+                analyses_by_year = {}
+                for analysis in analyses:
+                    try:
+                        year = pd.to_datetime(analysis['week_ending_date']).year
+                        if year not in analyses_by_year:
+                            analyses_by_year[year] = []
+                        analyses_by_year[year].append(analysis)
+                    except:
+                        if "Unknown" not in analyses_by_year:
+                            analyses_by_year["Unknown"] = []
+                        analyses_by_year["Unknown"].append(analysis)
+                for year in sorted(analyses_by_year.keys(), reverse=True):
+                    st.subheader(f"📅 {year}")
+                    year_analyses = analyses_by_year[year]
+                    for analysis in year_analyses:
+                        week_date = analysis.get('week_ending_date', 'Unknown')
+                        created_date = analysis.get('created_at', '')[:10] if analysis.get('created_at') else 'Unknown'
+                        created_by = analysis.get('created_by', 'Unknown')
+                        report_type = analysis.get('report_type', 'standard_analysis')
+                        reports_analyzed = analysis.get('reports_analyzed', 0)
+                        creator_name = "Unknown"
+                        if created_by and created_by != 'Unknown':
+                            try:
+                                profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
+                                if profile_resp.data:
+                                    profile = profile_resp.data[0]
+                                    creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
+                            except:
+                                creator_name = "Unknown"
+                        report_type_display = "Weekly Summary" if report_type == "weekly_summary" else "Standard Analysis"
+                        with st.expander(f"Week Ending {week_date} — {report_type_display} ({reports_analyzed} reports) — Created {created_date} by {creator_name}"):
+                            st.markdown(analysis.get('analysis_text', 'No content available'))
+                            st.divider()
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                download_filename = f"duty_analysis_{report_type}_{week_date}_{created_date}.md"
+                                st.download_button(
+                                    label="📄 Download Analysis",
+                                    data=analysis.get('analysis_text', ''),
+                                    file_name=download_filename,
+                                    mime="text/markdown",
+                                    help="Download this duty analysis as a markdown file",
+                                    key=f"download_duty_{analysis.get('id', week_date)}"
+                                )
+                            with col2:
+                                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                                if user_id and (user_id == created_by):
+                                    if st.button(f"🗑️ Delete", key=f"delete_duty_{analysis.get('id', week_date)}", 
+                                               type="secondary", help="Delete this saved analysis"):
+                                        try:
+                                            supabase.table('saved_duty_analyses').delete().eq('id', analysis['id']).execute()
+                                            st.success("Analysis deleted!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to delete: {e}")
+        except Exception as e:
+            st.error(f"Failed to fetch saved duty analyses: {e}")
+    with tab2:
+        st.subheader("Saved Staff Recognition Reports")
+        try:
+            recognition_response = supabase.table('saved_staff_recognition').select('*').order('week_ending_date', desc=True).execute()
+            recognitions = recognition_response.data or []
+            if not recognitions:
+                st.info("No saved staff recognition reports yet.")
+            else:
+                recognitions_by_year = {}
+                for recognition in recognitions:
+                    try:
+                        year = pd.to_datetime(recognition['week_ending_date']).year
+                        if year not in recognitions_by_year:
+                            recognitions_by_year[year] = []
+                        recognitions_by_year[year].append(recognition)
+                    except:
+                        if "Unknown" not in recognitions_by_year:
+                            recognitions_by_year["Unknown"] = []
+                        recognitions_by_year["Unknown"].append(recognition)
+                for year in sorted(recognitions_by_year.keys(), reverse=True):
+                    st.subheader(f"🏆 {year} Staff Recognition Reports")
+                    year_recognitions = recognitions_by_year[year]
+                    for recognition in year_recognitions:
+                        creator_name = "Unknown User"
+                        if recognition.get('created_by'):
+                            try:
+                                profile_response = supabase.table('profiles').select('full_name').eq('id', recognition['created_by']).execute()
+                                if profile_response.data:
+                                    creator_name = profile_response.data[0]['full_name']
+                            except:
+                                pass
+                        week_date = recognition['week_ending_date']
+                        created_date = recognition['created_at'][:10] if recognition.get('created_at') else 'Unknown'
+                        with st.expander(f"Week Ending {week_date} - Staff Recognition - {creator_name}"):
+                            st.write(f"**Staff Recognized:** {recognition.get('staff_recognized', 0)}")
+                            st.write(f"**Created:** {created_date} by {creator_name}")
+                            if recognition.get('recognition_text'):
+                                st.markdown("**Recognition Report:**")
+                                st.markdown(recognition['recognition_text'])
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.download_button(
+                                    label="📥 Download Report",
+                                    data=recognition.get('recognition_text', ''),
+                                    file_name=f"staff_recognition_{week_date}_{created_date}.md",
+                                    mime="text/markdown",
+                                    help="Download this staff recognition report as a markdown file",
+                                    key=f"download_recognition_{recognition.get('id', week_date)}"
+                                )
+                            with col2:
+                                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                                if user_id and (user_id == recognition.get('created_by')):
+                                    if st.button(f"🗑️ Delete", key=f"delete_recognition_{recognition.get('id', week_date)}", 
+                                               type="secondary", help="Delete this saved recognition"):
+                                        try:
+                                            supabase.table('saved_staff_recognition').delete().eq('id', recognition['id']).execute()
+                                            st.success("Recognition deleted!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to delete: {e}")
+        except Exception as e:
+            st.error(f"Failed to fetch saved staff recognition reports: {e}")
+    with tab3:
+        st.subheader("Saved Weekly Summaries")
+        try:
+            summaries_response = supabase.table('weekly_summaries').select('*').order('week_ending_date', desc=True).execute()
+            summaries = summaries_response.data or []
+            if not summaries:
+                st.info("No saved weekly summaries yet.")
+            else:
+                summaries_by_year = {}
+                for summary in summaries:
+                    try:
+                        year = pd.to_datetime(summary['week_ending_date']).year
+                        if year not in summaries_by_year:
+                            summaries_by_year[year] = []
+                        summaries_by_year[year].append(summary)
+                    except:
+                        if "Unknown" not in summaries_by_year:
+                            summaries_by_year["Unknown"] = []
+                        summaries_by_year["Unknown"].append(summary)
+                for year in sorted(summaries_by_year.keys(), reverse=True):
+                    st.subheader(f"📅 {year} Weekly Summaries")
+                    year_summaries = summaries_by_year[year]
+                    for summary in year_summaries:
+                        week_date = summary.get('week_ending_date', 'Unknown')
+                        created_date = summary.get('created_at', '')[:10] if summary.get('created_at') else 'Unknown'
+                        created_by = summary.get('created_by', 'Unknown')
+                        creator_name = "Unknown"
+                        if created_by and created_by != 'Unknown':
+                            try:
+                                profile_resp = supabase.table('profiles').select('full_name, title').eq('id', created_by).execute()
+                                if profile_resp.data:
+                                    profile = profile_resp.data[0]
+                                    creator_name = profile.get('full_name') or profile.get('title') or 'Unknown'
+                            except:
+                                creator_name = "Unknown"
+                        with st.expander(f"Week Ending {week_date} — Created {created_date} by {creator_name}"):
+                            st.markdown(summary.get('summary_text', 'No content available'))
+                            st.divider()
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                download_filename = f"weekly_summary_{week_date}_{created_date}.md"
+                                st.download_button(
+                                    label="📄 Download Summary",
+                                    data=summary.get('summary_text', ''),
+                                    file_name=download_filename,
+                                    mime="text/markdown",
+                                    help="Download this weekly summary as a markdown file",
+                                    key=f"download_weekly_{summary.get('id', week_date)}"
+                                )
+                            with col2:
+                                user_id = st.session_state.get('user', {}).id if st.session_state.get('user') else None
+                                if user_id and (user_id == created_by):
+                                    if st.button(f"🗑️ Delete", key=f"delete_weekly_{summary.get('id', week_date)}", 
+                                               type="secondary", help="Delete this saved summary"):
+                                        try:
+                                            supabase.table('saved_weekly_summaries').delete().eq('id', summary['id']).execute()
+                                            st.success("Summary deleted!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to delete: {e}")
+        except Exception as e:
+            st.error(f"Failed to fetch saved weekly summaries: {e}")
+        # (Staff recognition code moved to tab2)
+
+def user_manual_page():
+        st.title("User Manual & Getting Started Guide")
         st.markdown("""
 ## Welcome to the UND Housing Leadership Reporting Tool
 
@@ -5756,6 +7996,63 @@ def main():
         return
     
     # User is logged in - fetch profile info
-    ## Removed duplicate profile_page definition; now only using src/ui/profile.py
+    try:
+        user_id = st.session_state["user"].id
+        profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
+        profile_data = getattr(profile_response, "data", None)
+        
+        if profile_data:
+            profile = profile_data[0]
+            st.session_state["role"] = profile.get("role", "staff")
+            st.session_state["full_name"] = profile.get("full_name", "")
+            st.session_state["title"] = profile.get("title", "")
+            st.session_state["is_supervisor"] = bool(profile.get("supervisor_id"))
+            
+            # Check if user is a supervisor
+            supervisor_check = supabase.table("profiles").select("id").eq("supervisor_id", user_id).execute()
+            if getattr(supervisor_check, "data", []):
+                st.session_state["is_supervisor"] = True
+    except Exception as e:
+        st.error(f"Error fetching profile: {e}")
+        return
+    
+    # Show sidebar with user info and logout
+    st.sidebar.title("Navigation")
+    st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
+    st.sidebar.write(f"Role: {st.session_state.get('role', 'staff').title()}")
+    
+    if st.sidebar.button("Logout"):
+        logout()
+        st.rerun()
+    
+    # Build pages based on user role
+    pages = {
+        "My Profile": profile_page,
+        "Submit / Edit Report": submit_and_edit_page,
+        "User Manual": user_manual_page
+    }
+    
+    # Add role-specific pages
+    if st.session_state.get("role") == "admin":
+        pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
+        pages["Admin Settings"] = admin_settings_page
+    # pages["Weekly Summaries (Email)"] = admin_summaries_page
+        pages["📚 Saved Reports Archive"] = saved_reports_page
+        pages["Supervisors Section"] = supervisors_section_page
+    
+    if st.session_state.get("is_supervisor"):
+        pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
+        pages["My Team Summaries"] = supervisor_summaries_page
+        pages["📚 Saved Reports Archive"] = saved_reports_page
+        pages["Supervisors Section"] = supervisors_section_page
+    
+    # Page selection
+    selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
+    
+    # Run selected page
+    if selected_page in pages:
+        pages[selected_page]()
+
+# Run the main application
 if __name__ == "__main__":
     main()

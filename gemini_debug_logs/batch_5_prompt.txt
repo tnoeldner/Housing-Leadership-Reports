@@ -1,0 +1,318 @@
+
+                You are analyzing residence life duty reports for a weekly administrative summary. Your goal is to produce a concise, actionable, and easy-to-read report for leadership. Please:
+
+                - Summarize the week's overall activity and key trends in 3-5 bullet points.
+                - Highlight the most important incidents, challenges, or successes that require attention. Use bullet points for each item.
+                - Provide a quantitative breakdown (number of reports, incidents by type, hall-by-hall summary) in a clear, readable format.
+                - For each hall, create a dedicated section with the hall name as the header. The individual halls are: Swanson, West, McVey, Brannon, Noren, Selke, Johnstone, Smith, University Place. Under each hall, list the key items, incidents, challenges, successes, and any notable staff actions for that hall as bullet points. Do not group halls together; each hall should have its own section, even if some halls have no incidents or items to report.
+                - List specific action items or recommendations for staff or administration. Make these actionable and direct.
+                - Note any staff performance highlights or concerns.
+                - If relevant, mention any policy, facility, or safety issues that need follow-up.
+
+                Do NOT include a separate "Recurring Issues" section. Instead, ensure hall-specific issues are included under each hall's section.
+
+                Format your response in markdown with clear headers and bullet points. Focus on actionable insights and brevity. Do not include unnecessary narrative or filler text.
+
+                DUTY REPORTS DATA:
+                
+=== WEEKLY DUTY REPORTS ANALYSIS (BATCH 5) ===
+Date Range: 2025-11-16 to 2025-11-16
+Batch Reports: 8
+
+=== DETAILED REPORTS ===
+
+--- REPORT 1: Resident Assistant Duty Report ---
+Staff: Norah Tomasouw
+Date: 2025-11-17T05:26:15Z
+**Hall:** Selke Hall, University Place, Brannon Hall, Swanson Hall, Smith Hall, Johnstone Hall
+**Duty Partner:** None
+**Date:** 2025-11-16T00:00:00Z
+**I started my first round at:** 18:30:00
+**I ended my first round at:** 18:38:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** Starting on fourth floor east side I pushed in some chairs and talked to hall gov president Isaac and his friends/other residents hanging out in the common area, west side I pushed in some chairs otherwise it was clean. Third floor west side I pushed in some chairs otherwise it was clean, east side I talked to RA Kate who was studying in the common area and there were a couple residents watching tv there as well. Second floor east side I talked to a resident studying in the common area and pushed in some chairs, west side I talked to some residents playing video games on their computers in the common area. First floor west side there were some residents hanging out in the common area otherwise it was clean and there was one resident using a study room, east side I just pushed in some chairs otherwise it was clean. I then checked the laundry room and noticed dryer 16 was shut off (screen was blank, buttons did nothing). After my second round after desk I double checked that it was still off then called the CA on duty who said they will email Diane about it tomorrow. Kitchenette was good and people were playing pool in the lobby otherwise it was clean. 
+**I started my second round at:** 22:05:00
+**I ended my second round at:** 22:20:00
+**Round Checklist: While on my second round, I completed the following:** I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas
+**Round Summary: While on my second round, the following occurred:** Starting on fourth floor west side there was a resident using one of the study rooms otherwise I just pushed in some chairs, east side I talked to Issac and his friends who were still hanging out and studying in the common area. Third floor east side I pushed in chairs and there were some residents hanging out in the common area, west side I talked to my residents Nick and MaKaela by the study room about classes and such and said hi to my resident Kaden who was hanging out on the couch in the common area. Second floor west side there were residents hanging out in the common area and I pushed in some chairs, east side I said hi to RA Cyd and her residents who were watching Forest Gump in the common area and I pushed in some chairs. First floor east side there were a couple residents eating and listening to music in the common area, west side there were residents using both study rooms and some residents watching tv in the common area. Outside everything was good, then I said hi to a couple residents hanging out in the Landing Zone. I said hi to a couple resident in the laundry room and the kitchenette was all good.
+**I started my third round at (Weekends Only):** None
+**I ended my third round at (Weekends Only):** None
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** None
+**Round Summary: While on my third round, the following occurred (Weekends Only):** None
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** N/A
+
+==================================================
+
+--- REPORT 2: Resident Assistant Duty Report ---
+Staff: Faith Carey
+Date: 2025-11-17T05:05:10Z
+**Hall:** Selke Hall, University Place, Brannon Hall, Swanson Hall, Smith Hall, Johnstone Hall
+**Duty Partner:** None
+**Date:** 2025-11-16T00:00:00Z
+**I started my first round at:** 16:40:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** All floors in both in both east and west buildings were checked. Entrances were secure. An outside round was completed. Residents were greeted throughout. Nothing else to report
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:17:00
+**Round Checklist: While on my second round, I completed the following:** I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas
+**Round Summary: While on my second round, the following occurred:** All floors in east and west buildings were checked. All entrances are secure. Residents were greeted throughout. Elf bronzing drops were found in the skywalk on the west side it is in the office now. Nothing else to report.
+**I started my third round at (Weekends Only):** None
+**I ended my third round at (Weekends Only):** None
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** None
+**Round Summary: While on my third round, the following occurred (Weekends Only):** None
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** 7pm Bree Brandt checked out Vacuum #5 also bringing up that more blinds had fallen down in 464A and the living room work order was filed #3007.
+
+==================================================
+
+--- REPORT 3: Resident Assistant Duty Report ---
+Staff: Thien Thang
+Date: 2025-11-17T04:37:27Z
+**Hall:** Selke Hall, University Place, Brannon Hall, Swanson Hall, Smith Hall, Johnstone Hall
+**Duty Partner:** None
+**Date:** 2025-11-16T00:00:00Z
+**I started my first round at:** 16:40:00
+**I ended my first round at:** 17:10:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** I started my round on 4th floor. I saw people doing homework. Everything seemed casual. It wasn’t dirty so I was happy. 3rd floor was surprisingly lively. It looks like some 2nd floor resident has migrated onto 3rd floor to hang out. Love to see it. 2nd floor was chill, I talked to some residents about baking, that was pretty much it. I noticed that 1st floor handle for the main stairwell was broken. Reed informed me that a CA was contacted and a work order has been placed. Ground floor kitchen, sinks, bathrooms and laundry room looks good. I went outside to the exterior round. Found some trash and threw it away. I went to the landing zone, nobody was there. I ended my round underneath wilkerson. All was good.
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:13:00
+**Round Checklist: While on my second round, I completed the following:** I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas; I checked all kitchenettes, laundry rooms, study rooms, and common areas
+**Round Summary: While on my second round, the following occurred:** I began my round at 10:00. Not going to lie, I went through this one really quick because I had an allergic reaction to something. I dont know what, but I was not well. Ground floor entrances were closed. The trash bin in the kitchen was full. I went to first floor and the resident said that I look like a zombie… other than that, the door handle for the middle stairwell is still broken, the handle is in the office. 2nd floor was normal, people were playing card games. 3rd floor people were watching movies on the west wing, nothing seemed to be special today. I ended my rounds on 4th. All was good.
+**I started my third round at (Weekends Only):** None
+**I ended my third round at (Weekends Only):** None
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** None
+**Round Summary: While on my third round, the following occurred (Weekends Only):** None
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** 8:55 - isabell and nadia got locked out
+ 8:20 - called rd on duty for the emergency room.
+
+==================================================
+
+--- REPORT 4: Resident Assistant Duty Report ---
+Staff: Cydney Pathammavong
+Date: 2025-11-16T22:42:50Z
+**Hall:** West Hall, Brannon Hall
+**Duty Partner:** Alexander Her, Katharine Rhyner
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 19:00:00
+**I ended my first round at:** 19:25:00
+**Round Checklist: While on my first round, I did the following:** I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)
+**Round Summary: While on my first round, the following occurred:** 4 east: chairs, resident in study room
+4 west: chairs. One chair missing
+3 west: chairs
+3 east: resident dying hair
+2 east: chairs
+2 west: resident watching hockey, studying
+1 west: poster
+1 east: clean
+Ground: clean
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:13:00
+**Round Checklist: While on my second round, I completed the following:** I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)
+**Round Summary: While on my second round, the following occurred:** Floor 4:
+
+West Lounge: West lounge is clear and quiet, deserted islands. No one is alive.
+East Lounge: there are three residents watching the fight the UFC fight there’s four minutes and 45 seconds left in the fight. They are interrogating me about who is on the phone but it is no one little they know I’m documenting that they’re harassing me.
+
+Floor 3:
+
+East Lounge: there is actually not a single soul on this floor we can hear talking coming from 304 but other than that, there’s dirty tables some foods left out to be shared. That looks like interesting frosting on that donut.
+West Lounge: there’s a resident studying in the lounge I mean in the study hall there’s nobody in the lounge, but it looks very nice 
+Floor 2:
+
+West Lounge: per usual there’s about 1 million residents on the floor two are playing video games one is playing something on the TV to our watching. I believe we’re doing whatever it is that they’re doing they all look at me suspiciously. I walk away unbothered
+East Lounge: I can actually hear noise coming from the side of my floor. I wonder what it is. They’re doing Kate wonders the same there’s music playing. Kate is surprised that there are so many people on the floor. What is going on? There are five residents playing poker, gambling, their lives away, not caring about their grades or their lives or their futures. They bullied and harassed me so I left. They greet me as RA. Do I like it no do I love them? Yes they’re playing cards against humanity. The card that I’m reading says how far I can get my own penis up my butt. Hara, I hope you’re not reading this. They gave me a giggle. Cait also thought it was quite joyous.
+Floor 1:
+
+East Lounge: their lights are on nobody is home. Daniel is in the RA office doing homework because we just saw him.
+West side: there is absolutely nothing going on on the floor right now, but I’m gonna rip a fat one and walk away. 
+
+Outside: outside it is frigid many lights are off. There’s no one in the quad no one at the fire. There are nothing to the windows that we should be concerned about the stars are out and I’m looking into Kate‘s eyes and we get so close to kissing, but we don’t. she starts spinning around I refuse. 
+Ground Floor: in the landing zone there are five students playing poker. Why is everybody so into gambling? They’re just so happy to be absolutely no residence passed out in the landing zone bathrooms.Yay!
+The same resident from earlier who happened to spill water everywhere is still in the laundry room. The laundry room is clean. It smells great. The resident looks awesome. Nothing is happening. Nothing is going on. There is nothing exciting. There are three residents sitting in the kitchen seating watching something. 
+**I started my third round at (Weekends Only):** 12:48:00
+**I ended my third round at (Weekends Only):** 01:01:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)
+**Round Summary: While on my third round, the following occurred (Weekends Only):** Floor 4:
+
+West Lounge: the wing is tired besides the guy that was moaning at me when I let him back in his room
+East Lounge: there are a couple residents watching a movie. They’ve got food and drinks and snacks. They’re all hanging out like before.
+
+Floor 3:
+
+West Lounge: lights are on nobody is home. Brain is fried.
+East Lounge: there’s nothing going on the lights are on, but no one is out the tables look a little messy. All the furniture is here we will organize it.
+
+Floor 2:
+
+East Lounge: I can hear my residence from the other side for once in my life why are they all out and about? I go to shake Junior‘s hand very passionately shake shake I say hello to the residence hello to the other resident. They’re watching Moana and being awesome.
+Some have Ramen. It looks very yummy. 
+West Lounge: from resident is waving at me, listening, listening to the guitar playing they have a song for us!!! The song was very good. It was last Christmas and we all sang and danced and group hugged. We’re making him choose who he would fight. Out of Kate and I. He chose Danny.  We wish them a good night and moved on to the other portion of the floor hello residence good night residence. 
+
+Floor 1:
+
+West Lounge: there is one resident out in this lounge watching something on his computer
+East side: there is absolutely no one on the floor
+
+
+Ground Floor: there’s nothing to see on ground floor
+Laundry: all the washers and dryers are supposed to be
+Q
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** 8:25 resident mad wa big water mess he put a giant blanket in the washer, and there was still water in it. 
+
+Resident calls the Duty Phone. We pull up to put him back in his room and he moans.
+
+3 lockouts 1 at 5 one at 7 and then another at 12:30 
+
+
+==================================================
+
+--- REPORT 5: Resident Assistant Duty Report ---
+Staff: Natalie Valiga
+Date: 2025-11-16T22:17:45Z
+**Hall:** West Hall, Brannon Hall
+**Duty Partner:** Alexander Her, Katharine Rhyner
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 16:30:00
+**I ended my first round at:** 17:00:00
+**Round Checklist: While on my first round, I did the following:** I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)
+**Round Summary: While on my first round, the following occurred:** Alexander, and Natalie completed the first round inside and outside, talked with afew passing residents and took down some old posters.
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:30:00
+**Round Checklist: While on my second round, I completed the following:** I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)
+**Round Summary: While on my second round, the following occurred:** During the second round we walked around West and had no policy violations to note.
+**I started my third round at (Weekends Only):** 23:30:00
+**I ended my third round at (Weekends Only):** 23:59:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.); I addressed any incidents or policy violations (quiet hours violation, sports in the hallway, etc.)
+**Round Summary: While on my third round, the following occurred (Weekends Only):** Completed the round and there was nothing to note
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At approximately 3:40 pm on November 16, 2025 the West Hall fire alarms went off. This was caused by cooking in the kitchen where butter in a hot pan set the alarms off.  Operations was called at 3:45 pm to confirm that they got the call by RA Natalie Valiga.  The alarms turned off at approximately 3:50 pm, and RA's received the all clear for residents to go back into the hall.  The report number is 1150 given by Tyler Montgomery.
+
+==================================================
+
+--- REPORT 6: Resident Assistant Duty Report ---
+Staff: Brooke Wenner
+Date: 2025-11-16T08:49:35Z
+**Hall:** Smith Hall, Johnstone Hall, McVey Hall, University Place, Swanson Hall, Selke Hall, Noren Hall
+**Duty Partner:** Wesley Dolton, Luis Swanson, Faith Carey, NONE, Reed Hanson, Meris Lindsay
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 18:30:00
+**I ended my first round at:** 19:00:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** 4th e: no one
+4th w: no one
+3rd e: one resident on their computer
+3rd w: two residents building a gingerbread house and watching a movie
+2nd e: resident walking into room
+2nd w: residents brooklyn and sadie building a puzzle and residents joesph and liam watching a youtube video
+1st e: no one
+1st w: no one
+ground: no one, elevator is beeping- called CA on duty 
+wilkerson: 5 people eating and no one in innovation lab
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:30:00
+**Round Checklist: While on my second round, I completed the following:** I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round
+**Round Summary: While on my second round, the following occurred:** outside: nothing of concern
+landing zone: 2 residents standing next to bathrooms, 5 residents playing a board game
+4th e: no one
+4th w: one resident on their phone, took poster down
+3rd e: one resident on the phone 
+3rd w: no one, threw garbage away
+2nd e: one resident 
+2nd w: Asher Taylor, David, Kannon hanging out watching a movie
+1st e: RA lily, RA jaden, and RA eliza watching a movie with another resident
+1st w: no one
+ground: no one
+laundry: no one, 2 washers running
+**I started my third round at (Weekends Only):** None
+**I ended my third round at (Weekends Only):** None
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** ; ; ; ; 
+**Round Summary: While on my third round, the following occurred (Weekends Only):** 4th: no one 
+3rd: no one
+2nd e: no one, picked up garbage
+2nd w: victoria playing a game on her computer picked up garbage
+1st e: no one
+1st w: no one
+ground: no one
+laundry: no washers and no dryers running
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** Recieved a call from RA Meris about a loud beeping noise and flashing light coming from outside the elevator. RA Brooke called the CA on duty who then called JCI to come see what the problem was. JCI could not fix the issue so JCI filled out a UIT ticket. The CA on duty called the RD on duty to ask what we should do since the issue couldn’t be resolved. The RD on duty said to mark every elevator with an “out of order” sign. Brooke then marked every elevator with said signs.
+
+During the elevator issues, Brooke received a call from RD Sophia who was wondering what the issue was so Sophia could inform Moses about the issue. Brooke relayed the situation to Sophia.
+
+Brooke also recieved a call about a resident wanted to sign out a bowl after desk shift was over. Brooke went down to the office to have them check out a bowl.
+
+==================================================
+
+--- REPORT 7: Resident Assistant Duty Report ---
+Staff: Thien Thang
+Date: 2025-11-16T07:11:26Z
+**Hall:** Smith Hall, Johnstone Hall, McVey Hall, University Place, Swanson Hall, Selke Hall, Noren Hall
+**Duty Partner:** Wesley Dolton, Luis Swanson, Faith Carey, NONE, Reed Hanson, Meris Lindsay
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 17:15:00
+**I ended my first round at:** 17:30:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** We began my first round at 5:15 pm. The round began on ground floor of Wilkerson. There were some students doing homework, but other than studious activities, nothing was out of the ordinary. We rotated to the landing zone and did a lap around the quad, no mess was found. We began our interior round on ground floor. There was some poster on the floor we tried to pick up, but it didn’t take long for it to fall down. Petition to get Lauren her cork board. Kitchen appliances looked good, nothing was dirty. Rest in peace to the washer and dryer. A work order has been placed. 1st floor was good, nothing special. 2nd floor had some people studying and everything looks good. We saw some people playing chess on the third floor and stood there to commentate for a while. We ended our interior round on 4th floor. Some residents were watching Mormon wives, but other than that, all is good. 
+
+**I started my second round at:** 22:10:00
+**I ended my second round at:** 22:35:00
+**Round Checklist: While on my second round, I completed the following:** I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round
+**Round Summary: While on my second round, the following occurred:** We began our 2nd at 10:10 outside. Highly do not recommend doing that anymore… it was cold. No trash was found, no windows were open when we were doing rounds. We began our interior round on the ground floor, we picked up some posters but that was about it. 1st floor was really empty. However, Thien did find two "wet area sign" on the table of east wing. The signs are now in the office. 2nd floor was clean, some chairs were sprawled everywhere but we pushed it back so it looks good. 3rd floor east side started watching Mormon wives. Apparently it’s the “new wave”. We ended the round on 4th, Thien’s resident was watching some prison fighting show. Everything was good. Another casual day in Selke. 
+
+**I started my third round at (Weekends Only):** 12:20:00
+**I ended my third round at (Weekends Only):** 12:35:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** ; ; ; ; 
+**Round Summary: While on my third round, the following occurred (Weekends Only):** We began our rounds at 12:20. We started on 4th floor, it looked very… ominous, lights were off and there was one single chair in the middle of Thien’s common area. Nobody was in the common area. 3rd floor was really boring but clean. Not sure why but we guess people are either out or is just sleeping early. 2nd floor had some resident studying at this hour for some reason, but we were happy to see them so locked in. 1st floor had chairs kind of all over the place but it wasn’t a big deal. We ended the round on ground floor. Every entrance was secured, washer is still down, but other than that. All is good. 
+
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** 6:49 - Sebastian called to borrow a vacuum 
+8:45 - Resident from room 301 toilet stopped flushing. CA on duty was called. JCI came around 9:30 and fixed the issue. 
+10:20 - Sebastian called to return the vacuum
+
+==================================================
+
+--- REPORT 8: Resident Assistant Duty Report ---
+Staff: Alberta Ampah
+Date: 2025-11-16T22:12:38Z
+**Hall:** Smith Hall, Johnstone Hall, McVey Hall, University Place, Swanson Hall, Selke Hall, Noren Hall
+**Duty Partner:** None
+**Date:** 2025-11-15T00:00:00Z
+**I started my first round at:** 18:00:00
+**I ended my first round at:** 18:13:00
+**Round Checklist: While on my first round, I did the following:** I talked with residents; I talked with residents; I talked with residents; I talked with residents
+**Round Summary: While on my first round, the following occurred:** 
+Floor 5: RA Naa spoke with resident Jason.
+Floor 4: RA Naa said hi to resident Anthony.
+Floor 3: RA Naa said hi to resident Annabelle.
+Floor 2: RA Naa spoke with resident Kaitlyn. RA Naa said  hi to residents Abby and Asma.
+Floor 1: Nothing to note.
+Basement: Nothing to note.
+
+**I started my second round at:** 22:45:00
+**I ended my second round at:** 23:10:00
+**Round Checklist: While on my second round, I completed the following:** I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round; I completed an inside round
+**Round Summary: While on my second round, the following occurred:** 
+Floor 5: RA Naa said hi to resident Natalie.
+Floor 4: Nothing to note.
+Floor 3: Nothing to note.
+Floor 2: RA Naa said hi to residents Trevor and Zack.
+Floor 1: RA Naa said hi to resident Lovette.
+Basement: Nothing to note.
+Outside: RA Naa noticed that the window of the residents in room 313 was opened. RA Naa went to that room and asked for resident Jean to keep it closed as the weather was below freezing. RA Naa also informed resident Jean to either let an RA know if resident Jean feels like the room is significantly hot. Maxient Report Number 00004873
+
+**I started my third round at (Weekends Only):** 00:32:00
+**I ended my third round at (Weekends Only):** 00:42:00
+**Round Checklist: While on my third round, I completed the following (Weekends Only):** ; ; ; 
+**Round Summary: While on my third round, the following occurred (Weekends Only):** 
+Floor 5: Nothing to note.
+Floor 4: RA Naa said hi to residents Joseph and Barbara.
+Floor 3: Nothing to note.
+Floor 2: RA Naa said hi to resident Trevor.
+Floor 1: Nothing to note.
+Basement: Nothing to note.
+
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** At 3:18 pm on Sunday, RA Naa received a call from a resident cooking in the kitchenette on the 3rd floor. The resident explained that the sink was  leaking. Upon further investigation RA Naa found that the leak had spread through the wall to the hallway. RA Naa called the CA on duty - CA Samantha and explained the situation. CA Samantha arrived promptly. CA Samantha attempted to shut the water but couldn't. CA Samantha called JCI. JCI arrived shortly after and fixed the leak.; At 3:46 pm on Sunday, RA Naa received a call from resident Eli in room 116 that he accidentally locked himself out of his room. RA Naa unlocked the room using the master key. Master key log form was filed.
+
+==================================================
+
+
+                Generate the weekly duty analysis summary below:
+                

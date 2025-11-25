@@ -1,0 +1,34 @@
+
+=== WEEKLY DUTY REPORTS ANALYSIS (BATCH 7) ===
+Date Range: 2025-11-10 to 2025-11-16
+Batch Reports: 1
+
+=== DETAILED REPORTS ===
+
+--- REPORT 1: Resident Assistant Duty Report ---
+Staff: Thien Thang
+Date: 2025-11-17T04:37:27Z
+
+**Hall:** [{'tag_id': 'xMm94g', 'tag_name': 'Selke Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZEq', 'tag_name': 'University Place', 'tag_type': 'BUILDING'}, {'tag_id': '7eY2Vm', 'tag_name': 'Brannon Hall', 'tag_type': 'BUILDING'}, {'tag_id': 'xv5zZp', 'tag_name': 'Swanson Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7wOpoG', 'tag_name': 'Smith Hall', 'tag_type': 'BUILDING'}, {'tag_id': '7QzZGr', 'tag_name': 'Johnstone Hall', 'tag_type': 'BUILDING'}]
+**Date:** 2025-11-16T00:00:00Z
+**I started my first round at:** 16:40:00
+**I ended my first round at:** 17:10:00
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Checklist: While on my first round, I did the following:** [{'option': 'I talked with residents', 'option_id': 'AJy3jW'}]
+**Round Summary: While on my first round, the following occurred:** I started my round on 4th floor. I saw people doing homework. Everything seemed casual. It wasn’t dirty so I was happy. 3rd floor was surprisingly lively. It looks like some 2nd floor resident has migrated onto 3rd floor to hang out. Love to see it. 2nd floor was chill, I talked to some residents about baking, that was pretty much it. I noticed that 1st floor handle for the main stairwell was broken. Reed informed me that a CA was contacted and a work order has been placed. Ground floor kitchen, sinks, bathrooms and laundry room looks good. I went outside to the exterior round. Found some trash and threw it away. I went to the landing zone, nobody was there. I ended my round underneath wilkerson. All was good.
+**I started my second round at:** 22:00:00
+**I ended my second round at:** 22:13:00
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Checklist: While on my second round, I completed the following:** [{'option': 'I checked all kitchenettes, laundry rooms, study rooms, and common areas', 'option_id': 'G9VZeg'}]
+**Round Summary: While on my second round, the following occurred:** I began my round at 10:00. Not going to lie, I went through this one really quick because I had an allergic reaction to something. I dont know what, but I was not well. Ground floor entrances were closed. The trash bin in the kitchen was full. I went to first floor and the resident said that I look like a zombie… other than that, the door handle for the middle stairwell is still broken, the handle is in the office. 2nd floor was normal, people were playing card games. 3rd floor people were watching movies on the west wing, nothing seemed to be special today. I ended my rounds on 4th. All was good.
+**Please provide any additional information about any phone calls received or incidents that occurred while not on rounds. :** 8:55 - isabell and nadia got locked out
+ 8:20 - called rd on duty for the emergency room.
+
+==================================================
