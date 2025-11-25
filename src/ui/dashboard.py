@@ -274,15 +274,11 @@ def dashboard_page(supervisor_mode=False):
             deadline_info = calculate_deadline_info(draft_unlock_week, admin_supabase)
             deadline_passed = deadline_info["deadline_passed"]
             
-            # Get all draft reports for this week, including admin-created (even if user_id is None)
-            draft_reports = [r for r in all_reports_including_drafts if r.get("week_ending_date") == draft_unlock_week and r.get("status") == "draft"]
-            # Also include drafts where 'created_by_admin' is set for this week
-            admin_created_drafts = [r for r in all_reports_including_drafts if r.get("week_ending_date") == draft_unlock_week and r.get("status") == "draft" and r.get("created_by_admin")]
-            # Merge and deduplicate
-            draft_reports_dict = {r.get('id'): r for r in draft_reports}
-            for r in admin_created_drafts:
-                draft_reports_dict[r.get('id')] = r
-            draft_reports = list(draft_reports_dict.values())
+            # Get all draft reports for this week, including admin-created and status 'admin created'
+            draft_reports = [
+                r for r in all_reports_including_drafts
+                if r.get("week_ending_date") == draft_unlock_week and r.get("status") in ["draft", "admin created"]
+            ]
             
             if draft_reports:
                 st.write(f"Found {len(draft_reports)} draft report(s) for week ending {draft_unlock_week}:")
