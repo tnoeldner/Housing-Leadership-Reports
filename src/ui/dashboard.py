@@ -119,8 +119,9 @@ def dashboard_page(supervisor_mode=False):
         finalized_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'finalized'}
         draft_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'draft'}
         unlocked_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'unlocked'}
+        admin_created_user_ids = {r['user_id'] for r in week_reports if r.get('status') == 'admin created'}
         all_staff = all_staff_response.data
-        finalized_staff, draft_staff, unlocked_staff, missing_staff = [], [], [], []
+        finalized_staff, draft_staff, unlocked_staff, admin_created_staff, missing_staff = [], [], [], [], []
         for staff_member in all_staff:
             name = staff_member.get("full_name") or staff_member.get("email") or staff_member.get("id")
             title = staff_member.get("title")
@@ -132,9 +133,11 @@ def dashboard_page(supervisor_mode=False):
                 draft_staff.append(display_info)
             elif uid in unlocked_user_ids:
                 unlocked_staff.append(display_info)
+            elif uid in admin_created_user_ids:
+                admin_created_staff.append(display_info)
             else:
                 missing_staff.append(display_info)
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.markdown(f"#### ✅ Finalized ({len(finalized_staff)})")
             for person in sorted(finalized_staff):
@@ -146,6 +149,10 @@ def dashboard_page(supervisor_mode=False):
         with col3:
             st.markdown(f"#### ⏰ Unlocked ({len(unlocked_staff)})")
             for person in sorted(unlocked_staff):
+                st.markdown(f"- {person}")
+        with col4:
+            st.markdown(f"#### 🏷️ Created by Admin ({len(admin_created_staff)})")
+            for person in sorted(admin_created_staff):
                 st.markdown(f"- {person}")
         st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
         for person in sorted(missing_staff):
