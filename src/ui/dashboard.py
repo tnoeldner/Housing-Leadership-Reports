@@ -274,7 +274,7 @@ def dashboard_page(supervisor_mode=False):
             deadline_info = calculate_deadline_info(draft_unlock_week, admin_supabase)
             deadline_passed = deadline_info["deadline_passed"]
             
-            # Get draft reports for this week
+            # Get all draft reports for this week, including admin-created
             draft_reports = [r for r in all_reports_including_drafts if r.get("week_ending_date") == draft_unlock_week and r.get("status") == "draft"]
             
             if draft_reports:
@@ -417,36 +417,39 @@ def dashboard_page(supervisor_mode=False):
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
-                if not weekly_reports:
-                    st.warning("No reports found for the selected week.")
-                else:
-                    well_being_scores = [r.get("well_being_rating") for r in weekly_reports if isinstance(r, dict) and isinstance(r.get("well_being_rating"), (int, float))]
-                    valid_scores = [score for score in well_being_scores if isinstance(score, (int, float))]
-                    average_score = round(sum(valid_scores) / len(valid_scores), 1) if valid_scores else "N/A"
-                    reports_text = ""
-                    all_events_summary = []  # Collect all events for admin summary
-                    
-                    for r in weekly_reports:
-                        reports_text += f"\n---\n**Report from: {r.get('team_member','Unknown')}**\n"
-                        reports_text += f"Well-being Score: {r.get('well_being_rating')}/5\n"
-                        reports_text += f"Personal Check-in: {r.get('personal_check_in')}\n"
-                        reports_text += f"Lookahead: {r.get('key_topics_lookahead')}\n"
-                        if not supervisor_mode:
-                            reports_text += f"Concerns for Director: {r.get('director_concerns')}\n"
-                        
-                        report_body = r.get("report_body") or {}
-                        for sk, sn in CORE_SECTIONS.items():
-                            section_data = report_body.get(sk)
-                            if section_data and (section_data.get("successes") or section_data.get("challenges")):
-                                reports_text += f"\n*{sn}*:\n"
-                                if section_data.get("successes"):
-                                    for success in section_data["successes"]:
-                                        reports_text += f"- Success: {success.get('text')} `(ASCEND: {success.get('ascend_category','N/A')}, NORTH: {success.get('north_category','N/A')})`\n"
-                                        # If this is the events section, also collect for summary
-                                        if sk == "events":
-                                            # Parse event text to extract name and date
-                                            event_text = success.get('text', '')
-                                            event_name = event_text
+                if draft_reports:
+                    st.write(f"Found {len(draft_reports)} draft report(s) for week ending {draft_unlock_week}:")
+                    if deadline_passed:
+                        st.warning("⏰ The deadline for this week has passed. These reports are currently blocked from submission.")
+                    else:
+                        st.info("✅ The deadline for this week has not passed yet. These reports can already be submitted normally.")
+                    # Display reports with enable submission buttons
+                    for report in draft_reports:
+                        col1, col2, col3 = st.columns([3, 2, 1])
+                        with col1:
+                            name = report.get('team_member', 'Unknown')
+                            if report.get('created_by_admin'):
+                                name += " (Admin Created)"
+                            st.write(f"**{name}**")
+                        with col2:
+                            created_date = report.get('created_at', '')[:10] if report.get('created_at') else 'Unknown'
+                            st.write(f"Started: {created_date}")
+                        with col3:
+                            if deadline_passed:
+                                if st.button("⏰ Enable Submission", key=f"enable_{report.get('id')}", help="Allow this draft report to be submitted despite missed deadline"):
+                                    try:
+                                        # Change status to "unlocked" which bypasses deadline check
+                                        supabase.table("reports").update({
+                                            "status": "unlocked",
+                                            "admin_note": f"Submission enabled by administrator after deadline. Enabled on {datetime.now().astimezone(get_central_tz()).strftime('%Y-%m-%d %H:%M:%S')}"
+                                        }).eq("id", report.get('id')).execute()
+                                        st.success(f"Submission enabled for {report.get('team_member')}! They can now finalize their report.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Failed to enable submission: {e}")
+                            else:
+                                st.write("✅ Can submit")
                                             event_date = ""
                                             
                                             if " on " in event_text:
