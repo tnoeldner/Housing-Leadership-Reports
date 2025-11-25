@@ -170,86 +170,14 @@ def submit_and_edit_page():
         
         try:
             model = genai.GenerativeModel("models/gemini-2.5-pro")
-            ascend_list = ", ".join(ASCEND_VALUES)
-            north_list = ", ".join(NORTH_VALUES)
-            items_json = json.dumps(items_to_categorize)
-            prompt = f"""
-            You are an expert AI assistant for a university housing department. Your task is to perform two actions on a list of weekly activities including campus events and committee participation:
-            1. Categorize each activity with one ASCEND and one Guiding NORTH category.
-            2. Generate a concise 2-4 sentence individual summary that includes mention of campus engagement and its alignment with frameworks.
-            
-            ASCEND Categories: {ascend_list}
-            Guiding NORTH Categories: {north_list}
-
-            For campus events/committee participation, consider how attendance demonstrates:
-            - Community engagement and service (Community, Service)
-            - Professional development and learning (Development, Excellence)
-            - Supporting university initiatives (Accountability, Nurturing)
-            - Building relationships with stakeholders (Service, Transformative)
-
-            Also consider UND LEADS alignment in your summary:
-            - Learning: Training, workshops, skill development, educational activities
-            - Equity: Diversity events, inclusion initiatives, accessibility work
-            - Affinity: Networking, relationship building, team activities, community engagement
-            - Discovery: Innovation projects, research, exploring new methods, creative solutions
-            - Service: Volunteer work, helping others, community service, supporting university goals
-
-            Input JSON: {items_json}
-
-            CRITICAL: You must categorize EVERY item from the input. Return exactly {len(items_to_categorize)} categorized items.
-
-            Return valid JSON like:
-            {{
-              "categorized_items":[{{"id":0,"ascend_category":"Community","north_category":"Nurturing Student Success & Development"}}],
-              "individual_summary":"This week showed strong alignment with both ASCEND and NORTH frameworks through various activities and campus engagement. The work also demonstrates UND LEADS values through learning opportunities and service to the community..."
-            }}
-            """
-            
-            # Try up to 3 times with different strategies
-            for attempt in range(3):
-                try:
-                    response = model.generate_content(prompt)
-                    clean_response = response.text.strip().replace("```json", "").replace("```", "")
-                    result = json.loads(clean_response)
-                    
-                    # Validate the response
-                    if (result and 
-                        "categorized_items" in result and 
-                        "individual_summary" in result and
-                        isinstance(result["categorized_items"], list) and
-                        len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
-                        
-                        # Ensure we have categories for all items
-                        categorized_ids = {item.get("id") for item in result["categorized_items"]}
-                        missing_ids = [item["id"] for item in items_to_categorize if item["id"] not in categorized_ids]
-                        
-                        # Add default categories for missing items
-                        for missing_id in missing_ids:
-                            missing_item = next(item for item in items_to_categorize if item["id"] == missing_id)
-                            try:
-                                from src.config import get_secret
-                                api_key = get_secret("GOOGLE_API_KEY")
-                                client = genai.Client(api_key=api_key)
-                                ascend_list = ", ".join(ASCEND_VALUES)
-                                north_list = ", ".join(NORTH_VALUES)
-                                items_json = json.dumps(items_to_categorize)
-                                prompt = f"""
-                                        "categorized_items" in result and 
-                                        "individual_summary" in result and
-                                        isinstance(result["categorized_items"], list) and
-                                        len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
-
-                                        # Ensure we have categories for all items
-                                        #...
-        # Special handling for events section
-            if "events_count" not in st.session_state:
-                existing_events = report_data.get("events", {}).get("successes", [])
-                                # Try up to 3 times with different strategies
-                                for attempt in range(3):
-                                    try:
-                                        response = client.models.generate_content(
-                                            model="gemini-2.5-pro",
-                                            contents=prompt
+            try:
+                from src.config import get_secret
+                api_key = get_secret("GOOGLE_API_KEY")
+                client = genai.Client(api_key=api_key)
+                ascend_list = ", ".join(ASCEND_VALUES)
+                north_list = ", ".join(NORTH_VALUES)
+                items_json = json.dumps(items_to_categorize)
+                prompt = f"""
                                         )
                                         clean_response = response.text.strip().replace("```json", "").replace("```", "")
                                         result = json.loads(clean_response)
@@ -258,17 +186,8 @@ def submit_and_edit_page():
                                         if (result and 
                                             "categorized_items" in result and 
                                             "individual_summary" in result and
-                                            isinstance(result["categorized_items"], list) and
-                                            len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
-                                            # Ensure we have categories for all items
-                                            #...
                 st.session_state["events_count"] = len(existing_events) if existing_events else 1
             
-            # Display event entry fields
-            for i in range(st.session_state["events_count"]):
-                col1, col2 = st.columns([2, 1])
-                default_event_name = ""
-                default_event_date = datetime.now().date()
                 
                 # Load existing event data if editing - parse from text format
                 existing_events = report_data.get("events", {}).get("successes", [])
@@ -280,6 +199,55 @@ def submit_and_edit_page():
                         if len(parts) == 2:
                             default_event_name = parts[0]
                             try:
+                # Try up to 3 times with different strategies
+                for attempt in range(3):
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-2.5-pro",
+                            contents=prompt
+                        )
+                        clean_response = response.text.strip().replace("```json", "").replace("```", "")
+                        result = json.loads(clean_response)
+
+                        # Validate the response
+                        if (result and 
+                            "categorized_items" in result and 
+                            "individual_summary" in result and
+                            isinstance(result["categorized_items"], list) and
+                            len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
+                            # Ensure we have categories for all items
+                            categorized_ids = {item.get("id") for item in result["categorized_items"]}
+                            missing_ids = [item["id"] for item in items_to_categorize if item["id"] not in categorized_ids]
+                            # Add default categories for missing items
+                            for missing_id in missing_ids:
+                                missing_item = next(item for item in items_to_categorize if item["id"] == missing_id)
+                                result["categorized_items"].append({
+                                    "id": missing_id,
+                                    "ascend_category": "Development",
+                                    "north_category": "Nurturing Student Success & Development"
+                                })
+                            return result
+                    except Exception as e:
+                        if attempt == 2:
+                            st.warning(f"AI processing failed after {attempt + 1} attempts: {str(e)}")
+                            break
+                        continue
+                # Fallback: Create default categorization
+                fallback_result = {
+                    "categorized_items": [
+                        {
+                            "id": item["id"],
+                            "ascend_category": "Development",
+                            "north_category": "Nurturing Student Success & Development"
+                        } for item in items_to_categorize
+                    ],
+                    "individual_summary": "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
+                }
+                st.info("ℹ️ AI categorization used fallback defaults. You can manually review and adjust categories if needed.")
+                return fallback_result
+            except Exception as e:
+                st.error(f"An AI error occurred during processing: {e}")
+                return None
                                 default_event_date = pd.to_datetime(parts[1]).date()
                             except:
                                 default_event_date = datetime.now().date()
