@@ -10,28 +10,25 @@ def login_form():
         submit = st.form_submit_button("Login")
         if submit:
             try:
+                print(f"DEBUG: Attempting login for {email}")
                 user_session = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                print(f"DEBUG LOGIN: user_session type: {type(user_session)}")
-                print(f"DEBUG LOGIN: user_session attributes: {dir(user_session)}")
-                
+                print(f"DEBUG: user_session: {user_session}")
+                print(f"DEBUG: user_session type: {type(user_session)}")
+                print(f"DEBUG: user_session attributes: {dir(user_session)}")
                 if getattr(user_session, "user", None):
                     st.session_state["user"] = user_session.user
-                    # CRITICAL FIX: Store the auth session so RLS works
-                    print(f"DEBUG LOGIN: Checking for session attribute...")
+                    print(f"DEBUG: Login successful for {email}")
                     if hasattr(user_session, 'session'):
-                        print(f"DEBUG LOGIN: Found session! Type: {type(user_session.session)}")
+                        print(f"DEBUG: Found session attribute")
                         st.session_state["supabase_session"] = user_session.session
-                        # Set the session on the global supabase client
                         supabase.auth.set_session(user_session.session.access_token, user_session.session.refresh_token)
-                        print(f"DEBUG LOGIN: Session stored and set on client")
-                    else:
-                        print(f"DEBUG LOGIN: NO SESSION ATTRIBUTE! Available: {[a for a in dir(user_session) if not a.startswith('_')]}")
                     st.rerun()
                 else:
+                    print(f"DEBUG: Login failed, no user in session object")
                     st.error("Login failed. Please check your credentials.")
             except Exception as e:
-                print(f"DEBUG LOGIN: Exception during login: {e}")
-                st.error("Login failed: Invalid login credentials or unconfirmed email.")
+                print(f"DEBUG: Exception during login: {type(e)} - {e}")
+                st.error(f"Login failed: {e}")
 
 
 def signup_form():

@@ -167,124 +167,18 @@ def submit_and_edit_page():
     def process_report_with_ai(items_to_categorize):
         if not items_to_categorize:
             return None
-        
-        try:
-            model = genai.GenerativeModel("models/gemini-2.5-pro")
-            try:
-                from src.config import get_secret
-                api_key = get_secret("GOOGLE_API_KEY")
-                client = genai.Client(api_key=api_key)
-                ascend_list = ", ".join(ASCEND_VALUES)
-                north_list = ", ".join(NORTH_VALUES)
-                items_json = json.dumps(items_to_categorize)
-                prompt = f"""
-                                        )
-                                        clean_response = response.text.strip().replace("```json", "").replace("```", "")
-                                        result = json.loads(clean_response)
-
-                                        # Validate the response
-                                        if (result and 
-                                            "categorized_items" in result and 
-                                            "individual_summary" in result and
-                st.session_state["events_count"] = len(existing_events) if existing_events else 1
-            
-                
-                # Load existing event data if editing - parse from text format
-                existing_events = report_data.get("events", {}).get("successes", [])
-                if i < len(existing_events):
-                    event_text = existing_events[i].get("text", "")
-                    # Try to parse "EventName on YYYY-MM-DD" format
-                    if " on " in event_text:
-                        parts = event_text.rsplit(" on ", 1)
-                        if len(parts) == 2:
-                            default_event_name = parts[0]
-                            try:
-                # Try up to 3 times with different strategies
-                for attempt in range(3):
-                    try:
-                        response = client.models.generate_content(
-                            model="gemini-2.5-pro",
-                            contents=prompt
-                        )
-                        clean_response = response.text.strip().replace("```json", "").replace("```", "")
-                        result = json.loads(clean_response)
-
-                        # Validate the response
-                        if (result and 
-                            "categorized_items" in result and 
-                            "individual_summary" in result and
-                            isinstance(result["categorized_items"], list) and
-                            len(result["categorized_items"]) >= len(items_to_categorize) * 0.8):  # Allow 80% match
-                            # Ensure we have categories for all items
-                            categorized_ids = {item.get("id") for item in result["categorized_items"]}
-                            missing_ids = [item["id"] for item in items_to_categorize if item["id"] not in categorized_ids]
-                            # Add default categories for missing items
-                            for missing_id in missing_ids:
-                                missing_item = next(item for item in items_to_categorize if item["id"] == missing_id)
-                                result["categorized_items"].append({
-                                    "id": missing_id,
-                                    "ascend_category": "Development",
-                                    "north_category": "Nurturing Student Success & Development"
-                                })
-                            return result
-                    except Exception as e:
-                        if attempt == 2:
-                            st.warning(f"AI processing failed after {attempt + 1} attempts: {str(e)}")
-                            break
-                        continue
-                # Fallback: Create default categorization
-                fallback_result = {
-                    "categorized_items": [
-                        {
-                            "id": item["id"],
-                            "ascend_category": "Development",
-                            "north_category": "Nurturing Student Success & Development"
-                        } for item in items_to_categorize
-                    ],
-                    "individual_summary": "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
-                }
-                st.info("ℹ️ AI categorization used fallback defaults. You can manually review and adjust categories if needed.")
-                return fallback_result
-            except Exception as e:
-                st.error(f"An AI error occurred during processing: {e}")
-                return None
-                                default_event_date = pd.to_datetime(parts[1]).date()
-                            except:
-                                default_event_date = datetime.now().date()
-                    else:
-                        default_event_name = event_text
-                
-                with col1:
-                    st.text_input(f"Event/Committee Name", value=default_event_name, key=f"event_name_{i}", placeholder="Enter event or committee name")
-                with col2:
-                    st.date_input(f"Event Date", value=default_event_date, key=f"event_date_{i}")
-        else:
-            # Regular successes/challenges format for other sections
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("##### Successes")
-                s_key = f"{section_key}_success_count"
-                if s_key not in st.session_state:
-                    st.session_state[s_key] = len(report_data.get(section_key, {}).get("successes", [])) or 1
-                for i in range(st.session_state[s_key]):
-                    default = (
-                        report_data.get(section_key, {}).get("successes", [{}])[i].get("text", "")
-                        if i < len(report_data.get(section_key, {}).get("successes", []))
-                        else ""
-                    )
-                    st.text_area("Success", value=default, key=f"{section_key}_success_{i}", label_visibility="collapsed", placeholder=f"Success #{i+1}")
-            with col2:
-                st.markdown("##### Challenges")
-                c_key = f"{section_key}_challenge_count"
-                if c_key not in st.session_state:
-                    st.session_state[c_key] = len(report_data.get(section_key, {}).get("challenges", [])) or 1
-                for i in range(st.session_state[c_key]):
-                    default = (
-                        report_data.get(section_key, {}).get("challenges", [{}])[i].get("text", "")
-                        if i < len(report_data.get(section_key, {}).get("challenges", []))
-                        else ""
-                    )
-                    st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
+        fallback_result = {
+            "categorized_items": [
+                {
+                    "id": item["id"],
+                    "ascend_category": "Development",
+                    "north_category": "Nurturing Student Success & Development"
+                } for item in items_to_categorize
+            ],
+            "individual_summary": "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
+        }
+        st.info("ℹ️ AI categorization used fallback defaults. You can manually review and adjust categories if needed.")
+        return fallback_result
 
     def show_submission_form():
         report_data = st.session_state["report_to_edit"]

@@ -1,5 +1,6 @@
 import os
 import streamlit as st
+print("TEST SUPABASE_KEY from secrets:", st.secrets.get("SUPABASE_KEY", "not found"))
 
 # --- CONSTANTS ---
 ASCEND_VALUES = ["Accountability", "Service", "Community", "Excellence", "Nurture", "Development", "N/A"]
