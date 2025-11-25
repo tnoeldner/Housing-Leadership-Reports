@@ -450,25 +450,6 @@ def dashboard_page(supervisor_mode=False):
                                         st.error(f"Failed to enable submission: {e}")
                             else:
                                 st.write("✅ Can submit")
-                                            event_date = ""
-                                            
-                                            if " on " in event_text:
-                                                parts = event_text.rsplit(" on ", 1)
-                                                if len(parts) == 2:
-                                                    event_name = parts[0]
-                                                    event_date = parts[1]
-                                            
-                                            all_events_summary.append({
-                                                "event_name": event_name,
-                                                "event_date": event_date,
-                                                "attendee": r.get('team_member', 'Unknown'),
-                                                "ascend_category": success.get('ascend_category', 'N/A'),
-                                                "north_category": success.get('north_category', 'N/A'),
-                                                "alignment": f"ASCEND: {success.get('ascend_category', 'N/A')}, NORTH: {success.get('north_category', 'N/A')}"
-                                            })
-                                if section_data.get("challenges"):
-                                    for challenge in section_data["challenges"]:
-                                        reports_text += f"- Challenge: {challenge.get('text')} `(ASCEND: {challenge.get('ascend_category','N/A')}, NORTH: {challenge.get('north_category','N/A')})`\n"
 
                     director_section = ""
                     if not supervisor_mode:
