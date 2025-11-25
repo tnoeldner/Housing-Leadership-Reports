@@ -25,62 +25,63 @@ from src.utils import calculate_deadline_info, clear_form_state
 from src.ai import clean_summary_response
 
 def submit_and_edit_page():
-        def dynamic_entry_section(section_key, section_label, report_data):
-            st.subheader(section_label)
-            # Special handling for events section
-            if section_key == "events":
-                if "events_count" not in st.session_state:
-                    existing_events = report_data.get("events", {}).get("successes", [])
-                    st.session_state["events_count"] = len(existing_events) if existing_events else 1
-                for i in range(st.session_state["events_count"]):
-                    col1, col2 = st.columns([2, 1])
-                    default_event_name = ""
-                    default_event_date = datetime.now().date()
-                    existing_events = report_data.get("events", {}).get("successes", [])
-                    if i < len(existing_events):
-                        event_text = existing_events[i].get("text", "")
-                        if " on " in event_text:
-                            parts = event_text.rsplit(" on ", 1)
-                            default_event_name = parts[0]
-                            try:
-                                default_event_date = pd.to_datetime(parts[1]).date()
-                            except:
-                                default_event_date = datetime.now().date()
-                        else:
-                            default_event_name = event_text
-                    with col1:
-                        st.text_input(f"Event/Committee Name", value=default_event_name, key=f"event_name_{i}", placeholder="Enter event or committee name")
-                    with col2:
-                        st.date_input(f"Event Date", value=default_event_date, key=f"event_date_{i}")
-            else:
-                col1, col2 = st.columns(2)
+    def dynamic_entry_section(section_key, section_label, report_data):
+        st.subheader(section_label)
+        # Special handling for events section
+        if section_key == "events":
+            if "events_count" not in st.session_state:
+                existing_events = report_data.get("events", {}).get("successes", [])
+                st.session_state["events_count"] = len(existing_events) if existing_events else 1
+            for i in range(st.session_state["events_count"]):
+                col1, col2 = st.columns([2, 1])
+                default_event_name = ""
+                default_event_date = datetime.now().date()
+                existing_events = report_data.get("events", {}).get("successes", [])
+                if i < len(existing_events):
+                    event_text = existing_events[i].get("text", "")
+                    if " on " in event_text:
+                        parts = event_text.rsplit(" on ", 1)
+                        default_event_name = parts[0]
+                        try:
+                            default_event_date = pd.to_datetime(parts[1]).date()
+                        except:
+                            default_event_date = datetime.now().date()
+                    else:
+                        default_event_name = event_text
                 with col1:
-                    st.markdown("##### Successes")
-                    s_key = f"{section_key}_success_count"
-                    if s_key not in st.session_state:
-                        st.session_state[s_key] = len(report_data.get(section_key, {}).get("successes", [])) or 1
-                    for i in range(st.session_state[s_key]):
-                        default = (
-                            report_data.get(section_key, {}).get("successes", [{}])[i].get("text", "")
-                            if i < len(report_data.get(section_key, {}).get("successes", []))
-                            else ""
-                        )
-                        st.text_area("Success", value=default, key=f"{section_key}_success_{i}", label_visibility="collapsed", placeholder=f"Success #{i+1}")
+                    st.text_input(f"Event/Committee Name", value=default_event_name, key=f"event_name_{i}", placeholder="Enter event or committee name")
                 with col2:
-                    st.markdown("##### Challenges")
-                    c_key = f"{section_key}_challenge_count"
-                    if c_key not in st.session_state:
-                        st.session_state[c_key] = len(report_data.get(section_key, {}).get("challenges", [])) or 1
-                    for i in range(st.session_state[c_key]):
-                        default = (
-                            report_data.get(section_key, {}).get("challenges", [{}])[i].get("text", "")
-                            if i < len(report_data.get(section_key, {}).get("challenges", []))
-                            else ""
-                        )
-                        st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
+                    st.date_input(f"Event Date", value=default_event_date, key=f"event_date_{i}")
+        else:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("##### Successes")
+                s_key = f"{section_key}_success_count"
+                if s_key not in st.session_state:
+                    st.session_state[s_key] = len(report_data.get(section_key, {}).get("successes", [])) or 1
+                for i in range(st.session_state[s_key]):
+                    default = (
+                        report_data.get(section_key, {}).get("successes", [{}])[i].get("text", "")
+                        if i < len(report_data.get(section_key, {}).get("successes", []))
+                        else ""
+                    )
+                    st.text_area("Success", value=default, key=f"{section_key}_success_{i}", label_visibility="collapsed", placeholder=f"Success #{i+1}")
+            with col2:
+                st.markdown("##### Challenges")
+                c_key = f"{section_key}_challenge_count"
+                if c_key not in st.session_state:
+                    st.session_state[c_key] = len(report_data.get(section_key, {}).get("challenges", [])) or 1
+                for i in range(st.session_state[c_key]):
+                    default = (
+                        report_data.get(section_key, {}).get("challenges", [{}])[i].get("text", "")
+                        if i < len(report_data.get(section_key, {}).get("challenges", []))
+                        else ""
+                    )
+                    st.text_area("Challenge", value=default, key=f"{section_key}_challenge_{i}", label_visibility="collapsed", placeholder=f"Challenge #{i+1}")
     st.title("Submit / Edit Report")
 
     from src.database import get_user_client
+
     def show_report_list():
         st.subheader("Your Submitted Reports")
         user_id = st.session_state["user"].id
@@ -90,7 +91,10 @@ def submit_and_edit_page():
         # ...existing code...
 
         # Ensure deadline_info and related variables are defined
-        now = datetime.now(ZoneInfo("America/Chicago"))
+        try:
+            now = datetime.now(ZoneInfo("America/Chicago"))
+        except Exception:
+            now = datetime.now()
         deadline_info = calculate_deadline_info(now, supabase)
         active_saturday = deadline_info.get("active_saturday") if deadline_info else None
         is_grace_period = deadline_info.get("is_grace_period") if deadline_info else None
@@ -276,6 +280,11 @@ def submit_and_edit_page():
             with core_activities_tab:
                 core_tab_list = st.tabs(list(CORE_SECTIONS.values()))
                 add_buttons = {}
+                # Ensure dynamic_entry_section is accessible
+                from inspect import currentframe
+                frame = currentframe()
+                if "dynamic_entry_section" not in frame.f_globals:
+                    frame.f_globals["dynamic_entry_section"] = dynamic_entry_section
                 for i, (section_key, section_name) in enumerate(CORE_SECTIONS.items()):
                     with core_tab_list[i]:
                         dynamic_entry_section(section_key, section_name, report_data.get("report_body", {}))
