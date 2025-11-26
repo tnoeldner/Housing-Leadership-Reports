@@ -351,25 +351,41 @@ def duty_analysis_section():
     if 'duty_forms' in st.session_state and st.session_state['duty_forms']:
         st.markdown("---")
         st.subheader("📊 Analysis Options")
-        
+
         duty_forms = st.session_state['duty_forms']
         filter_info = st.session_state.get('duty_filter_info', {})
-        
+
         st.info(f"**Loaded:** {len(duty_forms)} duty reports from {filter_info.get('start_date')} to {filter_info.get('end_date')}")
-        
+
+        # Multi-select for choosing which reports to analyze
+        form_options = [
+            f"{i+1}: {form.get('current_revision', {}).get('date', 'Unknown')} | {form.get('current_revision', {}).get('author', 'Unknown')} | {form.get('form_template_name', 'Unknown Form')}"
+            for i, form in enumerate(duty_forms)
+        ]
+        selected_indices = st.multiselect(
+            "Select duty reports to analyze:",
+            options=list(range(len(duty_forms))),
+            format_func=lambda idx: form_options[idx],
+            default=list(range(len(duty_forms)))  # default: all selected
+        )
+        selected_forms = [duty_forms[idx] for idx in selected_indices]
+
         # Analysis type selection
         analysis_type = st.radio(
             "Select Analysis Type:",
             ["📊 Standard Analysis", "📅 Weekly Report Analysis"],
             key="duty_analysis_type"
         )
-        
+
         if st.button("🤖 Generate Analysis", type="primary", key="generate_duty_analysis"):
+            if not selected_forms:
+                st.warning("Please select at least one duty report to analyze.")
+                return
             if analysis_type == "📊 Standard Analysis":
                 # Standard analysis with create_duty_report_summary
                 with st.spinner("Generating standard duty report analysis..."):
                     result = create_duty_report_summary(
-                        duty_forms,
+                        selected_forms,
                         filter_info.get('start_date'),
                         filter_info.get('end_date')
                     )
@@ -385,7 +401,7 @@ def duty_analysis_section():
             else:  # Weekly Report Analysis
                 with st.spinner("Generating weekly duty report summary..."):
                     result = create_weekly_duty_report_summary(
-                        duty_forms,
+                        selected_forms,
                         filter_info.get('start_date'),
                         filter_info.get('end_date')
                     )

@@ -12,7 +12,6 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
     try:
         halls_data = defaultdict(lambda: {
             'total_reports': 0,
-            'incidents': [],
             'lockouts': 0,
             'maintenance': 0,
             'policy_violations': 0,
@@ -68,30 +67,6 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
                 weekly_data[week_key]['incident_count'] += 1
             if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
                 halls_data[hall_name]['staff_responses'] += 1
-            for response in responses:
-                field_response = str(response.get('response', '')).strip().lower()
-                report_text += field_response + " "
-
-            # Increment hall counters
-            halls_data[hall_name]['total_reports'] += 1
-
-            # Count specific incident types
-            if any(word in report_text for word in ['lockout', 'locked out', 'key']):
-                halls_data[hall_name]['lockouts'] += 1
-
-            if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
-                halls_data[hall_name]['maintenance'] += 1
-
-            if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
-                halls_data[hall_name]['policy_violations'] += 1
-                weekly_data[week_key]['incident_count'] += 1
-
-            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
-                halls_data[hall_name]['safety_concerns'] += 1
-                weekly_data[week_key]['incident_count'] += 1
-
-            if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
-                halls_data[hall_name]['staff_responses'] += 1
 
         # Prepare comprehensive report data for AI analysis
         reports_text = f"\n=== WEEKLY DUTY REPORTS ANALYSIS ===\n"
@@ -102,12 +77,12 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
         reports_text += "=== HALL-BY-HALL INCIDENT BREAKDOWN (FOR TABLE) ===\n"
 
         # Calculate totals for summary
-        total_lockouts = sum(data['lockouts'] for data in halls_data.values())
-        total_maintenance = sum(data['maintenance'] for data in halls_data.values())
-        total_violations = sum(data['policy_violations'] for data in halls_data.values())
-        total_safety = sum(data['safety_concerns'] for data in halls_data.values())
-        total_reports = sum(data['total_reports'] for data in halls_data.values())
-        total_responses = sum(data['staff_responses'] for data in halls_data.values())
+        total_lockouts = sum(int(data['lockouts']) for data in halls_data.values())
+        total_maintenance = sum(int(data['maintenance']) for data in halls_data.values())
+        total_violations = sum(int(data['policy_violations']) for data in halls_data.values())
+        total_safety = sum(int(data['safety_concerns']) for data in halls_data.values())
+        total_reports = sum(int(data['total_reports']) for data in halls_data.values())
+        total_responses = sum(int(data['staff_responses']) for data in halls_data.values())
 
         reports_text += "DATA FOR QUANTITATIVE METRICS TABLE:\n"
         reports_text += f"TOTALS: Reports={total_reports}, Lockouts={total_lockouts}, Maintenance={total_maintenance}, Violations={total_violations}, Safety={total_safety}, Responses={total_responses}\n\n"
@@ -118,7 +93,7 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
 
         reports_text += "\nDETAILED BREAKDOWN BY HALL:\n"
         for hall, data in sorted(halls_data.items()):
-            total_incidents = data['lockouts'] + data['maintenance'] + data['policy_violations'] + data['safety_concerns']
+            total_incidents = int(data['lockouts']) + int(data['maintenance']) + int(data['policy_violations']) + int(data['safety_concerns'])
             reports_text += f"**{hall}** ({data['total_reports']} reports, {total_incidents} total incidents):\n"
             reports_text += f"  • Lockouts: {data['lockouts']}\n"
             # Removed undefined 'week' reference. If weekly breakdown is needed, restructure using weekly_data.
@@ -168,16 +143,28 @@ DUTY REPORTS DATA:
 Generate the weekly duty analysis summary below:
 """
 
+        api_key = None
+        try:
+            from src.config import get_secret
+            api_key = get_secret("GOOGLE_API_KEY")
+        except Exception:
+            api_key = None
+        if not api_key:
+            st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+            return {"summary": "Error: Missing Google AI API key."}
         model = genai.GenerativeModel("models/gemini-2.5-pro")
         with st.spinner(f"AI is generating weekly duty report from {len(selected_forms)} reports..."):
-            result = model.generate_content(prompt)
-            summary_text = result.text if result and hasattr(result, 'text') else None
-            if not summary_text or not summary_text.strip():
-                st.info("Prompt sent to AI:")
-                st.code(prompt)
-                st.info("Input data summary:")
-                st.code(reports_text)
-                return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
-            return {"summary": summary_text}
+            try:
+                result = model.generate_content(prompt)
+                summary_text = result.text if result and hasattr(result, 'text') else None
+                if not summary_text or not summary_text.strip():
+                    st.info("Prompt sent to AI:")
+                    st.code(prompt)
+                    st.info("Input data summary:")
+                    st.code(reports_text)
+                    return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
+                return {"summary": summary_text}
+            except Exception as e:
+                return {"summary": f"Error generating weekly duty report summary: {str(e)}"}
     except Exception as e:
         return {"summary": f"Error generating weekly duty report summary: {str(e)}"}
