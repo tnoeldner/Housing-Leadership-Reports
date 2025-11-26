@@ -5,13 +5,7 @@ from datetime import datetime
 
 def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
     """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
-    # DEBUG: List available models to help diagnose API issues
-    try:
-        available_models = genai.list_models()
-        st.info("Available Gemini models:")
-        st.code("\n".join([m.name for m in available_models]))
-    except Exception as model_list_exc:
-        st.warning(f"Could not list Gemini models: {model_list_exc}")
+    
 
     if not selected_forms:
         return {"summary": "No duty reports selected for analysis."}
