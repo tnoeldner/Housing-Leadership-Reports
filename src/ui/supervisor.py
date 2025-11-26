@@ -404,6 +404,25 @@ def duty_analysis_section():
                         file_name=f"duty_analysis_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
                         mime="text/markdown"
                     )
+                    # Save Analysis Button
+                    if st.button("💾 Save Analysis", key="save_duty_analysis"):
+                        try:
+                            admin_supabase = get_admin_client()
+                            user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                            week_ending = str(filter_info.get('end_date'))
+                            insert_data = {
+                                "created_by": user_id,
+                                "week_ending_date": week_ending,
+                                "analysis_text": summary,
+                                "created_at": datetime.now().isoformat()
+                            }
+                            response = admin_supabase.table("saved_duty_analyses").insert(insert_data).execute()
+                            if getattr(response, "status_code", None) == 201:
+                                st.success("Analysis saved to archive!")
+                            else:
+                                st.warning(f"Could not save analysis. Response: {getattr(response, 'data', response)}")
+                        except Exception as e:
+                            st.error(f"Error saving analysis: {e}")
             else:  # Weekly Report Analysis
                 with st.spinner("Generating weekly duty report summary..."):
                     result = create_weekly_duty_report_summary(
@@ -420,6 +439,25 @@ def duty_analysis_section():
                         file_name=f"weekly_duty_report_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
                         mime="text/markdown"
                     )
+                    # Save Weekly Report Button
+                    if st.button("💾 Save Weekly Report", key="save_weekly_report"):
+                        try:
+                            admin_supabase = get_admin_client()
+                            user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                            week_ending = str(filter_info.get('end_date'))
+                            insert_data = {
+                                "created_by": user_id,
+                                "week_ending_date": week_ending,
+                                "summary_text": summary,
+                                "created_at": datetime.now().isoformat()
+                            }
+                            response = admin_supabase.table("weekly_summaries").insert(insert_data).execute()
+                            if getattr(response, "status_code", None) == 201:
+                                st.success("Weekly report saved to archive!")
+                            else:
+                                st.warning(f"Could not save weekly report. Response: {getattr(response, 'data', response)}")
+                        except Exception as e:
+                            st.error(f"Error saving weekly report: {e}")
 
 
 def engagement_analysis_section():
