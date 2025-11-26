@@ -47,16 +47,8 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             if date_str:
             # Updated AI prompt for improved, actionable, bullet-pointed summary
             prompt = f"""
-                try:
                     form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
 
-            # Count incidents by type in this report
-            report_text = ""
-            for response in responses:
-                field_response = str(response.get('response', '')).strip().lower()
-                report_text += field_response + " "
-
-            # Increment hall counters
             halls_data[hall_name]['total_reports'] += 1
 
             # Count specific incident types
@@ -66,15 +58,9 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
                 halls_data[hall_name]['maintenance'] += 1
 
+                prompt = f"""
             if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
                 halls_data[hall_name]['policy_violations'] += 1
-                weekly_data[week_key]['incident_count'] += 1
-
-            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
-                halls_data[hall_name]['safety_concerns'] += 1
-                weekly_data[week_key]['incident_count'] += 1
-
-            if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
                 halls_data[hall_name]['staff_responses'] += 1
 
         # Prepare comprehensive report data for AI analysis
