@@ -10,7 +10,6 @@ from src.roompact import (
     get_roompact_config,
     make_roompact_request
 )
-
 from src.weekly_report import create_weekly_duty_report_summary
 
 def supervisor_summaries_page():

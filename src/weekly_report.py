@@ -1,13 +1,20 @@
 from collections import defaultdict
-from google import genai
+import google.generativeai as genai
 import streamlit as st
 from datetime import datetime
 
 def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
     """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
+    # DEBUG: List available models to help diagnose API issues
+    try:
+        available_models = genai.list_models()
+        st.info("Available Gemini models:")
+        st.code("\n".join([m.name for m in available_models]))
+    except Exception as model_list_exc:
+        st.warning(f"Could not list Gemini models: {model_list_exc}")
+
     if not selected_forms:
         return {"summary": "No duty reports selected for analysis."}
-    
     try:
         halls_data = defaultdict(lambda: {
             'total_reports': 0,
@@ -29,26 +36,49 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             current_revision = form.get('current_revision', {})
             author = current_revision.get('author', 'Unknown')
             date_str = current_revision.get('date', '')
-
-            # Extract hall/building info from responses
             hall_name = "Unknown Hall"
             responses = current_revision.get('responses', [])
-
             for response in responses:
                 field_label = response.get('field_label', '').lower()
                 field_response = str(response.get('response', '')).strip()
-                # Try to identify hall/building
                 if any(word in field_label for word in ['building', 'hall', 'location', 'area']):
                     if field_response and field_response != 'None':
                         hall_name = field_response
                         break
-
             # Extract week from date
             if date_str:
-            # Updated AI prompt for improved, actionable, bullet-pointed summary
-            prompt = f"""
+                try:
                     form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    week_key = form_date.strftime('Week of %Y-%m-%d')
+                    weekly_data[week_key]['total_reports'] += 1
+                    weekly_data[week_key]['halls_active'].add(hall_name)
+                except:
+                    week_key = "Unknown Week"
+            else:
+                week_key = "Unknown Week"
+            # Count incidents by type in this report
+            report_text = ""
+            for response in responses:
+                field_response = str(response.get('response', '')).strip().lower()
+                report_text += field_response + " "
+            halls_data[hall_name]['total_reports'] += 1
+            if any(word in report_text for word in ['lockout', 'locked out', 'key']):
+                halls_data[hall_name]['lockouts'] += 1
+            if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
+                halls_data[hall_name]['maintenance'] += 1
+            if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
+                halls_data[hall_name]['policy_violations'] += 1
+                weekly_data[week_key]['incident_count'] += 1
+            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
+                halls_data[hall_name]['safety_concerns'] += 1
+                weekly_data[week_key]['incident_count'] += 1
+            if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
+                halls_data[hall_name]['staff_responses'] += 1
+            for response in responses:
+                field_response = str(response.get('response', '')).strip().lower()
+                report_text += field_response + " "
 
+            # Increment hall counters
             halls_data[hall_name]['total_reports'] += 1
 
             # Count specific incident types
@@ -58,9 +88,15 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             if any(word in report_text for word in ['maintenance', 'repair', 'broken', 'leak', 'ac', 'heat']):
                 halls_data[hall_name]['maintenance'] += 1
 
-                prompt = f"""
             if any(word in report_text for word in ['alcohol', 'intoxicated', 'violation', 'policy', 'noise']):
                 halls_data[hall_name]['policy_violations'] += 1
+                weekly_data[week_key]['incident_count'] += 1
+
+            if any(word in report_text for word in ['safety', 'emergency', 'security', 'fire', 'medical']):
+                halls_data[hall_name]['safety_concerns'] += 1
+                weekly_data[week_key]['incident_count'] += 1
+
+            if any(word in report_text for word in ['responded', 'contacted', 'called', 'notified']):
                 halls_data[hall_name]['staff_responses'] += 1
 
         # Prepare comprehensive report data for AI analysis
@@ -98,13 +134,7 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
         for i, form in enumerate(selected_forms, 1):
             current_revision = form.get('current_revision', {})
             form_name = form.get('form_template_name', 'Unknown Form')
-            from src.config import get_secret
-            api_key = get_secret("GOOGLE_API_KEY")
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            author = current_revision.get('author', 'Unknown')
             date = current_revision.get('date', 'Unknown date')
 
             reports_text += f"\n--- REPORT {i}: {form_name} ---\n"
@@ -144,15 +174,16 @@ DUTY REPORTS DATA:
 Generate the weekly duty analysis summary below:
 """
 
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        model = genai.GenerativeModel("models/gemini-2.5-pro")
         with st.spinner(f"AI is generating weekly duty report from {len(selected_forms)} reports..."):
             result = model.generate_content(prompt)
-            if not result or not getattr(result, 'text', None) or not result.text.strip():
+            summary_text = result.text if result and hasattr(result, 'text') else None
+            if not summary_text or not summary_text.strip():
                 st.info("Prompt sent to AI:")
                 st.code(prompt)
                 st.info("Input data summary:")
                 st.code(reports_text)
                 return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
-            return {"summary": result.text}
+            return {"summary": summary_text}
     except Exception as e:
         return {"summary": f"Error generating weekly duty report summary: {str(e)}"}
