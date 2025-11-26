@@ -357,17 +357,23 @@ def duty_analysis_section():
 
         st.info(f"**Loaded:** {len(duty_forms)} duty reports from {filter_info.get('start_date')} to {filter_info.get('end_date')}")
 
-        # Multi-select for choosing which reports to analyze
-        form_options = [
-            f"{i+1}: {form.get('current_revision', {}).get('date', 'Unknown')} | {form.get('current_revision', {}).get('author', 'Unknown')} | {form.get('form_template_name', 'Unknown Form')}"
-            for i, form in enumerate(duty_forms)
-        ]
-        selected_indices = st.multiselect(
-            "Select duty reports to analyze:",
-            options=list(range(len(duty_forms))),
-            format_func=lambda idx: form_options[idx],
-            default=list(range(len(duty_forms)))  # default: all selected
-        )
+        # Group reports by type, show submitter names and dates under each type
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for idx, form in enumerate(duty_forms):
+            form_type = form.get('form_template_name', 'Unknown Form')
+            author = form.get('current_revision', {}).get('author', 'Unknown')
+            date = form.get('current_revision', {}).get('date', 'Unknown')
+            grouped[form_type].append((idx, author, date))
+
+        st.markdown("**Select duty reports to analyze:**")
+        selected_indices = []
+        for form_type, items in grouped.items():
+            with st.expander(f"{form_type} ({len(items)})"):
+                for idx, author, date in items:
+                    label = f"{author} — {date}"
+                    if st.checkbox(label, value=True, key=f"select_{form_type}_{idx}"):
+                        selected_indices.append(idx)
         selected_forms = [duty_forms[idx] for idx in selected_indices]
 
         # Analysis type selection
