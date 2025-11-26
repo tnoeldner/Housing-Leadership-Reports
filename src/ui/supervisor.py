@@ -407,20 +407,21 @@ def duty_analysis_section():
                     # Save Analysis Button
                     if st.button("💾 Save Analysis", key="save_duty_analysis"):
                         try:
-                            admin_supabase = get_admin_client()
+                            from src.database import save_duty_analysis
                             user_id = st.session_state.get('user', {}).get('id', 'Unknown')
                             week_ending = str(filter_info.get('end_date'))
-                            insert_data = {
-                                "created_by": user_id,
-                                "week_ending_date": week_ending,
-                                "analysis_text": summary,
-                                "created_at": datetime.now().isoformat()
+                            analysis_data = {
+                                'summary': summary,
+                                'filter_info': filter_info,
+                                'selected_forms': selected_forms,
+                                'report_type': analysis_type,
+                                'all_selected_forms': duty_forms
                             }
-                            response = admin_supabase.table("saved_duty_analyses").insert(insert_data).execute()
-                            if getattr(response, "status_code", None) == 201:
-                                st.success("Analysis saved to archive!")
+                            result = save_duty_analysis(analysis_data, week_ending, created_by_user_id=user_id)
+                            if result.get('success'):
+                                st.success(result.get('message', 'Analysis saved to archive!'))
                             else:
-                                st.warning(f"Could not save analysis. Response: {getattr(response, 'data', response)}")
+                                st.warning(result.get('message', 'Could not save analysis.'))
                         except Exception as e:
                             st.error(f"Error saving analysis: {e}")
             else:  # Weekly Report Analysis
