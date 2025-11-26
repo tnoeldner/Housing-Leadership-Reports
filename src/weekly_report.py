@@ -6,7 +6,7 @@ from datetime import datetime
 def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
     """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
     if not selected_forms:
-        return "No duty reports selected for analysis."
+        return {"summary": "No duty reports selected for analysis."}
     
     try:
         halls_data = defaultdict(lambda: {
@@ -175,7 +175,7 @@ Generate the weekly duty analysis summary below:
                 st.code(prompt)
                 st.info("Input data summary:")
                 st.code(reports_text)
-                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return result.text
+                return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
+            return {"summary": result.text}
     except Exception as e:
-        return f"Error generating weekly duty report summary: {str(e)}"
+        return {"summary": f"Error generating weekly duty report summary: {str(e)}"}
