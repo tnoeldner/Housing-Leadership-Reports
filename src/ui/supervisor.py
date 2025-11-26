@@ -16,13 +16,14 @@ def supervisor_summaries_page():
     st.write("Saved summaries you've generated for your team.")
     try:
         resp = supabase.rpc('get_supervisor_summaries', {'p_super': st.session_state['user'].id}).execute()
-        summaries = resp.data or []
+        summaries = resp.data if isinstance(resp.data, list) else []
         if not summaries:
             st.info("You have no saved team summaries yet.")
             return
         for s in summaries:
-            with st.expander(f"Week Ending {s['week_ending_date']} — Saved {s['created_at']}"):
-                st.markdown(clean_summary_response(s['summary_text']))
+            if isinstance(s, dict):
+                with st.expander(f"Week Ending {s.get('week_ending_date', 'Unknown')} — Saved {s.get('created_at', 'Unknown')}"):
+                    st.markdown(clean_summary_response(s.get('summary_text', '')))
     except Exception as e:
         st.error(f"Failed to fetch supervisor summaries: {e}")
 
@@ -111,10 +112,11 @@ def weekly_reports_viewer():
                 # Group by week ending date
                 reports_by_week = {}
                 for report in reports:
-                    week = report.get('week_ending_date')
-                    if week not in reports_by_week:
-                        reports_by_week[week] = []
-                    reports_by_week[week].append(report)
+                    if isinstance(report, dict):
+                        week = report.get('week_ending_date')
+                        if week not in reports_by_week:
+                            reports_by_week[week] = []
+                        reports_by_week[week].append(report)
                 
                 # Display reports
                 for week, week_reports in reports_by_week.items():
@@ -124,8 +126,8 @@ def weekly_reports_viewer():
                         
                         for i, report in enumerate(week_reports):
                             with cols[i % 3]:
-                                name = report.get('team_member', 'Unknown')
-                                status = report.get('status', 'draft').capitalize()
+                                name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
+                                status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
                                 
                                 with st.container(border=True):
                                     st.markdown(f"#### {name}")
@@ -140,57 +142,55 @@ def weekly_reports_viewer():
                                         st.metric("Well-being", f"{report.get('well_being_rating')}/5")
                                     
                                     # AI Summary Snippet
-                                    summary = report.get('individual_summary')
+                                    summary = report.get('individual_summary') if isinstance(report, dict) else None
+                                    clean_sum = None
                                     if summary:
                                         clean_sum = clean_summary_response(summary)
-                                        # Truncate for card view
                                         snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
                                         st.info(snippet)
                                     
                                     # View Details
                                     with st.expander("View Full Report"):
                                         # Full AI Summary
-                                        if summary:
+                                        if clean_sum:
                                             st.markdown("##### 🤖 AI Summary")
                                             st.markdown(clean_sum)
-                                        
                                         # Director Concerns
-                                        if report.get('director_concerns'):
+                                        if isinstance(report, dict) and report.get('director_concerns'):
                                             st.error(f"**⚠️ Director Concerns:**\n{report.get('director_concerns')}")
                                         
                                         # General Updates
                                         st.markdown("##### 📝 General Updates")
-                                        st.markdown(f"**Professional Development:**\n{report.get('professional_development') or 'None'}")
-                                        st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead') or 'None'}")
-                                        st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in') or 'None'}")
+                                        st.markdown(f"**Professional Development:**\n{report.get('professional_development', 'None') if isinstance(report, dict) else 'None'}")
+                                        st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead', 'None') if isinstance(report, dict) else 'None'}")
+                                        st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in', 'None') if isinstance(report, dict) else 'None'}")
                                         
                                         st.markdown("---")
                                         st.markdown("##### 🎯 Core Activities")
                                         
                                         # Report Body
-                                        body = report.get('report_body', {})
+                                        body = report.get('report_body', {}) if isinstance(report, dict) else {}
                                         
                                         for section_key, section_name in CORE_SECTIONS.items():
-                                            section_data = body.get(section_key, {})
+                                            section_data = body.get(section_key, {}) if isinstance(body, dict) else {}
                                             if section_data and (section_data.get('successes') or section_data.get('challenges')):
                                                 st.markdown(f"**{section_name}**")
-                                                
                                                 if section_data.get('successes'):
                                                     st.markdown("*Successes:*")
                                                     for item in section_data['successes']:
-                                                        text = item.get('text', '')
-                                                        ascend = item.get('ascend_category', 'N/A')
-                                                        north = item.get('north_category', 'N/A')
-                                                        st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                                                        
+                                                        if isinstance(item, dict):
+                                                            text = item.get('text', '')
+                                                            ascend = item.get('ascend_category', 'N/A')
+                                                            north = item.get('north_category', 'N/A')
+                                                            st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
                                                 if section_data.get('challenges'):
                                                     st.markdown("*Challenges:*")
                                                     for item in section_data['challenges']:
-                                                        text = item.get('text', '')
-                                                        ascend = item.get('ascend_category', 'N/A')
-                                                        north = item.get('north_category', 'N/A')
-                                                        st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                                                
+                                                        if isinstance(item, dict):
+                                                            text = item.get('text', '')
+                                                            ascend = item.get('ascend_category', 'N/A')
+                                                            north = item.get('north_category', 'N/A')
+                                                            st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
                                                 st.markdown("")
             
             except Exception as e:
@@ -372,44 +372,32 @@ def duty_analysis_section():
                         filter_info.get('start_date'),
                         filter_info.get('end_date')
                     )
-                    
-                    if result:
-                        st.markdown("### 📊 Duty Report Analysis")
-                        st.markdown(result['summary'])
-                        
-                        # Download button
-                        st.download_button(
-                            label="📥 Download Analysis",
-                            data=result['summary'],
-                            file_name=f"duty_analysis_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
-                            mime="text/markdown"
-                        )
-                    else:
-                        st.error("Failed to generate analysis")
-                        
+                    summary = result.get('summary', "Failed to generate analysis")
+                    st.markdown("### 📊 Duty Report Analysis")
+                    st.markdown(summary)
+                    st.download_button(
+                        label="📥 Download Analysis",
+                        data=summary,
+                        file_name=f"duty_analysis_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
+                        mime="text/markdown"
+                    )
             else:  # Weekly Report Analysis
                 from src.weekly_report import create_weekly_duty_report_summary
-                
                 with st.spinner("Generating weekly duty report summary..."):
                     result = create_weekly_duty_report_summary(
                         duty_forms,
                         filter_info.get('start_date'),
                         filter_info.get('end_date')
                     )
-                    
-                    if result:
-                        st.markdown("### 📅 Weekly Duty Report Summary")
-                        st.markdown(result)
-                        
-                        # Download button
-                        st.download_button(
-                            label="📥 Download Weekly Report",
-                            data=result,
-                            file_name=f"weekly_duty_report_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
-                            mime="text/markdown"
-                        )
-                    else:
-                        st.error("Failed to generate weekly report")
+                    summary = result.get('summary', result) if isinstance(result, dict) else result
+                    st.markdown("### 📅 Weekly Duty Report Summary")
+                    st.markdown(summary)
+                    st.download_button(
+                        label="📥 Download Weekly Report",
+                        data=summary,
+                        file_name=f"weekly_duty_report_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
+                        mime="text/markdown"
+                    )
 
 
 def engagement_analysis_section():
@@ -455,9 +443,7 @@ def engagement_analysis_section():
                 progress_callback=show_engagement_progress
             )
             
-            if error:
-                st.error(error)
-                return
+            # Removed undefined error variable handling
             
             if not all_forms:
                 st.warning("No forms found.")
@@ -842,7 +828,10 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analys
                     return
                 else:
                     st.success("✅ API connection successful")
-                    total_forms = test_data.get('total_records', 0)
+                    if isinstance(test_data, dict):
+                        total_forms = test_data.get('total_records', 0)
+                    else:
+                        total_forms = 0
                     st.info(f"📊 Total forms available: {total_forms}")
     
     st.divider()

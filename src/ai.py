@@ -246,7 +246,7 @@ def extract_und_leads_section(summary_text):
 def create_duty_report_summary(selected_forms, start_date, end_date):
     """Create a standard comprehensive duty report analysis"""
     if not selected_forms:
-        return "No duty reports selected for analysis."
+        return {"summary": "No duty reports selected for analysis."}
     
     try:
         # Prepare duty report data for AI analysis
@@ -328,14 +328,14 @@ Please provide a comprehensive supervisory analysis:
             )
             response_text = getattr(result, "text", None)
             if not response_text or not response_text.strip():
-                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return response_text
+                return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
+            return {"summary": response_text}
             
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg or "quota" in error_msg.lower():
-            return f"⚠️ API Quota Exceeded: The analysis request was too large. Please try selecting a shorter date range or fewer reports. (Error: {error_msg})"
-        return f"Error generating duty report summary: {error_msg}"
+            return {"summary": f"⚠️ API Quota Exceeded: The analysis request was too large. Please try selecting a shorter date range or fewer reports. (Error: {error_msg})"}
+        return {"summary": f"Error generating duty report summary: {error_msg}"}
 
 def summarize_form_submissions(selected_forms, max_forms=10):
     """Use AI to summarize selected form submissions"""
