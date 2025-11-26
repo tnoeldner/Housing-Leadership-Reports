@@ -110,11 +110,7 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
             total_incidents = data['lockouts'] + data['maintenance'] + data['policy_violations'] + data['safety_concerns']
             reports_text += f"**{hall}** ({data['total_reports']} reports, {total_incidents} total incidents):\n"
             reports_text += f"  • Lockouts: {data['lockouts']}\n"
-            reports_text += f"\n**{week}:**\n"
-            reports_text += f"- Total Reports: {data['total_reports']}\n"
-            reports_text += f"- Incident Reports: {data['incident_count']}\n"
-            reports_text += f"- Active Halls: {len(data['halls_active'])}\n"
-            reports_text += f"- Halls: {', '.join(sorted(data['halls_active']))}\n"
+            # Removed undefined 'week' reference. If weekly breakdown is needed, restructure using weekly_data.
 
         reports_text += f"\n=== DETAILED REPORTS ===\n"
 
