@@ -478,10 +478,10 @@ def dashboard_page(supervisor_mode=False):
                         duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
                         for i, duty_report in enumerate(st.session_state['weekly_duty_reports'], 1):
                             duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
-                            duty_reports_section += f"Generated: {duty_report['date_generated']}\n"
-                            duty_reports_section += f"Date Range: {duty_report['date_range']}\n"
-                            duty_reports_section += f"Reports Analyzed: {duty_report['reports_analyzed']}\n\n"
-                            duty_reports_section += duty_report['summary']
+                            duty_reports_section += f"Generated: {duty_report.get('date_generated', 'N/A')}\n"
+                            duty_reports_section += f"Date Range: {duty_report.get('date_range', 'N/A')}\n"
+                            duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
+                            duty_reports_section += duty_report.get('summary', '')
                             duty_reports_section += "\n" + "="*50 + "\n"
 
                     # Check for saved weekly engagement reports to integrate
