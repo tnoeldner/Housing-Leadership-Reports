@@ -45,15 +45,10 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
 
             # Extract week from date
             if date_str:
+            # Updated AI prompt for improved, actionable, bullet-pointed summary
+            prompt = f"""
                 try:
                     form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                    week_key = form_date.strftime('Week of %Y-%m-%d')
-                    weekly_data[week_key]['total_reports'] += 1
-                    weekly_data[week_key]['halls_active'].add(hall_name)
-                except:
-                    week_key = "Unknown Week"
-            else:
-                week_key = "Unknown Week"
 
             # Count incidents by type in this report
             report_text = ""
