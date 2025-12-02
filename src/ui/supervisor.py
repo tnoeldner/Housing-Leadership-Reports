@@ -437,6 +437,8 @@ def duty_analysis_section():
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
                     st.markdown(f"**Debug:** User ID to be sent: `{user_id}` (type: `{type(user_id)}`)")
+                    if user_id == 'Unknown' or not user_id:
+                        st.markdown(f"**Debug:** Full user object: `{user}`")
                     # Convert date fields to ISO strings
                     week_ending = to_iso(filter_info.get('end_date'))
                     filter_info_serialized = dict(filter_info)
