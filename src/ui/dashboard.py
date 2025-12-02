@@ -593,9 +593,20 @@ def dashboard_page(supervisor_mode=False):
         summary_data = st.session_state["last_summary"]
         if summary_data.get("date") == selected_date_for_summary:
             st.markdown("---")
+            st.subheader("Raw Duty Analysis Section Preview")
+            # Show the raw duty_reports_section that was sent to the AI
+            if 'duty_reports_section' in locals():
+                st.code(duty_reports_section, language="markdown")
+            else:
+                st.info("No duty analysis section was generated for this summary.")
+
             st.subheader("Generated Summary (Editable)")
+            # Warn if the AI output does not contain the required section
+            summary_text = summary_data.get("text", "")
+            if "Operational & Safety Summary" not in summary_text:
+                st.warning("⚠️ The AI output does not contain the 'Operational & Safety Summary' section. Please review the prompt and summary.")
             with st.form("save_summary_form"):
-                edited_summary = st.text_area("Edit Summary:", value=summary_data.get("text", ""), height=400)
+                edited_summary = st.text_area("Edit Summary:", value=summary_text, height=400)
                 save_button = st.form_submit_button("Save Final Summary to Archive", type="primary")
                 if save_button:
                     try:
