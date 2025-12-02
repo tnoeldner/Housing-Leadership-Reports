@@ -441,6 +441,13 @@ def duty_analysis_section():
                         'summary': summary
                     }
                     week_ending = filter_info.get('end_date')
+                    # Convert date fields to ISO strings if needed
+                    if hasattr(week_ending, 'isoformat'):
+                        week_ending = week_ending.isoformat()
+                    if 'start_date' in filter_info and hasattr(filter_info['start_date'], 'isoformat'):
+                        analysis_data['filter_info']['start_date'] = filter_info['start_date'].isoformat()
+                    if 'end_date' in filter_info and hasattr(filter_info['end_date'], 'isoformat'):
+                        analysis_data['filter_info']['end_date'] = filter_info['end_date'].isoformat()
                     result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
