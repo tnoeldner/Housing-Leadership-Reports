@@ -473,7 +473,11 @@ def dashboard_page(supervisor_mode=False):
 
                     # Check for saved weekly duty reports to integrate (filter by selected week)
                     duty_reports_section = ""
-                    if 'weekly_duty_reports' in st.session_state and st.session_state['weekly_duty_reports']:
+                    if 'weekly_duty_reports' not in st.session_state:
+                        st.warning("No 'weekly_duty_reports' found in session state. Duty analysis integration skipped.")
+                    elif not st.session_state['weekly_duty_reports']:
+                        st.warning("'weekly_duty_reports' in session state is empty. Duty analysis integration skipped.")
+                    else:
                         # Try to match on week_ending_date or date_range
                         filtered_duty_reports = []
                         for dr in st.session_state['weekly_duty_reports']:
