@@ -507,6 +507,30 @@ def dashboard_page(supervisor_mode=False):
                     well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
                     average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
 
+                    # Build reports_text from weekly_reports
+                    reports_text = ""
+                    for r in weekly_reports:
+                        team_member = r.get("team_member", "Unknown")
+                        well_being = r.get("well_being_rating", "N/A")
+                        report_body = r.get("report_body", {})
+                        reports_text += f"\n---\n**Report from: {team_member}**\n"
+                        reports_text += f"Well-being Score: {well_being}/5\n"
+                        for section, section_data in report_body.items():
+                            if section_data:
+                                successes = section_data.get("successes", [])
+                                challenges = section_data.get("challenges", [])
+                                if successes:
+                                    reports_text += f"- {section} Successes:\n"
+                                    for s in successes:
+                                        text = s.get("text", "") if isinstance(s, dict) else str(s)
+                                        reports_text += f"    - {text}\n"
+                                if challenges:
+                                    reports_text += f"- {section} Challenges:\n"
+                                    for c in challenges:
+                                        text = c.get("text", "") if isinstance(c, dict) else str(c)
+                                        reports_text += f"    - {text}\n"
+                        reports_text += "\n"
+
                     from src.ai import generate_admin_dashboard_summary
                     cleaned_text = generate_admin_dashboard_summary(
                         selected_date_for_summary=selected_date_for_summary,
