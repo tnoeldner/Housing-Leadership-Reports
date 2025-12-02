@@ -478,15 +478,23 @@ def dashboard_page(supervisor_mode=False):
                         filtered_duty_reports = []
                         for dr in st.session_state['weekly_duty_reports']:
                             week_match = False
-                            if str(dr.get('week_ending_date')) == str(selected_date_for_summary):
-                                week_match = True
-                            elif dr.get('date_range'):
-                                try:
-                                    start, end = dr['date_range'].split(' to ')
-                                    if start <= str(selected_date_for_summary) <= end:
+                            dr_week = dr.get('week_ending_date')
+                            try:
+                                # Allow ±1 day window for matching
+                                if dr_week:
+                                    dr_date = pd.to_datetime(str(dr_week)).date()
+                                    summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
+                                    if abs((dr_date - summary_date).days) <= 1:
                                         week_match = True
-                                except Exception:
-                                    pass
+                                elif dr.get('date_range'):
+                                    start, end = dr['date_range'].split(' to ')
+                                    start_date = pd.to_datetime(start).date()
+                                    end_date = pd.to_datetime(end).date()
+                                    summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
+                                    if start_date <= summary_date <= end_date:
+                                        week_match = True
+                            except Exception:
+                                pass
                             if week_match:
                                 filtered_duty_reports.append(dr)
                         if filtered_duty_reports:
