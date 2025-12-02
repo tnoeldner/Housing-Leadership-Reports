@@ -289,51 +289,45 @@ def save_staff_performance_scores(all_scores, week_ending_date, created_by_user_
 
 
 def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id=None):
-    """Save an engagement analysis report to the database for permanent storage"""
+    """Save a duty analysis report to the database for permanent storage"""
+    pass
+
+def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None):
+    """Save or update a weekly summary report in the weekly_summaries table."""
     try:
-        # Determine report type
-        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
-        
-        # Handle date conversions for database storage
-        start_date = analysis_data['filter_info']['start_date']
-        end_date = analysis_data['filter_info']['end_date']
-        
         # Convert to ISO format strings if they're date objects
+        start_date = summary_data.get('date_range_start')
+        end_date = summary_data.get('date_range_end')
         if hasattr(start_date, 'isoformat'):
             start_date = start_date.isoformat()
         if hasattr(end_date, 'isoformat'):
             end_date = end_date.isoformat()
-        
-        # Extract upcoming events if available
-        upcoming_events = extract_upcoming_events(analysis_data['selected_forms'])
-        
+
         # Prepare data for saving
         save_data = {
             'week_ending_date': week_ending_date,
-            'report_type': report_type,
+            'report_type': summary_data.get('report_type', 'weekly_summary'),
             'date_range_start': start_date,
             'date_range_end': end_date,
-            'events_analyzed': len(analysis_data['selected_forms']),
-            'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
-            'analysis_text': analysis_data['summary'],
-            'upcoming_events': upcoming_events,
+            'reports_analyzed': summary_data.get('reports_analyzed'),
+            'total_selected': summary_data.get('total_selected'),
+            'analysis_text': summary_data.get('analysis_text'),
             'created_by': created_by_user_id,
             'updated_at': datetime.now().isoformat()
         }
-        
-        # Save to database with graceful error handling
-        try:
-            # Try simple insert first
-            response = supabase.table("saved_engagement_analyses").insert(save_data).execute()
-            
-            if response.data:
-                return {
-                    "success": True, 
-                    "message": f"Engagement analysis saved for week ending {week_ending_date}",
-                    "saved_id": response.data[0]['id']
-                }
-            else:
-                return {"success": False, "message": "Failed to save engagement analysis"}
+
+        # Use upsert to insert or update on conflict
+        response = supabase.table("weekly_summaries").upsert(save_data, on_conflict=["week_ending_date"]).execute()
+        if response.data:
+            return {
+                "success": True,
+                "message": f"Weekly summary saved/updated for week ending {week_ending_date}",
+                "saved_id": response.data[0].get('id')
+            }
+        else:
+            return {"success": False, "message": "Failed to save weekly summary"}
+    except Exception as e:
+        return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
                 
         except Exception as e:
             error_msg = str(e)
