@@ -201,15 +201,6 @@ def to_iso(val):
     return val.isoformat() if hasattr(val, 'isoformat') else val
 
 def duty_analysis_section():
-                        # Debug: Show which client and key is being used
-                        client_type = "ADMIN (service role)" if role == 'admin' else "DEFAULT (anon/public)"
-                        st.markdown(f"**Debug:** Saving with client type: `{client_type}`")
-                        try:
-                            # Try to print the key (will be masked in UI, but useful for local logs)
-                            key_used = db_client._supabase_key if hasattr(db_client, '_supabase_key') else 'Unknown'
-                            st.markdown(f"**Debug:** Supabase key used: `{key_used[:8]}...` (first 8 chars)")
-                        except Exception as e:
-                            st.markdown(f"**Debug:** Could not access Supabase key: {e}")
     """Specialized section for duty report analysis"""
     st.subheader("🛡️ Duty Analysis")
     st.markdown("""
@@ -446,7 +437,17 @@ def duty_analysis_section():
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
                     role = st.session_state.get('role', 'staff')
-                    db_client = get_admin_client() if role == 'admin' else supabase
+                    if role == 'admin':
+                        db_client = get_admin_client()
+                        # Print first 8 chars of key for debug (do not print full key)
+                        from src.config import get_secret
+                        admin_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
+                        st.markdown(f"**Debug:** Using ADMIN client. Key prefix: `{admin_key[:8]}`")
+                    else:
+                        db_client = supabase
+                        from src.config import get_secret
+                        anon_key = get_secret("SUPABASE_KEY")
+                        st.markdown(f"**Debug:** Using ANON client. Key prefix: `{anon_key[:8]}`")
                     st.markdown(f"**Debug:** User ID to be sent: `{user_id}` (type: `{type(user_id)}`)")
                     if user_id == 'Unknown' or not user_id:
                         st.markdown(f"**Debug:** Full user object: `{user}`")

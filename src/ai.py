@@ -1,3 +1,144 @@
+def generate_admin_dashboard_summary(
+    selected_date_for_summary,
+    reports_text,
+    duty_reports_section,
+    engagement_reports_section,
+    average_score
+):
+    """Generate the admin dashboard summary using Gemini AI."""
+    prompt = f"""
+You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
+
+IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
+
+DATA SOURCES AVAILABLE:
+1. Weekly staff reports from residence life team members
+2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
+3. Weekly engagement analysis (if available) - event programming, attendance data, community engagement activities
+
+The report MUST contain the following sections, in this order, using markdown headings exactly as shown:
+
+## Executive Summary
+A 2-3 sentence high-level overview of the week's key takeaways.
+
+## ASCEND Framework Summary
+Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name.
+
+### Accountability
+[Include relevant staff activities and names]
+
+### Service
+[Include relevant staff activities and names]
+
+### Community
+[Include relevant staff activities and names]
+
+### Excellence
+[Include relevant staff activities and names]
+
+### Nurture
+[Include relevant staff activities and names]
+
+### Development
+[Include relevant staff activities and names]
+
+## Guiding NORTH Pillars Summary
+Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name.
+
+## UND LEADS Summary
+Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names:
+
+### Learning
+Professional development, training, skill building, educational initiatives, mentoring
+
+### Equity
+Diversity initiatives, inclusive practices, accessibility improvements, fair treatment efforts
+
+### Affinity
+Community building, relationship development, team cohesion, campus connections
+
+### Discovery
+Research, innovation, new approaches, creative problem-solving, exploration of best practices
+
+### Service
+Community service, helping others, volunteer work, supporting university initiatives
+
+## Overall Staff Well-being
+Start by stating, "The average well-being score for the week was {average_score} out of 5." Provide a 1-2 sentence qualitative summary and include a subsection.
+
+### Staff to Connect With
+List staff who reported low scores or concerning comments, with a brief reason.
+
+## Campus Events Summary
+Create a markdown table with the exact format below:
+
+| Event/Committee | Date | Attendees | Alignment |
+|-----------------|------|-----------|-----------|
+| Event Name | YYYY-MM-DD | Staff Member Name | ASCEND: Category, NORTH: Category |
+
+Include all campus events and committee meetings attended by staff this week. Group multiple attendees for the same event in one row.
+
+## For the Director's Attention
+A clear list of items that require director-level attention; mention the staff member who raised each item. If none, state "No specific concerns were raised for the Director this week."
+
+## Key Challenges
+Bullet-point summary of significant or recurring challenges reported by staff, noting who reported them where relevant.
+
+## Operational & Safety Summary
+If duty reports data is available, create this section with:
+
+### Quantitative Metrics
+Create a hall-by-hall breakdown table using this exact format:
+
+| Hall/Building | Total Reports | Lockouts | Maintenance | Policy Violations | Safety Concerns | Staff Responses |
+|---------------|---------------|----------|-------------|-------------------|-----------------|-----------------|
+| Hall Name | # | # | # | # | # | # |
+
+Include summary totals row at the bottom.
+
+### Trending Issues
+Bullet-point summary of patterns in lockouts, maintenance requests, policy violations based on the quantitative data above.
+
+### Staff Response Effectiveness
+Assessment of duty staff performance and response times based on staff response data.
+
+### Safety & Security Highlights
+Critical incidents and follow-up actions needed based on safety concerns identified.
+
+## Upcoming Projects & Initiatives
+Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
+ 
+CRITICAL FORMATTING REQUIREMENTS:
+- Use EXACTLY the markdown headings shown above (## for main sections, ### for subsections)
+- Follow the section structure precisely - do not skip sections or change the order
+- When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...")
+- For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement)
+- Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets
+- Ensure every staff member's activities are analyzed for UND LEADS alignment - do not leave this section empty
+- CREATE PROPER MARKDOWN TABLES: Use exact table formats shown, ensure proper alignment with | symbols
+- If duty reports data is provided, create the Quantitative Metrics table using the hall-by-hall data provided, including totals row
+- For Campus Events and Operational & Safety tables: follow exact column structures and formatting shown
+Here is the raw report data from all reports for the week, which includes the names of each team member and their categorized activities:
+
+STAFF REPORTS DATA:
+{reports_text}
+
+{duty_reports_section}
+
+{engagement_reports_section}
+"""
+    global client
+    if client is None:
+        init_ai()
+    with st.spinner("AI is generating the admin dashboard summary..."):
+        result = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=prompt
+        )
+        response_text = getattr(result, "text", None)
+        if not response_text or not response_text.strip():
+            return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+        return clean_summary_response(response_text)
 from google import genai
 from google.genai import types
 import streamlit as st
