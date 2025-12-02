@@ -525,7 +525,11 @@ def dashboard_page(supervisor_mode=False):
                                 duty_reports_section += f"Generated: {duty_report.get('date_generated', 'N/A')}\n"
                                 duty_reports_section += f"Date Range: {duty_report.get('date_range', 'N/A')}\n"
                                 duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
-                                duty_reports_section += duty_report.get('summary', '')
+                                # Include full analysis if present, otherwise fallback to summary
+                                if duty_report.get('analysis'):
+                                    duty_reports_section += duty_report.get('analysis')
+                                else:
+                                    duty_reports_section += duty_report.get('summary', '')
                                 duty_reports_section += "\n" + "="*50 + "\n"
                             st.session_state['last_duty_reports_section'] = duty_reports_section
                         else:
