@@ -527,6 +527,7 @@ def dashboard_page(supervisor_mode=False):
                                 duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
                                 duty_reports_section += duty_report.get('summary', '')
                                 duty_reports_section += "\n" + "="*50 + "\n"
+                            st.session_state['last_duty_reports_section'] = duty_reports_section
                         else:
                             st.warning("⚠️ No duty analysis found for this week. None will be included in the summary.")
 
@@ -595,8 +596,9 @@ def dashboard_page(supervisor_mode=False):
             st.markdown("---")
             st.subheader("Raw Duty Analysis Section Preview")
             # Show the raw duty_reports_section that was sent to the AI
-            if 'duty_reports_section' in locals():
-                st.code(duty_reports_section, language="markdown")
+            duty_preview = st.session_state.get('last_duty_reports_section', None)
+            if duty_preview:
+                st.code(duty_preview, language="markdown")
             else:
                 st.info("No duty analysis section was generated for this summary.")
 
