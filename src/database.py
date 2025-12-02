@@ -90,12 +90,20 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
 def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None):
     """Save or update a weekly summary report in the weekly_summaries table."""
     try:
+        # Convert to ISO format strings if they're date objects
+        start_date = summary_data.get('date_range_start')
+        end_date = summary_data.get('date_range_end')
+        if hasattr(start_date, 'isoformat'):
+            start_date = start_date.isoformat()
+        if hasattr(end_date, 'isoformat'):
+            end_date = end_date.isoformat()
+
         # Prepare data for saving
         save_data = {
             'week_ending_date': week_ending_date,
             'report_type': summary_data.get('report_type', 'weekly_summary'),
-            'date_range_start': summary_data.get('date_range_start'),
-            'date_range_end': summary_data.get('date_range_end'),
+            'date_range_start': start_date,
+            'date_range_end': end_date,
             'reports_analyzed': summary_data.get('reports_analyzed'),
             'total_selected': summary_data.get('total_selected'),
             'analysis_text': summary_data.get('analysis_text'),
@@ -115,10 +123,6 @@ def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None)
             return {"success": False, "message": "Failed to save weekly summary"}
     except Exception as e:
         return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
-        if hasattr(start_date, 'isoformat'):
-            start_date = start_date.isoformat()
-        if hasattr(end_date, 'isoformat'):
-            end_date = end_date.isoformat()
         
         # Check for existing analysis with same week ending date and user
         existing_query = supabase.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
