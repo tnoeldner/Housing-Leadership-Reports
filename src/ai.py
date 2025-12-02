@@ -219,7 +219,7 @@ def get_gemini_models():
     if client is None:
         init_ai()
     try:
-            models = list(client.list_models())
+        models = list(client.list_models())
         return models
     except Exception as e:
         return f"Error listing models: {e}"
@@ -230,7 +230,7 @@ def gemini_test_prompt(prompt="Hello Gemini, are you working?", model_name="gemi
     if client is None:
         init_ai()
     try:
-            response = client.generate_content(
+        response = client.generate_content(
             model=model_name,
             contents=prompt
         )
