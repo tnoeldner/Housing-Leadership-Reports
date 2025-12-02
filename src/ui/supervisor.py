@@ -433,9 +433,11 @@ def duty_analysis_section():
             # Save button for analysis
             if analysis_type == "📊 Standard Analysis":
                 if st.button("💾 Save Analysis", key="save_duty_analysis"):
-                    from src.database import save_duty_analysis
+                    from src.database import save_duty_analysis, get_admin_client, supabase
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
+                    role = st.session_state.get('role', 'staff')
+                    db_client = get_admin_client() if role == 'admin' else supabase
                     st.markdown(f"**Debug:** User ID to be sent: `{user_id}` (type: `{type(user_id)}`)")
                     if user_id == 'Unknown' or not user_id:
                         st.markdown(f"**Debug:** Full user object: `{user}`")
@@ -453,7 +455,7 @@ def duty_analysis_section():
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
-                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
+                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id, db_client=db_client)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
                         st.success(result.get('message', 'Duty analysis saved.'))
@@ -461,9 +463,11 @@ def duty_analysis_section():
                         st.error(result.get('message', 'Failed to save duty analysis.'))
             else:
                 if st.button("💾 Save Weekly Duty Analysis", key="save_weekly_duty_analysis"):
-                    from src.database import save_duty_analysis
+                    from src.database import save_duty_analysis, get_admin_client, supabase
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
+                    role = st.session_state.get('role', 'staff')
+                    db_client = get_admin_client() if role == 'admin' else supabase
                     # Convert date fields to ISO strings
                     week_ending = to_iso(filter_info.get('end_date'))
                     filter_info_serialized = dict(filter_info)
@@ -478,7 +482,7 @@ def duty_analysis_section():
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
-                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
+                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id, db_client=db_client)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
                         st.success(result.get('message', 'Duty analysis saved.'))

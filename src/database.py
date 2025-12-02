@@ -76,30 +76,27 @@ def get_user_client():
         client.auth.set_session(access_token, access_token)
     return client
 
-def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None):
+def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None, db_client=None):
     """Save a duty analysis report to the database for permanent storage"""
     try:
         # Determine report type
         report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
-        
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']
         end_date = analysis_data['filter_info']['end_date']
-        
         # Convert to ISO format strings if they're date objects
         if hasattr(start_date, 'isoformat'):
             start_date = start_date.isoformat()
         if hasattr(end_date, 'isoformat'):
             end_date = end_date.isoformat()
-        
+        # Use provided db_client or fallback to supabase
+        client = db_client if db_client is not None else supabase
         # Check for existing analysis with same week ending date and user
-        existing_query = supabase.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
+        existing_query = client.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
         if created_by_user_id:
             existing_query = existing_query.eq("created_by", created_by_user_id)
-        
         existing_response = existing_query.execute()
         existing_records = existing_response.data if existing_response.data else []
-        
         # Prepare data for saving
         now = datetime.now().isoformat()
         save_data = {
@@ -131,7 +128,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
         else:
             # No existing record, safe to insert
             try:
-                response = supabase.table("saved_duty_analyses").insert(save_data).execute()
+                response = client.table("saved_duty_analyses").insert(save_data).execute()
                 if response.data:
                     return {
                         "success": True, 
