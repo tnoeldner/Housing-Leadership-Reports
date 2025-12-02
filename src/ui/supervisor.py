@@ -404,25 +404,32 @@ def duty_analysis_section():
                         file_name=f"duty_analysis_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
                         mime="text/markdown"
                     )
-                    # Save Analysis Button
+                    # Save Analysis Button (refactored)
                     if st.button("💾 Save Analysis", key="save_duty_analysis"):
-                        try:
-                            admin_supabase = get_admin_client()
-                            user_id = st.session_state.get('user', {}).get('id', 'Unknown')
-                            week_ending = str(filter_info.get('end_date'))
-                            insert_data = {
-                                "created_by": user_id,
-                                "week_ending_date": week_ending,
-                                "analysis_text": summary,
-                                "created_at": datetime.now().isoformat()
-                            }
-                            response = admin_supabase.table("saved_duty_analyses").insert(insert_data).execute()
-                            if getattr(response, "status_code", None) == 201:
-                                st.success("Analysis saved to archive!")
-                            else:
-                                st.warning(f"Could not save analysis. Response: {getattr(response, 'data', response)}")
-                        except Exception as e:
-                            st.error(f"Error saving analysis: {e}")
+                        from src.database import save_weekly_duty_analysis, get_admin_client
+                        admin_supabase = get_admin_client()
+                        user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                        week_ending = filter_info.get('end_date')
+                        report_type = "weekly_summary"
+                        date_range_start = filter_info.get('start_date')
+                        date_range_end = filter_info.get('end_date')
+                        reports_analyzed = len(selected_forms)
+                        total_selected = len(selected_forms)
+                        success, message = save_weekly_duty_analysis(
+                            admin_supabase,
+                            week_ending_date=week_ending,
+                            report_type=report_type,
+                            date_range_start=date_range_start,
+                            date_range_end=date_range_end,
+                            reports_analyzed=reports_analyzed,
+                            total_selected=total_selected,
+                            analysis_text=summary,
+                            created_by=user_id
+                        )
+                        if success:
+                            st.success(message)
+                        else:
+                            st.error(message)
             else:  # Weekly Report Analysis
                 with st.spinner("Generating weekly duty report summary..."):
                     result = create_weekly_duty_report_summary(
