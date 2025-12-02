@@ -446,32 +446,26 @@ def duty_analysis_section():
                         file_name=f"weekly_duty_report_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
                         mime="text/markdown"
                     )
-                    # Save Weekly Duty Analysis Button (refactored)
+                    # Save Weekly Duty Analysis Button (using save_duty_analysis)
                     if st.button("💾 Save Weekly Duty Analysis", key="save_weekly_duty_analysis"):
-                        from src.database import save_weekly_duty_analysis, get_admin_client
-                        admin_supabase = get_admin_client()
+                        from src.database import save_duty_analysis
                         user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                        analysis_data = {
+                            'report_type': '📅 Weekly Summary Report',
+                            'filter_info': {
+                                'start_date': filter_info.get('start_date'),
+                                'end_date': filter_info.get('end_date'),
+                            },
+                            'selected_forms': selected_forms,
+                            'all_selected_forms': selected_forms,
+                            'summary': summary
+                        }
                         week_ending = filter_info.get('end_date')
-                        report_type = "weekly_summary"
-                        date_range_start = filter_info.get('start_date')
-                        date_range_end = filter_info.get('end_date')
-                        reports_analyzed = len(selected_forms)
-                        total_selected = len(selected_forms)
-                        success, message = save_weekly_duty_analysis(
-                            admin_supabase,
-                            week_ending_date=week_ending,
-                            report_type=report_type,
-                            date_range_start=date_range_start,
-                            date_range_end=date_range_end,
-                            reports_analyzed=reports_analyzed,
-                            total_selected=total_selected,
-                            analysis_text=summary,
-                            created_by=user_id
-                        )
-                        if success:
-                            st.success(message)
+                        result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
+                        if result.get('success'):
+                            st.success(result.get('message', 'Duty analysis saved.'))
                         else:
-                            st.error(message)
+                            st.error(result.get('message', 'Failed to save duty analysis.'))
 
 
 def engagement_analysis_section():

@@ -1,31 +1,3 @@
-def save_weekly_duty_analysis(
-    admin_supabase, week_ending_date, report_type, date_range_start, date_range_end,
-    reports_analyzed, total_selected, analysis_text, created_by
-):
-    """
-    Save a weekly duty analysis to the saved_duty_analyses table in Supabase.
-    Returns (success: bool, message: str)
-    """
-    try:
-        insert_data = {
-            "week_ending_date": str(week_ending_date),
-            "report_type": report_type,
-            "date_range_start": str(date_range_start),
-            "date_range_end": str(date_range_end),
-            "reports_analyzed": int(reports_analyzed),
-            "total_selected": int(total_selected),
-            "analysis_text": analysis_text,
-            "created_by": created_by,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
-        response = admin_supabase.table("saved_duty_analyses").insert(insert_data).execute()
-        if getattr(response, "status_code", None) == 201:
-            return True, "Analysis saved successfully."
-        else:
-            return False, f"Save failed: {getattr(response, 'data', response)}"
-    except Exception as e:
-        return False, f"Error: {e}"
 import streamlit as st
 from supabase import create_client, Client
 import time
