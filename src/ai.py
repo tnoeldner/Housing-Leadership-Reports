@@ -513,7 +513,7 @@ Please provide a comprehensive supervisory analysis:
         if client is None:
             init_ai()
         with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
-                        result = client.generate_content(
+            result = client.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt
             )
