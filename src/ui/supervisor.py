@@ -491,6 +491,7 @@ def duty_analysis_section():
 
 
 
+
 def engagement_analysis_section():
     """Specialized section for Residence Life Event Submission analysis - Full Semester Management"""
     st.subheader("🎉 Engagement Analysis - Fall Semester")
