@@ -471,18 +471,37 @@ def dashboard_page(supervisor_mode=False):
 - **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
 """
 
-                    # Check for saved weekly duty reports to integrate
+                    # Check for saved weekly duty reports to integrate (filter by selected week)
                     duty_reports_section = ""
                     if 'weekly_duty_reports' in st.session_state and st.session_state['weekly_duty_reports']:
-                        st.info("🛡️ **Including Weekly Duty Reports:** Found saved duty analysis reports to integrate into this summary.")
-                        duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
-                        for i, duty_report in enumerate(st.session_state['weekly_duty_reports'], 1):
-                            duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
-                            duty_reports_section += f"Generated: {duty_report.get('date_generated', 'N/A')}\n"
-                            duty_reports_section += f"Date Range: {duty_report.get('date_range', 'N/A')}\n"
-                            duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
-                            duty_reports_section += duty_report.get('summary', '')
-                            duty_reports_section += "\n" + "="*50 + "\n"
+                        # Try to match on week_ending_date or date_range
+                        filtered_duty_reports = []
+                        for dr in st.session_state['weekly_duty_reports']:
+                            # Try to match by week_ending_date or by date_range containing selected_date_for_summary
+                            week_match = False
+                            # Check for direct match on week_ending_date
+                            if str(dr.get('week_ending_date')) == str(selected_date_for_summary):
+                                week_match = True
+                            # Or check if selected_date_for_summary is within date_range (if available)
+                            elif dr.get('date_range'):
+                                try:
+                                    start, end = dr['date_range'].split(' to ')
+                                    if start <= str(selected_date_for_summary) <= end:
+                                        week_match = True
+                                except Exception:
+                                    pass
+                            if week_match:
+                                filtered_duty_reports.append(dr)
+                        if filtered_duty_reports:
+                            st.info(f"🛡️ **Including Weekly Duty Reports:** Found {len(filtered_duty_reports)} duty analysis report(s) for this week.")
+                            duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
+                            for i, duty_report in enumerate(filtered_duty_reports, 1):
+                                duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
+                                duty_reports_section += f"Generated: {duty_report.get('date_generated', 'N/A')}\n"
+                                duty_reports_section += f"Date Range: {duty_report.get('date_range', 'N/A')}\n"
+                                duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
+                                duty_reports_section += duty_report.get('summary', '')
+                                duty_reports_section += "\n" + "="*50 + "\n"
 
                     # Check for saved weekly engagement reports to integrate
                     engagement_reports_section = ""
