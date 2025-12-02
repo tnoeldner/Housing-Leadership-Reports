@@ -429,6 +429,7 @@ def duty_analysis_section():
                 mime="text/markdown"
             )
             if st.button("💾 Save Analysis", key="save_duty_analysis"):
+                try:
                     from src.database import save_duty_analysis
                     user_id = getattr(st.session_state.get('user', None), 'id', 'Unknown')
                     week_ending = str(filter_info.get('end_date'))
