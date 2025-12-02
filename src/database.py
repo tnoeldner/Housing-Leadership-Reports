@@ -19,7 +19,6 @@ def init_connection():
     return create_client(url, key)
 
 def get_admin_client():
-        print("[DEBUG] get_admin_client: Using service role key:", service_key[:8], "...")
     """Get a Supabase client with service role key for admin operations (bypasses RLS)"""
     url = get_secret("SUPABASE_URL")
     service_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
@@ -78,7 +77,6 @@ def get_user_client():
     return client
 
 def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None, db_client=None):
-        print("[DEBUG] save_duty_analysis: client is admin?", getattr(db_client, 'auth', None) is None)
     """Save a duty analysis report to the database for permanent storage"""
     try:
         # Determine report type

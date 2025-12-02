@@ -201,8 +201,6 @@ def to_iso(val):
     return val.isoformat() if hasattr(val, 'isoformat') else val
 
 def duty_analysis_section():
-                        # Debug: Print which client is being used for save
-                        st.markdown(f"**Debug:** Using client: {'admin' if role == 'admin' else 'default'}")
     """Specialized section for duty report analysis"""
     st.subheader("🛡️ Duty Analysis")
     st.markdown("""
