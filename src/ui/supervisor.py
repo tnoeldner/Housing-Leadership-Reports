@@ -388,47 +388,20 @@ def duty_analysis_section():
                 st.warning("Please select at least one duty report to analyze.")
                 return
             if analysis_type == "📊 Standard Analysis":
-                # Standard analysis with create_duty_report_summary
                 with st.spinner("Generating standard duty report analysis..."):
                     result = create_duty_report_summary(
                         selected_forms,
                         filter_info.get('start_date'),
                         filter_info.get('end_date')
                     )
-                    summary = result.get('summary', "Failed to generate analysis")
-                    st.session_state['duty_analysis_summary'] = summary
-                    st.session_state['duty_analysis_metadata'] = {
-                        'filter_info': filter_info,
-                        'selected_forms': selected_forms,
-                        'report_type': analysis_type,
-                        'all_selected_forms': duty_forms
-                    }
-                    st.markdown("### 📊 Duty Report Analysis")
-                    st.markdown(summary)
-                    st.download_button(
-                        label="📥 Download Analysis",
-                        data=summary,
-                        file_name=f"duty_analysis_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
-                        mime="text/markdown"
-                    )
-                # Save Analysis Button (outside spinner)
-            if st.session_state.get('duty_analysis_summary'):
-                if st.button("💾 Save Analysis", key="save_duty_analysis"):
-                    try:
-                        from src.database import save_duty_analysis
-                        user_id = st.session_state.get('user', {}).get('id', 'Unknown')
-                        week_ending = str(filter_info.get('end_date'))
-                        analysis_data = {
-                            'summary': st.session_state['duty_analysis_summary'],
-                            **st.session_state['duty_analysis_metadata']
-                        }
-                        result = save_duty_analysis(analysis_data, week_ending, created_by_user_id=user_id)
-                        if result.get('success'):
-                            st.success(result.get('message', 'Analysis saved to archive!'))
-                        else:
-                            st.warning(result.get('message', 'Could not save analysis.'))
-                    except Exception as e:
-                        st.error(f"Error saving analysis: {e}")
+                summary = result.get('summary', "Failed to generate analysis")
+                st.session_state['duty_analysis_summary'] = summary
+                st.session_state['duty_analysis_metadata'] = {
+                    'filter_info': filter_info,
+                    'selected_forms': selected_forms,
+                    'report_type': analysis_type,
+                    'all_selected_forms': duty_forms
+                }
             else:  # Weekly Report Analysis
                 with st.spinner("Generating weekly duty report summary..."):
                     result = create_weekly_duty_report_summary(
@@ -436,42 +409,68 @@ def duty_analysis_section():
                         filter_info.get('start_date'),
                         filter_info.get('end_date')
                     )
-                    summary = result.get('summary', result) if isinstance(result, dict) else result
-                    st.session_state['weekly_report_summary'] = summary
-                    st.session_state['weekly_report_metadata'] = {
-                        'filter_info': filter_info,
-                        'selected_forms': selected_forms,
-                        'report_type': analysis_type,
-                        'all_selected_forms': duty_forms
+                summary = result.get('summary', result) if isinstance(result, dict) else result
+                st.session_state['weekly_report_summary'] = summary
+                st.session_state['weekly_report_metadata'] = {
+                    'filter_info': filter_info,
+                    'selected_forms': selected_forms,
+                    'report_type': analysis_type,
+                    'all_selected_forms': duty_forms
+                }
+
+        # Always show analysis and buttons if present in session state
+        if st.session_state.get('duty_analysis_summary'):
+            st.markdown("### 📊 Duty Report Analysis")
+            st.markdown(st.session_state['duty_analysis_summary'])
+            st.download_button(
+                label="📥 Download Analysis",
+                data=st.session_state['duty_analysis_summary'],
+                file_name=f"duty_analysis_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
+                mime="text/markdown"
+            )
+            if st.button("💾 Save Analysis", key="save_duty_analysis"):
+                try:
+                    from src.database import save_duty_analysis
+                    user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                    week_ending = str(filter_info.get('end_date'))
+                    analysis_data = {
+                        'summary': st.session_state['duty_analysis_summary'],
+                        **st.session_state['duty_analysis_metadata']
                     }
-                    st.markdown("### 📅 Weekly Duty Report Summary")
-                    st.markdown(summary)
-                    st.download_button(
-                        label="📥 Download Weekly Report",
-                        data=summary,
-                        file_name=f"weekly_duty_report_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
-                        mime="text/markdown"
-                    )
-                # Save Weekly Report Button (outside spinner)
-            if st.session_state.get('weekly_report_summary'):
-                if st.button("💾 Save Weekly Report", key="save_weekly_report"):
-                    try:
-                        admin_supabase = get_admin_client()
-                        user_id = st.session_state.get('user', {}).get('id', 'Unknown')
-                        week_ending = str(filter_info.get('end_date'))
-                        insert_data = {
-                            "created_by": user_id,
-                            "week_ending_date": week_ending,
-                            "summary_text": st.session_state['weekly_report_summary'],
-                            "created_at": datetime.now().isoformat()
-                        }
-                        response = admin_supabase.table("weekly_summaries").insert(insert_data).execute()
-                        if getattr(response, "status_code", None) == 201:
-                            st.success("Weekly report saved to archive!")
-                        else:
-                            st.warning(f"Could not save weekly report. Response: {getattr(response, 'data', response)}")
-                    except Exception as e:
-                        st.error(f"Error saving weekly report: {e}")
+                    result = save_duty_analysis(analysis_data, week_ending, created_by_user_id=user_id)
+                    if result.get('success'):
+                        st.success(result.get('message', 'Analysis saved to archive!'))
+                    else:
+                        st.warning(result.get('message', 'Could not save analysis.'))
+                except Exception as e:
+                    st.error(f"Error saving analysis: {e}")
+        if st.session_state.get('weekly_report_summary'):
+            st.markdown("### 📅 Weekly Duty Report Summary")
+            st.markdown(st.session_state['weekly_report_summary'])
+            st.download_button(
+                label="📥 Download Weekly Report",
+                data=st.session_state['weekly_report_summary'],
+                file_name=f"weekly_duty_report_{filter_info.get('start_date')}_{filter_info.get('end_date')}.md",
+                mime="text/markdown"
+            )
+            if st.button("💾 Save Weekly Report", key="save_weekly_report"):
+                try:
+                    admin_supabase = get_admin_client()
+                    user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                    week_ending = str(filter_info.get('end_date'))
+                    insert_data = {
+                        "created_by": user_id,
+                        "week_ending_date": week_ending,
+                        "summary_text": st.session_state['weekly_report_summary'],
+                        "created_at": datetime.now().isoformat()
+                    }
+                    response = admin_supabase.table("weekly_summaries").insert(insert_data).execute()
+                    if getattr(response, "status_code", None) == 201:
+                        st.success("Weekly report saved to archive!")
+                    else:
+                        st.warning(f"Could not save weekly report. Response: {getattr(response, 'data', response)}")
+                except Exception as e:
+                    st.error(f"Error saving weekly report: {e}")
 
 
 def engagement_analysis_section():
