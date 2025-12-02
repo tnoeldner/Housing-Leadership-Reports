@@ -465,7 +465,8 @@ def duty_analysis_section():
                         "created_at": datetime.now().isoformat()
                     }
                     response = admin_supabase.table("weekly_summaries").insert(insert_data).execute()
-                    if getattr(response, "status_code", None) == 201:
+                    # Treat any non-empty response.data as success
+                    if getattr(response, "status_code", None) == 201 or (hasattr(response, "data") and response.data):
                         st.success("Weekly report saved to archive!")
                     else:
                         st.warning(f"Could not save weekly report. Response: {getattr(response, 'data', response)}")
