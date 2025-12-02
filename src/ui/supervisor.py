@@ -490,6 +490,7 @@ def duty_analysis_section():
                             st.error(f"Error saving weekly report: {e}")
 
 
+
 def engagement_analysis_section():
     """Specialized section for Residence Life Event Submission analysis - Full Semester Management"""
     st.subheader("🎉 Engagement Analysis - Fall Semester")
