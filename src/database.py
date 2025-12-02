@@ -164,68 +164,8 @@ def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None)
                         "success": True, 
                         "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
                         "saved_id": response.data[0]['id'],
-                        "action": "created_new"
-                    }
-                else:
-                    return {"success": False, "message": "Failed to save duty analysis - no data returned"}
-                    
-            except Exception as e:
-                error_msg = str(e)
-                
-                # Check if it's a table doesn't exist error
-                if "does not exist" in error_msg or "relation" in error_msg:
-                    return {
-                        "success": False, 
-                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
-                    }
-                # Check if it's a duplicate key error (fallback)
-                elif "duplicate key" in error_msg or "already exists" in error_msg or "violates unique constraint" in error_msg:
-                    return {
-                        "success": True,
-                        "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
-                        "action": "duplicate_prevented"
-                    }
-                else:
-                    return {"success": False, "message": f"Database error: {error_msg}"}
-                
-    except Exception as e:
-        return {"success": False, "message": f"Error saving duty analysis: {str(e)}"}
-
-def save_staff_recognition(recognition_data, week_ending_date, created_by_user_id=None):
-    """Save a staff recognition report to the database for permanent storage"""
-    try:
-        # Extract recognition components
-        ascend_rec = recognition_data.get("ascend_recognition", {})
-        north_rec = recognition_data.get("north_recognition", {})
-        
-        # Create formatted recognition text
-        recognition_text = f"""# Weekly Staff Recognition Report
-
-**Week Ending:** {week_ending_date}
-**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-## 🌟 ASCEND Recognition
-"""
-        
-        except Exception as e:
-            return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
-        except Exception as e:
-            error_msg = str(e)
-
-            # Check if it's a table doesn't exist error
-            if "does not exist" in error_msg or "relation" in error_msg:
-                return {
-                    "success": False,
-                    "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
-                }
-            # Check for RLS error and try fallback
-            elif "42501" in error_msg or "row-level security" in error_msg:
-                try:
-                    # Use admin client to bypass RLS
-                    admin_client = get_admin_client()
-                    response = admin_client.table("saved_staff_recognition").upsert(save_data, on_conflict=["week_ending_date"]).execute()
-                    if response.data:
-                        return {
+                        except Exception as e:
+                            return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
                             "success": True,
                             "message": f"Staff recognition saved/updated for week ending {week_ending_date} (via admin override)",
                             "saved_id": response.data[0]['id']
