@@ -431,7 +431,7 @@ def duty_analysis_section():
             if st.button("💾 Save Analysis", key="save_duty_analysis"):
                 try:
                     from src.database import save_duty_analysis
-                    user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                    user_id = getattr(st.session_state.get('user', None), 'id', 'Unknown')
                     week_ending = str(filter_info.get('end_date'))
                     analysis_data = {
                         'summary': st.session_state['duty_analysis_summary'],
@@ -456,7 +456,7 @@ def duty_analysis_section():
             if st.button("💾 Save Weekly Report", key="save_weekly_report"):
                 try:
                     admin_supabase = get_admin_client()
-                    user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                    user_id = getattr(st.session_state.get('user', None), 'id', 'Unknown')
                     week_ending = str(filter_info.get('end_date'))
                     insert_data = {
                         "created_by": user_id,
