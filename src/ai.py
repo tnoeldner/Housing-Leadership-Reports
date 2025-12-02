@@ -1,3 +1,62 @@
+import streamlit as st
+import json
+import re
+from google import genai
+from google.genai import types
+from src.config import get_secret
+
+client = None
+
+def init_ai():
+    global client
+    api_key = get_secret("GOOGLE_API_KEY")
+    if not api_key:
+        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+        st.stop()
+    try:
+        client = genai.Client(api_key=api_key)
+        return True
+    except Exception as e:
+        st.error(f"❌ Google AI API key configuration failed: {e}")
+        st.info("Please update your Google AI API key in secrets or environment variables.")
+        st.stop()
+
+def clean_summary_response(text):
+    if not text:
+        return text
+    cleaned_text = text.strip()
+    # ...existing code for cleaning...
+    return cleaned_text
+
+def generate_individual_report_summary(items_to_categorize):
+    """
+    Generate a unique summary for an individual report using Gemini AI.
+    items_to_categorize: list of dicts representing report items (successes/challenges/events)
+    Returns a cleaned summary string.
+    """
+    global client
+    if client is None:
+        init_ai()
+    report_json = json.dumps(items_to_categorize, indent=2)
+    prompt = f"""
+You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise summary for the week. Focus on professional development, engagement, successes, and challenges. Use clear, professional language and reference specific activities where possible.
+
+STAFF REPORT DATA:
+{report_json}
+"""
+    try:
+        with st.spinner("AI is generating your individual summary..."):
+            result = client.generate_content(
+                model="gemini-2.5-pro",
+                contents=prompt
+            )
+            summary_text = getattr(result, "text", None)
+            if not summary_text or not summary_text.strip():
+                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+            return clean_summary_response(summary_text)
+    except Exception as e:
+        st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
+        return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
 def generate_admin_dashboard_summary(
     selected_date_for_summary,
     reports_text,
@@ -115,20 +174,11 @@ CRITICAL FORMATTING REQUIREMENTS:
 - For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement)
 - Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets
 - Ensure every staff member's activities are analyzed for UND LEADS alignment - do not leave this section empty
-- CREATE PROPER MARKDOWN TABLES: Use exact table formats shown, ensure proper alignment with | symbols
-- If duty reports data is provided, create the Quantitative Metrics table using the hall-by-hall data provided, including totals row
-- For Campus Events and Operational & Safety tables: follow exact column structures and formatting shown
-Here is the raw report data from all reports for the week, which includes the names of each team member and their categorized activities:
-
-STAFF REPORTS DATA:
-{reports_text}
-
-{duty_reports_section}
 
 {engagement_reports_section}
 """
     global client
-    if client is None:
+            result = client.generate_content(
         init_ai()
     with st.spinner("AI is generating the admin dashboard summary..."):
         result = client.models.generate_content(
@@ -169,7 +219,7 @@ def get_gemini_models():
     if client is None:
         init_ai()
     try:
-        models = list(client.models.list())
+            models = list(client.list_models())
         return models
     except Exception as e:
         return f"Error listing models: {e}"
@@ -180,7 +230,7 @@ def gemini_test_prompt(prompt="Hello Gemini, are you working?", model_name="gemi
     if client is None:
         init_ai()
     try:
-        response = client.models.generate_content(
+            response = client.generate_content(
             model=model_name,
             contents=prompt
         )
@@ -463,7 +513,7 @@ Please provide a comprehensive supervisory analysis:
         if client is None:
             init_ai()
         with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
-            result = client.models.generate_content(
+                        result = client.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt
             )
@@ -522,7 +572,7 @@ Format the response in clear markdown with headers and bullet points. Focus on a
         if client is None:
             init_ai()
         with st.spinner("AI is analyzing form submissions..."):
-            result = client.models.generate_content(
+                result = client.generate_content(
                 model="gemini-2.5-pro",
                 contents=prompt
             )

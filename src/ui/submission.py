@@ -220,18 +220,21 @@ def submit_and_edit_page():
     def process_report_with_ai(items_to_categorize):
         if not items_to_categorize:
             return None
-        fallback_result = {
-            "categorized_items": [
-                {
-                    "id": item["id"],
-                    "ascend_category": "Development",
-                    "north_category": "Nurturing Student Success & Development"
-                } for item in items_to_categorize
-            ],
-            "individual_summary": "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
+
+        from src.ai import generate_individual_report_summary
+        individual_summary = generate_individual_report_summary(items_to_categorize)
+        # Fallback for categories (can be improved to use AI in future)
+        categorized_items = [
+            {
+                "id": item["id"],
+                "ascend_category": "Development",
+                "north_category": "Nurturing Student Success & Development"
+            } for item in items_to_categorize
+        ]
+        return {
+            "categorized_items": categorized_items,
+            "individual_summary": individual_summary
         }
-        st.info("ℹ️ AI categorization used fallback defaults. You can manually review and adjust categories if needed.")
-        return fallback_result
 
     def show_submission_form():
         report_data = st.session_state["report_to_edit"]
