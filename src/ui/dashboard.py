@@ -479,22 +479,33 @@ def dashboard_page(supervisor_mode=False):
                         for dr in st.session_state['weekly_duty_reports']:
                             week_match = False
                             dr_week = dr.get('week_ending_date')
+                            debug_msg = ''
                             try:
                                 # Allow ±1 day window for matching
                                 if dr_week:
                                     dr_date = pd.to_datetime(str(dr_week)).date()
                                     summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
-                                    if abs((dr_date - summary_date).days) <= 1:
+                                    diff_days = abs((dr_date - summary_date).days)
+                                    debug_msg = f"Duty analysis date: {dr_date}, summary week: {summary_date}, diff: {diff_days} days. "
+                                    if diff_days <= 1:
                                         week_match = True
+                                        debug_msg += "INCLUDED (±1 day window)"
+                                    else:
+                                        debug_msg += "NOT included (outside ±1 day window)"
                                 elif dr.get('date_range'):
                                     start, end = dr['date_range'].split(' to ')
                                     start_date = pd.to_datetime(start).date()
                                     end_date = pd.to_datetime(end).date()
                                     summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
+                                    debug_msg = f"Duty analysis date range: {start_date} to {end_date}, summary week: {summary_date}. "
                                     if start_date <= summary_date <= end_date:
                                         week_match = True
-                            except Exception:
-                                pass
+                                        debug_msg += "INCLUDED (within date range)"
+                                    else:
+                                        debug_msg += "NOT included (outside date range)"
+                            except Exception as e:
+                                debug_msg = f"ERROR parsing duty analysis date: {e}"
+                            st.info(debug_msg)
                             if week_match:
                                 filtered_duty_reports.append(dr)
                         if filtered_duty_reports:
