@@ -22,11 +22,11 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
-        # Auto-load all saved duty analyses into session state if not already set
-        if 'weekly_duty_reports' not in st.session_state or not st.session_state['weekly_duty_reports']:
-            admin_supabase = get_admin_client()
-            duty_analyses_response = admin_supabase.table("saved_duty_analyses").select("*").order("created_at", desc=True).execute()
-            st.session_state['weekly_duty_reports'] = getattr(duty_analyses_response, "data", None) or []
+    # Auto-load all saved duty analyses into session state if not already set
+    if 'weekly_duty_reports' not in st.session_state or not st.session_state['weekly_duty_reports']:
+        admin_supabase = get_admin_client()
+        duty_analyses_response = admin_supabase.table("saved_duty_analyses").select("*").order("created_at", desc=True).execute()
+        st.session_state['weekly_duty_reports'] = getattr(duty_analyses_response, "data", None) or []
     # Defensive: always assign all_reports and all_staff as lists of dicts
     all_reports = []
     all_staff = []
