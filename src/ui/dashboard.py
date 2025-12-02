@@ -477,12 +477,9 @@ def dashboard_page(supervisor_mode=False):
                         # Try to match on week_ending_date or date_range
                         filtered_duty_reports = []
                         for dr in st.session_state['weekly_duty_reports']:
-                            # Try to match by week_ending_date or by date_range containing selected_date_for_summary
                             week_match = False
-                            # Check for direct match on week_ending_date
                             if str(dr.get('week_ending_date')) == str(selected_date_for_summary):
                                 week_match = True
-                            # Or check if selected_date_for_summary is within date_range (if available)
                             elif dr.get('date_range'):
                                 try:
                                     start, end = dr['date_range'].split(' to ')
@@ -493,7 +490,7 @@ def dashboard_page(supervisor_mode=False):
                             if week_match:
                                 filtered_duty_reports.append(dr)
                         if filtered_duty_reports:
-                            st.info(f"🛡️ **Including Weekly Duty Reports:** Found {len(filtered_duty_reports)} duty analysis report(s) for this week.")
+                            st.success(f"🛡️ Duty analysis FOUND for this week. It will be included in the summary.")
                             duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
                             for i, duty_report in enumerate(filtered_duty_reports, 1):
                                 duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
@@ -502,6 +499,10 @@ def dashboard_page(supervisor_mode=False):
                                 duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
                                 duty_reports_section += duty_report.get('summary', '')
                                 duty_reports_section += "\n" + "="*50 + "\n"
+                        else:
+                            st.warning("⚠️ No duty analysis found for this week. None will be included in the summary.")
+                    else:
+                        st.info("ℹ️ No duty analyses are loaded in session. None will be included in the summary.")
 
                     # Check for saved weekly engagement reports to integrate
                     engagement_reports_section = ""
