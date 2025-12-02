@@ -197,6 +197,9 @@ def weekly_reports_viewer():
             except Exception as e:
                 st.error(f"Error fetching reports: {str(e)}")
 
+def to_iso(val):
+    return val.isoformat() if hasattr(val, 'isoformat') else val
+
 def duty_analysis_section():
     """Specialized section for duty report analysis"""
     st.subheader("🛡️ Duty Analysis")
@@ -433,21 +436,20 @@ def duty_analysis_section():
                     from src.database import save_duty_analysis
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
+                    # Convert date fields to ISO strings
+                    week_ending = to_iso(filter_info.get('end_date'))
+                    filter_info_serialized = dict(filter_info)
+                    if 'start_date' in filter_info_serialized:
+                        filter_info_serialized['start_date'] = to_iso(filter_info_serialized['start_date'])
+                    if 'end_date' in filter_info_serialized:
+                        filter_info_serialized['end_date'] = to_iso(filter_info_serialized['end_date'])
                     analysis_data = {
                         'report_type': '📊 Standard Analysis',
-                        'filter_info': filter_info,
+                        'filter_info': filter_info_serialized,
                         'selected_forms': selected_forms,
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
-                    week_ending = filter_info.get('end_date')
-                    # Convert date fields to ISO strings if needed
-                    if hasattr(week_ending, 'isoformat'):
-                        week_ending = week_ending.isoformat()
-                    if 'start_date' in filter_info and hasattr(filter_info['start_date'], 'isoformat'):
-                        analysis_data['filter_info']['start_date'] = filter_info['start_date'].isoformat()
-                    if 'end_date' in filter_info and hasattr(filter_info['end_date'], 'isoformat'):
-                        analysis_data['filter_info']['end_date'] = filter_info['end_date'].isoformat()
                     result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
@@ -459,14 +461,20 @@ def duty_analysis_section():
                     from src.database import save_duty_analysis
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
+                    # Convert date fields to ISO strings
+                    week_ending = to_iso(filter_info.get('end_date'))
+                    filter_info_serialized = dict(filter_info)
+                    if 'start_date' in filter_info_serialized:
+                        filter_info_serialized['start_date'] = to_iso(filter_info_serialized['start_date'])
+                    if 'end_date' in filter_info_serialized:
+                        filter_info_serialized['end_date'] = to_iso(filter_info_serialized['end_date'])
                     analysis_data = {
                         'report_type': '📅 Weekly Summary Report',
-                        'filter_info': filter_info,
+                        'filter_info': filter_info_serialized,
                         'selected_forms': selected_forms,
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
-                    week_ending = filter_info.get('end_date')
                     result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
