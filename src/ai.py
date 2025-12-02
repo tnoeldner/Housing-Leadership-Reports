@@ -64,6 +64,7 @@ Personal Check-in: {personal_check_in}
 Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
+    summary_text = None
     try:
         with st.spinner("AI is generating your individual summary..."):
             result = client.generate_content(
@@ -71,14 +72,16 @@ Well-being Rating: {well_being_rating}
                 contents=prompt
             )
             summary_text = getattr(result, "text", None)
-            st.write("--- RAW AI RESPONSE ---")
-            st.write(summary_text if summary_text is not None else "[None]")
-            if not summary_text or not summary_text.strip():
-                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return clean_summary_response(summary_text)
     except Exception as e:
+        st.write("--- RAW AI RESPONSE ---")
+        st.write(summary_text if summary_text is not None else "[None]")
         st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
         return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
+    st.write("--- RAW AI RESPONSE ---")
+    st.write(summary_text if summary_text is not None else "[None]")
+    if not summary_text or not summary_text.strip():
+        return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+    return clean_summary_response(summary_text)
 def generate_admin_dashboard_summary(
     selected_date_for_summary,
     reports_text,
