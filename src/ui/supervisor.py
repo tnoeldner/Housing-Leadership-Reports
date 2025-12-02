@@ -488,14 +488,6 @@ def duty_analysis_section():
                                 st.error(f"Error updating weekly report: {update_e}")
                         else:
                             st.error(f"Error saving weekly report: {e}")
-                                if hasattr(update_response, "data") and update_response.data:
-                                    st.success("Weekly report updated in archive!")
-                                else:
-                                    st.warning(f"Could not update weekly report. Response: {getattr(update_response, 'data', update_response)}")
-                            except Exception as update_e:
-                                st.error(f"Error updating weekly report: {update_e}")
-                        else:
-                            st.error(f"Error saving weekly report: {e}")
 
 
 def engagement_analysis_section():
