@@ -464,14 +464,30 @@ def duty_analysis_section():
                         "summary_text": st.session_state['weekly_report_summary'],
                         "created_at": datetime.now().isoformat()
                     }
-                    response = admin_supabase.table("weekly_summaries").insert(insert_data).execute()
-                    # Treat any non-empty response.data as success
-                    if getattr(response, "status_code", None) == 201 or (hasattr(response, "data") and response.data):
-                        st.success("Weekly report saved to archive!")
-                    else:
-                        st.warning(f"Could not save weekly report. Response: {getattr(response, 'data', response)}")
-                except Exception as e:
-                    st.error(f"Error saving weekly report: {e}")
+                    try:
+                        response = admin_supabase.table("weekly_summaries").insert(insert_data).execute()
+                        if getattr(response, "status_code", None) == 201 or (hasattr(response, "data") and response.data):
+                            st.success("Weekly report saved to archive!")
+                        else:
+                            st.warning(f"Could not save weekly report. Response: {getattr(response, 'data', response)}")
+                    except Exception as e:
+                        # If duplicate key error, update instead
+                        if hasattr(e, 'args') and any('duplicate key' in str(arg) for arg in e.args):
+                            try:
+                                update_data = {
+                                    "summary_text": st.session_state['weekly_report_summary'],
+                                    "created_by": user_id,
+                                    "created_at": datetime.now().isoformat()
+                                }
+                                update_response = admin_supabase.table("weekly_summaries").update(update_data).eq("week_ending_date", week_ending).execute()
+                                if hasattr(update_response, "data") and update_response.data:
+                                    st.success("Weekly report updated in archive!")
+                                else:
+                                    st.warning(f"Could not update weekly report. Response: {getattr(update_response, 'data', update_response)}")
+                            except Exception as update_e:
+                                st.error(f"Error updating weekly report: {update_e}")
+                        else:
+                            st.error(f"Error saving weekly report: {e}")
 
 
 def engagement_analysis_section():
