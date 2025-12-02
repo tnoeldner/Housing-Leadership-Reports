@@ -37,12 +37,32 @@ def generate_individual_report_summary(items_to_categorize):
     global client
     if client is None:
         init_ai()
+    # Accept additional context via st.session_state for richer prompt
+    team_member = st.session_state.get("full_name") or st.session_state.get("title") or st.session_state.get("user", {}).get("email", "Unknown")
+    week_ending_date = st.session_state.get("active_saturday") or st.session_state.get("week_ending_date")
+    professional_development = st.session_state.get("prof_dev", "")
+    key_topics_lookahead = st.session_state.get("lookahead", "")
+    personal_check_in = st.session_state.get("personal_check_in", "")
+    well_being_rating = st.session_state.get("well_being_rating", "")
+    director_concerns = st.session_state.get("director_concerns", "")
     report_json = json.dumps(items_to_categorize, indent=2)
     prompt = f"""
-You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise summary for the week. Focus on professional development, engagement, successes, and challenges. Use clear, professional language and reference specific activities where possible.
+You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise, director-focused summary for the week ending {week_ending_date}. Your summary should:
+- Reference the staff member by name: {team_member}
+- Highlight professional development, engagement, successes, and challenges
+- Include any personal well-being check-in and overall well-being score ({well_being_rating}/5)
+- Note any concerns for the director and key topics/lookahead
+- Use clear, professional language and reference specific activities where possible
+- Be written for the director to quickly understand the staff member's overall week and priorities
 
 STAFF REPORT DATA:
 {report_json}
+
+Professional Development: {professional_development}
+Key Topics & Lookahead: {key_topics_lookahead}
+Personal Check-in: {personal_check_in}
+Director Concerns: {director_concerns}
+Well-being Rating: {well_being_rating}
 """
     try:
         with st.spinner("AI is generating your individual summary..."):
