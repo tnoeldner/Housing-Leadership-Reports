@@ -433,26 +433,21 @@ def duty_analysis_section():
                     from src.database import save_duty_analysis
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
-                    # Convert all date fields to ISO strings
-                    week_ending = filter_info.get('end_date')
-                    start_date = filter_info.get('start_date')
-                    end_date = filter_info.get('end_date')
-                    if hasattr(week_ending, 'isoformat'):
-                        week_ending = week_ending.isoformat()
-                    if hasattr(start_date, 'isoformat'):
-                        start_date = start_date.isoformat()
-                    if hasattr(end_date, 'isoformat'):
-                        end_date = end_date.isoformat()
                     analysis_data = {
                         'report_type': '📊 Standard Analysis',
-                        'filter_info': {
-                            'start_date': start_date,
-                            'end_date': end_date,
-                        },
+                        'filter_info': filter_info,
                         'selected_forms': selected_forms,
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
+                    week_ending = filter_info.get('end_date')
+                    # Convert date fields to ISO strings if needed
+                    if hasattr(week_ending, 'isoformat'):
+                        week_ending = week_ending.isoformat()
+                    if 'start_date' in filter_info and hasattr(filter_info['start_date'], 'isoformat'):
+                        analysis_data['filter_info']['start_date'] = filter_info['start_date'].isoformat()
+                    if 'end_date' in filter_info and hasattr(filter_info['end_date'], 'isoformat'):
+                        analysis_data['filter_info']['end_date'] = filter_info['end_date'].isoformat()
                     result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
@@ -834,37 +829,32 @@ def general_form_analysis_section():
             max_general_forms = st.slider("Max forms to analyze", 
                                 min_value=1, 
                                 max_value=1000, 
-                                else:
-                                    if st.button("💾 Save Weekly Duty Analysis", key="save_weekly_duty_analysis"):
-                                        from src.database import save_duty_analysis
-                                        user = st.session_state.get('user')
-                                        user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
-                                        # Convert all date fields to ISO strings
-                                        week_ending = filter_info.get('end_date')
-                                        start_date = filter_info.get('start_date')
-                                        end_date = filter_info.get('end_date')
-                                        if hasattr(week_ending, 'isoformat'):
-                                            week_ending = week_ending.isoformat()
-                                        if hasattr(start_date, 'isoformat'):
-                                            start_date = start_date.isoformat()
-                                        if hasattr(end_date, 'isoformat'):
-                                            end_date = end_date.isoformat()
-                                        analysis_data = {
-                                            'report_type': '📅 Weekly Summary Report',
-                                            'filter_info': {
-                                                'start_date': start_date,
-                                                'end_date': end_date,
-                                            },
-                                            'selected_forms': selected_forms,
-                                            'all_selected_forms': selected_forms,
-                                            'summary': summary
-                                        }
-                                        result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
-                                        st.session_state['last_save_result'] = result
-                                        if result.get('success'):
-                                            st.success(result.get('message', 'Duty analysis saved.'))
-                                        else:
-                                            st.error(result.get('message', 'Failed to save duty analysis.'))
+                                value=500,
+                                help="Set high limit to analyze all forms (AI can handle large datasets)",
+                                key="max_general_forms")
+            
+            if len(selected_general_forms) > 0:
+                st.success(f"✅ {len(selected_general_forms)} forms selected")
+                
+                # Show helpful message for large datasets
+                if len(selected_general_forms) > 100:
+                    st.info(f"💪 **Large Dataset Ready:** You can analyze all {len(selected_general_forms)} forms! Set the slider to {len(selected_general_forms)} or higher.")
+                
+                if st.button("🤖 Generate Analysis", type="primary", key="analyze_general"):
+                    if len(selected_general_forms) > max_general_forms:
+                        st.warning(f"⚠️ Too many forms selected. Analyzing first {max_general_forms} forms.")
+                    
+                    # Use general form summary
+                    summary = summarize_form_submissions(
+                        selected_general_forms[:max_general_forms], 
+                        max_general_forms
+                    )
+                    
+                    # Display results
+                    st.subheader("📊 General Analysis Results")
+                    st.markdown(summary)
+                    
+                    # Download option
                     date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
                     
                     summary_data = f"""# General Form Analysis Summary
