@@ -201,6 +201,15 @@ def to_iso(val):
     return val.isoformat() if hasattr(val, 'isoformat') else val
 
 def duty_analysis_section():
+                        # Debug: Show which client and key is being used
+                        client_type = "ADMIN (service role)" if role == 'admin' else "DEFAULT (anon/public)"
+                        st.markdown(f"**Debug:** Saving with client type: `{client_type}`")
+                        try:
+                            # Try to print the key (will be masked in UI, but useful for local logs)
+                            key_used = db_client._supabase_key if hasattr(db_client, '_supabase_key') else 'Unknown'
+                            st.markdown(f"**Debug:** Supabase key used: `{key_used[:8]}...` (first 8 chars)")
+                        except Exception as e:
+                            st.markdown(f"**Debug:** Could not access Supabase key: {e}")
     """Specialized section for duty report analysis"""
     st.subheader("🛡️ Duty Analysis")
     st.markdown("""
