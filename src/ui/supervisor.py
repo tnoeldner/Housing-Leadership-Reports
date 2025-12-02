@@ -431,7 +431,8 @@ def duty_analysis_section():
             if analysis_type == "📊 Standard Analysis":
                 if st.button("💾 Save Analysis", key="save_duty_analysis"):
                     from src.database import save_duty_analysis
-                    user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                    user = st.session_state.get('user')
+                    user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
                     analysis_data = {
                         'report_type': '📊 Standard Analysis',
                         'filter_info': filter_info,
@@ -449,7 +450,8 @@ def duty_analysis_section():
             else:
                 if st.button("💾 Save Weekly Duty Analysis", key="save_weekly_duty_analysis"):
                     from src.database import save_duty_analysis
-                    user_id = st.session_state.get('user', {}).get('id', 'Unknown')
+                    user = st.session_state.get('user')
+                    user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
                     analysis_data = {
                         'report_type': '📅 Weekly Summary Report',
                         'filter_info': filter_info,
