@@ -71,7 +71,7 @@ def get_user_client():
     url = get_secret("SUPABASE_URL")
     key = get_secret("SUPABASE_KEY")
     access_token = st.session_state.get("access_token")
-    client = create_client(url, key)
+    client = create_client(str(url), str(key))
     if access_token:
         client.auth.set_session(access_token, access_token)
     return client
@@ -79,15 +79,8 @@ def get_user_client():
 def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None):
     """Save a duty analysis report to the database for permanent storage"""
     pass
-    try:
-        # Determine report type
-        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
-        
-        # Handle date conversions for database storage
-        start_date = analysis_data['filter_info']['start_date']
-        end_date = analysis_data['filter_info']['end_date']
-        
-        # Convert to ISO format strings if they're date objects
+    
+
 def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None):
     """Save or update a weekly summary report in the weekly_summaries table."""
     try:
@@ -113,75 +106,19 @@ def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None)
         }
 
         # Use upsert to insert or update on conflict
-        response = supabase.table("weekly_summaries").upsert(save_data, on_conflict=["week_ending_date"]).execute()
-        if response.data:
+        response = supabase.table("weekly_summaries").upsert(save_data, on_conflict="week_ending_date").execute()
+        if response.data and isinstance(response.data, list) and len(response.data) > 0:
+            saved_id = response.data[0].get('id') if isinstance(response.data[0], dict) else None
             return {
                 "success": True,
                 "message": f"Weekly summary saved/updated for week ending {week_ending_date}",
-                "saved_id": response.data[0].get('id')
+                "saved_id": saved_id
             }
         else:
             return {"success": False, "message": "Failed to save weekly summary"}
     except Exception as e:
         return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
-        
-        # Check for existing analysis with same week ending date and user
-        existing_query = supabase.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
-        if created_by_user_id:
-            existing_query = existing_query.eq("created_by", created_by_user_id)
-        
-        existing_response = existing_query.execute()
-        existing_records = existing_response.data if existing_response.data else []
-        
-        # Prepare data for saving
-        save_data = {
-            'week_ending_date': week_ending_date,
-            'report_type': report_type,
-            'date_range_start': start_date,
-            'date_range_end': end_date,
-            'reports_analyzed': len(analysis_data['selected_forms']),
-            'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
-            'analysis_text': analysis_data['summary'],
-            'created_by': created_by_user_id,
-            'updated_at': datetime.now().isoformat()
-        }
-        
-        # Save to database with enhanced duplicate detection
-        if existing_records:
-            # Record already exists, provide feedback but don't create duplicate
-            return {
-                "success": True,
-                "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
-                "existing_id": existing_records[0]['id'],
-                "action": "duplicate_prevented"
-            }
-        else:
-            # No existing record, safe to insert
-            try:
-                response = supabase.table("saved_duty_analyses").insert(save_data).execute()
-                
-                if response.data:
-                    return {
-                        "success": True, 
-                        "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
-                        "saved_id": response.data[0]['id'],
-                        except Exception as e:
-                            return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
-                            "success": True,
-                            "message": f"Staff recognition saved/updated for week ending {week_ending_date} (via admin override)",
-                            "saved_id": response.data[0]['id']
-                        }
-                except Exception as admin_e:
-                    admin_error_msg = str(admin_e)
-                    return {"success": False, "message": f"Error saving staff recognition (admin override failed): {admin_error_msg}"}
-
-                return {"success": False, "message": f"Database error: {error_msg}"}
-            else:
-                return {"success": False, "message": f"Database error: {error_msg}"}
-            
-    except Exception as e:
-        return {"success": False, "message": f"Error saving staff recognition: {str(e)}"}
-
+    
 def save_staff_performance_scores(all_scores, week_ending_date, created_by_user_id=None):
     """Save individual staff performance scores to the database for historical tracking
     
@@ -292,60 +229,3 @@ def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id
     """Save a duty analysis report to the database for permanent storage"""
     pass
 
-def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None):
-    """Save or update a weekly summary report in the weekly_summaries table."""
-    try:
-        # Convert to ISO format strings if they're date objects
-        start_date = summary_data.get('date_range_start')
-        end_date = summary_data.get('date_range_end')
-        if hasattr(start_date, 'isoformat'):
-            start_date = start_date.isoformat()
-        if hasattr(end_date, 'isoformat'):
-            end_date = end_date.isoformat()
-
-        # Prepare data for saving
-        save_data = {
-            'week_ending_date': week_ending_date,
-            'report_type': summary_data.get('report_type', 'weekly_summary'),
-            'date_range_start': start_date,
-            'date_range_end': end_date,
-            'reports_analyzed': summary_data.get('reports_analyzed'),
-            'total_selected': summary_data.get('total_selected'),
-            'analysis_text': summary_data.get('analysis_text'),
-            'created_by': created_by_user_id,
-            'updated_at': datetime.now().isoformat()
-        }
-
-        # Use upsert to insert or update on conflict
-        response = supabase.table("weekly_summaries").upsert(save_data, on_conflict=["week_ending_date"]).execute()
-        if response.data:
-            return {
-                "success": True,
-                "message": f"Weekly summary saved/updated for week ending {week_ending_date}",
-                "saved_id": response.data[0].get('id')
-            }
-        else:
-            return {"success": False, "message": "Failed to save weekly summary"}
-    except Exception as e:
-        return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
-                
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Check if it's a table doesn't exist error
-            if "does not exist" in error_msg or "relation" in error_msg:
-                return {
-                    "success": False, 
-                    "message": "Database tables not found. Please run the database schema setup first. See database_schema_engagement_reports.sql"
-                }
-            # Check if it's a duplicate key error
-            elif "duplicate key" in error_msg or "already exists" in error_msg:
-                return {
-                    "success": True,
-                    "message": f"Analysis for week ending {week_ending_date} already exists (no duplicate created)"
-                }
-            else:
-                return {"success": False, "message": f"Database error: {error_msg}"}
-            
-    except Exception as e:
-        return {"success": False, "message": f"Error saving engagement analysis: {str(e)}"}
