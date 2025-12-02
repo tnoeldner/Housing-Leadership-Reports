@@ -114,6 +114,11 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
             'created_at': now,
             'updated_at': now
         }
+        print("[DEBUG] save_data to Supabase:", save_data)
+        try:
+            st.write("[DEBUG] save_data to Supabase:", save_data)
+        except Exception:
+            pass
         
         # Save to database with enhanced duplicate detection
         if existing_records:
