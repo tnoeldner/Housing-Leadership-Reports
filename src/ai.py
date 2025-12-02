@@ -71,7 +71,8 @@ Well-being Rating: {well_being_rating}
                 contents=prompt
             )
             summary_text = getattr(result, "text", None)
-            st.info(f"Raw AI response:\n{summary_text}")
+            st.write("--- RAW AI RESPONSE ---")
+            st.write(summary_text if summary_text is not None else "[None]")
             if not summary_text or not summary_text.strip():
                 return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
             return clean_summary_response(summary_text)
