@@ -524,8 +524,6 @@ def dashboard_page(supervisor_mode=False):
                                 duty_reports_section += "\n" + "="*50 + "\n"
                         else:
                             st.warning("⚠️ No duty analysis found for this week. None will be included in the summary.")
-                    else:
-                        st.info("ℹ️ No duty analyses are loaded in session. None will be included in the summary.")
 
                     # Check for saved weekly engagement reports to integrate
                     engagement_reports_section = ""
