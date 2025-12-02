@@ -462,11 +462,16 @@ def duty_analysis_section():
                         }
                         week_ending = filter_info.get('end_date')
                         result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
-                        st.write("Save result:", result)
+                        st.session_state['last_weekly_analysis'] = summary
+                        st.session_state['last_save_result'] = result
                         if result.get('success'):
                             st.success(result.get('message', 'Duty analysis saved.'))
                         else:
                             st.error(result.get('message', 'Failed to save duty analysis.'))
+                    # Show debug info if available
+                    if 'last_save_result' in st.session_state:
+                        st.markdown("**Debug Save Result:**")
+                        st.write(st.session_state['last_save_result'])
 
 
 def engagement_analysis_section():
