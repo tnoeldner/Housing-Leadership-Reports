@@ -462,6 +462,7 @@ def duty_analysis_section():
                         }
                         week_ending = filter_info.get('end_date')
                         result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
+                        st.write("Save result:", result)
                         if result.get('success'):
                             st.success(result.get('message', 'Duty analysis saved.'))
                         else:

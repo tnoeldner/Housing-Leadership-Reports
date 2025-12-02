@@ -101,6 +101,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
         existing_records = existing_response.data if existing_response.data else []
         
         # Prepare data for saving
+        now = datetime.now().isoformat()
         save_data = {
             'week_ending_date': week_ending_date,
             'report_type': report_type,
@@ -110,7 +111,8 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
             'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
             'analysis_text': analysis_data['summary'],
             'created_by': created_by_user_id,
-            'updated_at': datetime.now().isoformat()
+            'created_at': now,
+            'updated_at': now
         }
         
         # Save to database with enhanced duplicate detection
