@@ -178,10 +178,10 @@ CRITICAL FORMATTING REQUIREMENTS:
 {engagement_reports_section}
 """
     global client
-            result = client.generate_content(
+    if client is None:
         init_ai()
     with st.spinner("AI is generating the admin dashboard summary..."):
-        result = client.models.generate_content(
+        result = client.generate_content(
             model="gemini-2.5-pro",
             contents=prompt
         )
