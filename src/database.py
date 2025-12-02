@@ -87,6 +87,34 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
         end_date = analysis_data['filter_info']['end_date']
         
         # Convert to ISO format strings if they're date objects
+def save_weekly_summary(summary_data, week_ending_date, created_by_user_id=None):
+    """Save or update a weekly summary report in the weekly_summaries table."""
+    try:
+        # Prepare data for saving
+        save_data = {
+            'week_ending_date': week_ending_date,
+            'report_type': summary_data.get('report_type', 'weekly_summary'),
+            'date_range_start': summary_data.get('date_range_start'),
+            'date_range_end': summary_data.get('date_range_end'),
+            'reports_analyzed': summary_data.get('reports_analyzed'),
+            'total_selected': summary_data.get('total_selected'),
+            'analysis_text': summary_data.get('analysis_text'),
+            'created_by': created_by_user_id,
+            'updated_at': datetime.now().isoformat()
+        }
+
+        # Use upsert to insert or update on conflict
+        response = supabase.table("weekly_summaries").upsert(save_data, on_conflict=["week_ending_date"]).execute()
+        if response.data:
+            return {
+                "success": True,
+                "message": f"Weekly summary saved/updated for week ending {week_ending_date}",
+                "saved_id": response.data[0].get('id')
+            }
+        else:
+            return {"success": False, "message": "Failed to save weekly summary"}
+    except Exception as e:
+        return {"success": False, "message": f"Error saving weekly summary: {str(e)}"}
         if hasattr(start_date, 'isoformat'):
             start_date = start_date.isoformat()
         if hasattr(end_date, 'isoformat'):
