@@ -572,7 +572,7 @@ Format the response in clear markdown with headers and bullet points. Focus on a
         if client is None:
             init_ai()
         with st.spinner("AI is analyzing form submissions..."):
-                result = client.generate_content(
+            result = client.generate_content(
                 model="gemini-2.5-pro",
                 contents=prompt
             )
