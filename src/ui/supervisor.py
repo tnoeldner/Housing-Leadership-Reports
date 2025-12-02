@@ -484,10 +484,13 @@ def duty_analysis_section():
                         st.success(result.get('message', 'Duty analysis saved.'))
                     else:
                         st.error(result.get('message', 'Failed to save duty analysis.'))
-            # Show debug info if available
-            if 'last_save_result' in st.session_state:
-                st.markdown("**Debug Save Result:**")
-                st.write(st.session_state['last_save_result'])
+                    # Show debug info if available
+                    if 'last_save_result' in st.session_state:
+                        st.markdown("**Debug Save Result:**")
+                        st.write(st.session_state['last_save_result'])
+                        if 'debug_save_data' in st.session_state['last_save_result']:
+                            st.markdown("**Debug: Payload sent to Supabase:**")
+                            st.json(st.session_state['last_save_result']['debug_save_data'])
 
 
 def engagement_analysis_section():

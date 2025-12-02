@@ -115,10 +115,8 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
             'updated_at': now
         }
         print("[DEBUG] save_data to Supabase:", save_data)
-        try:
-            st.write("[DEBUG] save_data to Supabase:", save_data)
-        except Exception:
-            pass
+        # Attach save_data to result for UI debug
+        debug_save_data = save_data.copy()
         
         # Save to database with enhanced duplicate detection
         if existing_records:
@@ -127,41 +125,42 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
                 "success": True,
                 "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
                 "existing_id": existing_records[0]['id'],
-                "action": "duplicate_prevented"
+                "action": "duplicate_prevented",
+                "debug_save_data": debug_save_data
             }
         else:
             # No existing record, safe to insert
             try:
                 response = supabase.table("saved_duty_analyses").insert(save_data).execute()
-                
                 if response.data:
                     return {
                         "success": True, 
                         "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
                         "saved_id": response.data[0]['id'],
-                        "action": "created_new"
+                        "action": "created_new",
+                        "debug_save_data": debug_save_data
                     }
                 else:
-                    return {"success": False, "message": "Failed to save duty analysis - no data returned"}
-                    
+                    return {"success": False, "message": "Failed to save duty analysis - no data returned", "debug_save_data": debug_save_data}
             except Exception as e:
                 error_msg = str(e)
-                
                 # Check if it's a table doesn't exist error
                 if "does not exist" in error_msg or "relation" in error_msg:
                     return {
                         "success": False, 
-                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
+                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql",
+                        "debug_save_data": debug_save_data
                     }
                 # Check if it's a duplicate key error (fallback)
                 elif "duplicate key" in error_msg or "already exists" in error_msg or "violates unique constraint" in error_msg:
                     return {
                         "success": True,
                         "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
-                        "action": "duplicate_prevented"
+                        "action": "duplicate_prevented",
+                        "debug_save_data": debug_save_data
                     }
                 else:
-                    return {"success": False, "message": f"Database error: {error_msg}"}
+                    return {"success": False, "message": f"Database error: {error_msg}", "debug_save_data": debug_save_data}
                 
     except Exception as e:
         return {"success": False, "message": f"Error saving duty analysis: {str(e)}"}
