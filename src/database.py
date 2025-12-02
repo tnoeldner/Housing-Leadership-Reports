@@ -78,6 +78,7 @@ def get_user_client():
 
 def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None):
     """Save a duty analysis report to the database for permanent storage"""
+    pass
     try:
         # Determine report type
         report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
