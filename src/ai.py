@@ -205,7 +205,7 @@ Critical incidents and follow-up actions needed based on safety concerns identif
 Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
  
 CRITICAL FORMATTING REQUIREMENTS:
-- Use EXACTLY the markdown headings shown above (## for main sections, ### for subsections)
+- Use EXACTLY the markdown headings shown (## for main sections, ### for subsections)
 - Follow the section structure precisely - do not skip sections or change the order
 - When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...")
 - For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement)
@@ -566,3 +566,11 @@ Format the response in clear markdown with headers and bullet points. Focus on a
             
     except Exception as e:
         return f"Error generating AI summary: {str(e)}"
+
+def get_gemini_models():
+    """Return a list of available Gemini models using the google-genai SDK."""
+    try:
+        models = list(genai.list_models())
+        return models
+    except Exception as e:
+        return f"Error listing models: {e}"
