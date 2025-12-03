@@ -500,6 +500,25 @@ def submit_and_edit_page():
             st.divider()
             st.subheader("Editable Individual Summary")
             st.text_area("AI-Generated Summary", value=draft.get("individual_summary", ""), key="review_summary", height=150)
+            # Add Regenerate AI Summary button
+            if st.button("🔄 Regenerate AI Summary", key="regenerate_ai_summary"):
+                from src.ai import generate_individual_report_summary
+                # Use the current draft report_body as items_to_categorize
+                items_to_categorize = []
+                report_body = draft.get("report_body", {})
+                for section_key, section_data in report_body.items():
+                    for item_type in ["successes", "challenges"]:
+                        for item in section_data.get(item_type, []):
+                            items_to_categorize.append({
+                                "id": None,
+                                "text": item.get("text", ""),
+                                "section": section_key,
+                                "type": item_type
+                            })
+                new_summary = generate_individual_report_summary(items_to_categorize)
+                st.session_state["review_summary"] = new_summary
+                st.success("AI summary regenerated. Please review the debug output above and the new summary below.")
+                st.rerun()
             st.divider()
             col1, col2 = st.columns([3, 1])
             with col2:
