@@ -215,60 +215,7 @@ CRITICAL FORMATTING REQUIREMENTS:
 {engagement_reports_section}
 """
     global client
-    if client is None:
-        init_ai()
-    with st.spinner("AI is generating the admin dashboard summary..."):
-        result = client.generate_content(
-            model="gemini-2.5-pro",
-            contents=prompt
-        )
-        response_text = getattr(result, "text", None)
-        if not response_text or not response_text.strip():
-            return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-        return clean_summary_response(response_text)
-from google import genai
-from google.genai import types
-import streamlit as st
-import re
-from src.config import get_secret
 
-    try:
-        with st.spinner("AI is generating your individual summary..."):
-            model = genai.GenerativeModel("models/gemini-2.5-pro")
-            result = model.generate_content(prompt)
-            response_text = getattr(result, "text", None)
-            import datetime, pprint
-            raw_debug = (
-                f"[SUCCESS] {datetime.datetime.now().isoformat()}\n"
-                f"Result object: {pprint.pformat(result)}\n"
-                f"Summary text: {repr(response_text)}"
-            )
-            st.session_state["raw_ai_response"] = raw_debug
-            print("STREAMLIT RAW AI RESPONSE (SUCCESS):", raw_debug)
-            if not response_text or not response_text.strip():
-                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return clean_summary_response(response_text)
-    except Exception as e:
-        import datetime, traceback
-        raw_debug = (
-            f"[EXCEPTION] {datetime.datetime.now().isoformat()}\n"
-            f"Exception: {e}\n"
-            f"Traceback:\n{traceback.format_exc()}\n"
-        )
-        st.session_state["raw_ai_response"] = raw_debug
-        print("STREAMLIT RAW AI RESPONSE (EXCEPTION):", raw_debug)
-        st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
-        return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
-    if client is None:
-        init_ai()
-    try:
-        response = client.generate_content(
-            model=model_name,
-            contents=prompt
-        )
-        return getattr(response, "text", str(response))
-    except Exception as e:
-        return f"Gemini model error: {e}"
 
 def clean_summary_response(text):
     """Remove unwanted introductory text from AI-generated summaries"""
