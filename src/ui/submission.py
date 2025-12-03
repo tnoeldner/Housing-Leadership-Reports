@@ -176,18 +176,21 @@ def submit_and_edit_page():
             api_key = get_secret("GOOGLE_API_KEY")
             client = genai.Client(api_key=api_key)
             if selected_report.get("individual_summary"):
-                st.info(f"**Your AI-Generated Summary:**\n\n{clean_summary_response(selected_report.get('individual_summary'))}")
+                # Always show RAW AI debug info at the top
                 raw_ai = st.session_state.get("raw_ai_response")
                 if raw_ai:
+                    st.warning("DEBUG: RAW AI RESPONSE FOUND. See expander below.")
                     with st.expander("--- RAW AI RESPONSE ---", expanded=True):
                         st.write(raw_ai)
                 else:
                     # Fallback: try to show from report if present
                     if selected_report.get("raw_ai_response"):
+                        st.warning("DEBUG: RAW AI RESPONSE FOUND IN REPORT. See expander below.")
                         with st.expander("--- RAW AI RESPONSE (from report) ---", expanded=True):
                             st.write(selected_report["raw_ai_response"])
                     else:
-                        st.info("No RAW AI debug info found in session or report.")
+                        st.error("DEBUG: No RAW AI debug info found in session or report. If you see this, please report it to the developer.")
+                st.info(f"**Your AI-Generated Summary:**\n\n{clean_summary_response(selected_report.get('individual_summary'))}")
             report_body = selected_report.get("report_body") or {}
             for section_key, section_name in CORE_SECTIONS.items():
                 section_data = report_body.get(section_key)
