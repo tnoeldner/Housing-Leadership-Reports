@@ -513,6 +513,14 @@ def submit_and_edit_page():
                                 col2.selectbox("Guiding NORTH Category", options=NORTH_VALUES, index=north_index, key=f"review_{section_key}_{item_type}_{i}_north")
             st.divider()
             st.subheader("Editable Individual Summary")
+            # Show RAW AI debug info above the editable summary
+            raw_ai = st.session_state.get("raw_ai_response")
+            if raw_ai:
+                st.warning("DEBUG: RAW AI RESPONSE FOUND. See expander below.")
+                with st.expander("--- RAW AI RESPONSE ---", expanded=True):
+                    st.write(raw_ai)
+            else:
+                st.error("DEBUG: No RAW AI debug info found in session. If you see this, please report it to the developer.")
             st.text_area("AI-Generated Summary", value=draft.get("individual_summary", ""), key="review_summary", height=150)
             st.divider()
             col1, col2 = st.columns([3, 1])
