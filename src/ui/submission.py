@@ -585,5 +585,6 @@ def submit_and_edit_page():
                             st.rerun()
                         except Exception as e:
                             st.error(f"An error occurred while saving the final report: {e}")
+
     else:
         show_report_list()
