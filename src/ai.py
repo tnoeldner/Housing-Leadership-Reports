@@ -205,7 +205,7 @@ Critical incidents and follow-up actions needed based on safety concerns identif
 Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
  
 CRITICAL FORMATTING REQUIREMENTS:
-- Use EXACTLY the markdown headings shown (## for main sections, ### for subsections)
+- Use EXACTLY the markdown headings shown above (## for main sections, ### for subsections)
 - Follow the section structure precisely - do not skip sections or change the order
 - When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...")
 - For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement)
@@ -215,7 +215,65 @@ CRITICAL FORMATTING REQUIREMENTS:
 {engagement_reports_section}
 """
     global client
+    if client is None:
+        init_ai()
+    with st.spinner("AI is generating the admin dashboard summary..."):
+        result = client.generate_content(
+            model="gemini-2.5-pro",
+            contents=prompt
+        )
+        response_text = getattr(result, "text", None)
+        if not response_text or not response_text.strip():
+            return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+        return clean_summary_response(response_text)
+from google import genai
+from google.genai import types
+import streamlit as st
+import re
+from src.config import get_secret
 
+client = None
+
+# Initialize Google Gemini AI using google-genai SDK
+def init_ai():
+    global client
+    api_key = get_secret("GOOGLE_API_KEY")
+    if not api_key:
+        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+        st.stop()
+    try:
+        client = genai.Client(api_key=api_key)
+        return True
+    except Exception as e:
+        st.error(f"❌ Google AI API key configuration failed: {e}")
+        st.info("Please update your Google AI API key in secrets or environment variables.")
+        st.stop()
+
+
+# Return a list of available Gemini models
+def get_gemini_models():
+    global client
+    if client is None:
+        init_ai()
+    try:
+        models = list(client.list_models())
+        return models
+    except Exception as e:
+        return f"Error listing models: {e}"
+
+# Send a test prompt to Gemini and return the response or error
+def gemini_test_prompt(prompt="Hello Gemini, are you working?", model_name="gemini-2.5-pro"):
+    global client
+    if client is None:
+        init_ai()
+    try:
+        response = client.generate_content(
+            model=model_name,
+            contents=prompt
+        )
+        return getattr(response, "text", str(response))
+    except Exception as e:
+        return f"Gemini model error: {e}"
 
 def clean_summary_response(text):
     """Remove unwanted introductory text from AI-generated summaries"""
@@ -566,11 +624,3 @@ Format the response in clear markdown with headers and bullet points. Focus on a
             
     except Exception as e:
         return f"Error generating AI summary: {str(e)}"
-
-def get_gemini_models():
-    """Return a list of available Gemini models using the google-genai SDK."""
-    try:
-        models = list(genai.list_models())
-        return models
-    except Exception as e:
-        return f"Error listing models: {e}"
