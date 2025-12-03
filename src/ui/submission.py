@@ -1,4 +1,3 @@
-## File updated to force git change
 import streamlit as st
 import pandas as pd
 import json
@@ -502,26 +501,9 @@ def submit_and_edit_page():
             st.subheader("Editable Individual Summary")
             st.text_area("AI-Generated Summary", value=draft.get("individual_summary", ""), key="review_summary", height=150)
             st.divider()
-            # Move Regenerate AI Summary button outside the form
-        # OUTSIDE st.form block
-        if st.button("🔄 Regenerate AI Summary", key="regenerate_ai_summary"):
-            from src.ai import generate_individual_report_summary
-            # Use the current draft report_body as items_to_categorize
-            items_to_categorize = []
-            report_body = draft.get("report_body", {})
-            for section_key, section_data in report_body.items():
-                for item_type in ["successes", "challenges"]:
-                    for item in section_data.get(item_type, []):
-                        items_to_categorize.append({
-                            "id": None,
-                            "text": item.get("text", ""),
-                            "section": section_key,
-                            "type": item_type
-                        })
-            new_summary = generate_individual_report_summary(items_to_categorize)
-            st.session_state["review_summary"] = new_summary
-            st.success("AI summary regenerated. Please review the debug output above and the new summary below.")
-            st.rerun()
+            col1, col2 = st.columns([3, 1])
+            with col2:
+                finalize_button = st.form_submit_button("Lock and Submit Report", type="primary", use_container_width=True)
 
         if st.button("Go Back to Edit"):
             st.session_state["report_to_edit"] = {
@@ -539,53 +521,53 @@ def submit_and_edit_page():
                 del st.session_state["draft_report"]
             st.rerun()
 
-            st.divider()
-            col1, col2 = st.columns([3, 1])
-            with col2:
-                finalize_button = st.form_submit_button("Lock and Submit Report", type="primary", use_container_width=True)
-                if finalize_button:
-                    with st.spinner("Finalizing and saving your report..."):
-                        final_report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
-                        original_body = draft.get("report_body", {})
-                        for section_key in CORE_SECTIONS.keys():
-                            for item_type in ["successes", "challenges"]:
-                                for i, item in enumerate(original_body.get(section_key, {}).get(item_type, [])):
-                                    final_item = {
-                                        "text": item.get("text", ""),
-                                        "ascend_category": st.session_state.get(f"review_{section_key}_{item_type}_{i}_ascend", "N/A"),
-                                        "north_category": st.session_state.get(f"review_{section_key}_{item_type}_{i}_north", "N/A"),
-                                    }
-                                    final_report_body[section_key][item_type].append(final_item)
+        if finalize_button:
+            with st.spinner("Finalizing and saving your report..."):
+                final_report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
+                original_body = draft.get("report_body", {})
+                for section_key in CORE_SECTIONS.keys():
+                    for item_type in ["successes", "challenges"]:
+                        for i, item in enumerate(original_body.get(section_key, {}).get(item_type, [])):
+                            final_item = {
+                                "text": item.get("text", ""),
+                                "ascend_category": st.session_state.get(f"review_{section_key}_{item_type}_{i}_ascend", "N/A"),
+                                "north_category": st.session_state.get(f"review_{section_key}_{item_type}_{i}_north", "N/A"),
+                            }
+                            final_report_body[section_key][item_type].append(final_item)
 
-                        final_data = {
-                            "user_id": st.session_state["user"].id,
-                            "team_member": draft.get("team_member_name"),
-                            "week_ending_date": draft.get("week_ending_date"),
-                            "report_body": final_report_body,
-                            "professional_development": st.session_state.get("review_prof_dev", ""),
-                            "key_topics_lookahead": st.session_state.get("lookahead", ""),
-                            "personal_check_in": st.session_state.get("review_personal_check_in", ""),
-                            "well_being_rating": st.session_state.get("review_well_being", 3),
-                            "individual_summary": st.session_state.get("review_summary", ""),
-                            "director_concerns": st.session_state.get("review_director_concerns", ""),
-                            "status": "finalized",
-                            "submitted_at": datetime.now().isoformat(),
-                        }
+                final_data = {
+                    "user_id": st.session_state["user"].id,
+                    "team_member": draft.get("team_member_name"),
+                    "week_ending_date": draft.get("week_ending_date"),
+                    "report_body": final_report_body,
+                    "professional_development": st.session_state.get("review_prof_dev", ""),
+                    "key_topics_lookahead": st.session_state.get("lookahead", ""),
+                    "personal_check_in": st.session_state.get("review_personal_check_in", ""),
+                    "well_being_rating": st.session_state.get("review_well_being", 3),
+                    "individual_summary": st.session_state.get("review_summary", ""),
+                    "director_concerns": st.session_state.get("review_director_concerns", ""),
+                    "status": "finalized",
+                    "submitted_at": datetime.now().isoformat(),
+                }
 
-                        try:
-                            from src.database import get_user_client
-                            user_client = get_user_client()
-                            user_client.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
-                            st.success("✅ Your final report has been saved successfully!")
-                            is_update = bool(draft.get("report_id"))
-                            if is_update:
-                                user_client.table("weekly_summaries").delete().eq("week_ending_date", draft.get("week_ending_date")).execute()
-                                st.warning(f"Note: The saved team summary for {draft.get('week_ending_date')} has been deleted. An admin will need to regenerate it.")
-                            clear_form_state()
-                            time.sleep(1)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"An error occurred while saving the final report: {e}")
+                try:
+                    from src.database import get_user_client
+                    user_client = get_user_client()
+                    user_client.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
+                    st.success("✅ Your final report has been saved successfully!")
+                    is_update = bool(draft.get("report_id"))
+                    if is_update:
+                        user_client.table("weekly_summaries").delete().eq("week_ending_date", draft.get("week_ending_date")).execute()
+                        st.warning(f"Note: The saved team summary for {draft.get('week_ending_date')} has been deleted. An admin will need to regenerate it.")
+                    clear_form_state()
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred while saving the final report: {e}")
 
+    if "draft_report" in st.session_state:
+        show_review_form()
+    elif "report_to_edit" in st.session_state:
+        show_submission_form()
     else:
         show_report_list()
