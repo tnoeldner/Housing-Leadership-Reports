@@ -181,6 +181,13 @@ def submit_and_edit_page():
                 if raw_ai:
                     with st.expander("--- RAW AI RESPONSE ---", expanded=True):
                         st.write(raw_ai)
+                else:
+                    # Fallback: try to show from report if present
+                    if selected_report.get("raw_ai_response"):
+                        with st.expander("--- RAW AI RESPONSE (from report) ---", expanded=True):
+                            st.write(selected_report["raw_ai_response"])
+                    else:
+                        st.info("No RAW AI debug info found in session or report.")
             report_body = selected_report.get("report_body") or {}
             for section_key, section_name in CORE_SECTIONS.items():
                 section_data = report_body.get(section_key)
