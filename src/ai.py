@@ -64,9 +64,7 @@ Personal Check-in: {personal_check_in}
 Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
-    global client
-    if client is None:
-        init_ai()
+    # (Removed duplicate global client)
     try:
         with st.spinner("AI is generating your individual summary..."):
             result = client.generate_content(
