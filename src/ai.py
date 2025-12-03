@@ -65,6 +65,7 @@ Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
     summary_text = None
+    result = None
     try:
         with st.spinner("AI is generating your individual summary..."):
             result = client.generate_content(
@@ -74,13 +75,25 @@ Well-being Rating: {well_being_rating}
             summary_text = getattr(result, "text", None)
     except Exception as e:
         import datetime
-        raw_debug = f"[EXCEPTION] {datetime.datetime.now().isoformat()}\n" + (summary_text if summary_text is not None else "[None]")
+        import traceback
+        raw_debug = (
+            f"[EXCEPTION] {datetime.datetime.now().isoformat()}\n"
+            f"Exception: {e}\n"
+            f"Traceback:\n{traceback.format_exc()}\n"
+            f"Result object: {repr(result)}\n"
+            f"Summary text: {repr(summary_text)}"
+        )
         st.session_state["raw_ai_response"] = raw_debug
         print("STREAMLIT RAW AI RESPONSE (EXCEPTION):", raw_debug)
         st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
         return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
     import datetime
-    raw_debug = f"[SUCCESS] {datetime.datetime.now().isoformat()}\n" + (summary_text if summary_text is not None else "[None]")
+    import pprint
+    raw_debug = (
+        f"[SUCCESS] {datetime.datetime.now().isoformat()}\n"
+        f"Result object: {pprint.pformat(result)}\n"
+        f"Summary text: {repr(summary_text)}"
+    )
     st.session_state["raw_ai_response"] = raw_debug
     print("STREAMLIT RAW AI RESPONSE (SUCCESS):", raw_debug)
     if not summary_text or not summary_text.strip():
