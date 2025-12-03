@@ -232,38 +232,33 @@ import streamlit as st
 import re
 from src.config import get_secret
 
-client = None
-
-# Initialize Google Gemini AI using google-genai SDK
-def init_ai():
-    global client
-    api_key = get_secret("GOOGLE_API_KEY")
-    if not api_key:
-        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
-        st.stop()
     try:
-        client = genai.Client(api_key=api_key)
-        return True
+        with st.spinner("AI is generating your individual summary..."):
+            model = genai.GenerativeModel("models/gemini-2.5-pro")
+            result = model.generate_content(prompt)
+            response_text = getattr(result, "text", None)
+            import datetime, pprint
+            raw_debug = (
+                f"[SUCCESS] {datetime.datetime.now().isoformat()}\n"
+                f"Result object: {pprint.pformat(result)}\n"
+                f"Summary text: {repr(response_text)}"
+            )
+            st.session_state["raw_ai_response"] = raw_debug
+            print("STREAMLIT RAW AI RESPONSE (SUCCESS):", raw_debug)
+            if not response_text or not response_text.strip():
+                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+            return clean_summary_response(response_text)
     except Exception as e:
-        st.error(f"❌ Google AI API key configuration failed: {e}")
-        st.info("Please update your Google AI API key in secrets or environment variables.")
-        st.stop()
-
-
-# Return a list of available Gemini models
-def get_gemini_models():
-    global client
-    if client is None:
-        init_ai()
-    try:
-        models = list(client.list_models())
-        return models
-    except Exception as e:
-        return f"Error listing models: {e}"
-
-# Send a test prompt to Gemini and return the response or error
-def gemini_test_prompt(prompt="Hello Gemini, are you working?", model_name="gemini-2.5-pro"):
-    global client
+        import datetime, traceback
+        raw_debug = (
+            f"[EXCEPTION] {datetime.datetime.now().isoformat()}\n"
+            f"Exception: {e}\n"
+            f"Traceback:\n{traceback.format_exc()}\n"
+        )
+        st.session_state["raw_ai_response"] = raw_debug
+        print("STREAMLIT RAW AI RESPONSE (EXCEPTION):", raw_debug)
+        st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
+        return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
     if client is None:
         init_ai()
     try:
