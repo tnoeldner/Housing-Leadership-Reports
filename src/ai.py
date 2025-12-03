@@ -73,12 +73,10 @@ Well-being Rating: {well_being_rating}
             )
             summary_text = getattr(result, "text", None)
     except Exception as e:
-        with st.expander("--- RAW AI RESPONSE ---", expanded=True):
-            st.write(summary_text if summary_text is not None else "[None]")
+        st.session_state["raw_ai_response"] = summary_text if summary_text is not None else "[None]"
         st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
         return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
-    with st.expander("--- RAW AI RESPONSE ---", expanded=True):
-        st.write(summary_text if summary_text is not None else "[None]")
+    st.session_state["raw_ai_response"] = summary_text if summary_text is not None else "[None]"
     if not summary_text or not summary_text.strip():
         return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
     return clean_summary_response(summary_text)

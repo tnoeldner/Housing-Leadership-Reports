@@ -177,6 +177,10 @@ def submit_and_edit_page():
             client = genai.Client(api_key=api_key)
             if selected_report.get("individual_summary"):
                 st.info(f"**Your AI-Generated Summary:**\n\n{clean_summary_response(selected_report.get('individual_summary'))}")
+                raw_ai = st.session_state.get("raw_ai_response")
+                if raw_ai:
+                    with st.expander("--- RAW AI RESPONSE ---", expanded=True):
+                        st.write(raw_ai)
             report_body = selected_report.get("report_body") or {}
             for section_key, section_name in CORE_SECTIONS.items():
                 section_data = report_body.get(section_key)
