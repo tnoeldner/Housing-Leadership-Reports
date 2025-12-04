@@ -137,7 +137,31 @@ STAFF REPORTS DATA:
         response = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
         st.info(f"DEBUG: Gemini raw response:\n{response}")
         print("DEBUG: Gemini raw response:\n", response)
-        response_text = response
+        response_text = None
+        # Try extracting text from different possible response formats
+        if response is None:
+            response_text = None
+        elif isinstance(response, str):
+            response_text = response
+        elif hasattr(response, "text") and isinstance(response.text, str):
+            response_text = response.text
+        elif hasattr(response, "candidates") and isinstance(response.candidates, list) and response.candidates:
+            # Some Gemini SDKs return a list of candidates
+            candidate = response.candidates[0]
+            if hasattr(candidate, "text"):
+                response_text = candidate.text
+            elif isinstance(candidate, str):
+                response_text = candidate
+        elif isinstance(response, list) and response:
+            # If response is a list, try first item
+            first = response[0]
+            if hasattr(first, "text"):
+                response_text = first.text
+            elif isinstance(first, str):
+                response_text = first
+        # Log what was extracted
+        st.info(f"DEBUG: Extracted response_text:\n{response_text}")
+        print("DEBUG: Extracted response_text:\n", response_text)
         if not response_text or not str(response_text).strip():
             return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
         return clean_summary_response(response_text)
