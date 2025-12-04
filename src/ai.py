@@ -387,7 +387,7 @@ from google import genai
 from google.genai import types
 import streamlit as st
 import re
-from src.config import get_secret
+import google.generativeai as genai
 
 client = None
 
@@ -395,7 +395,7 @@ client = None
 def init_ai():
     global client
     api_key = get_secret("GOOGLE_API_KEY")
-    if not api_key:
+import google.generativeai as genai
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
