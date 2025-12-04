@@ -213,8 +213,19 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
         print("DEBUG: Gemini response object:\n", response)
         # Extract text from response
         response_text = None
+        # Try to extract text using the most common Gemini SDK patterns
         try:
-            response_text = response.result.candidates[0].content.parts[0].text
+            # Try .text (most recent SDKs)
+            if hasattr(response, 'text') and response.text:
+                response_text = response.text
+            # Try .candidates[0].content.parts[0].text (older SDKs)
+            elif hasattr(response, 'candidates') and response.candidates:
+                response_text = response.candidates[0].content.parts[0].text
+            # Try .result.candidates[0].content.parts[0].text (legacy, fallback)
+            elif hasattr(response, 'result') and hasattr(response.result, 'candidates'):
+                response_text = response.result.candidates[0].content.parts[0].text
+            else:
+                response_text = str(response)
         except Exception as extract_exc:
             st.warning(f"DEBUG: Could not extract text from Gemini response: {extract_exc}")
             print(f"DEBUG: Could not extract text from Gemini response: {extract_exc}")
