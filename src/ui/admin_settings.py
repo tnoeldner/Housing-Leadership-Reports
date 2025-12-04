@@ -68,9 +68,53 @@ Well-being Rating: {well_being_rating}
                 individual_prompt = default_individual_prompt
         except Exception:
             individual_prompt = default_individual_prompt
+        # Duty analysis and staff recognition prompt defaults
+        default_weekly_duty_prompt = """
+You are a senior residence life administrator. Analyze the following weekly duty reports and provide a comprehensive summary for leadership, including key incidents, trends, staff response effectiveness, and recommendations for improvement. Use clear markdown with sections for Executive Summary, Incident Analysis, Operational Insights, Facility & Maintenance, and Recommendations. Include actionable insights and highlight any urgent issues.
+{reports_text}
+"""
+        default_standard_duty_prompt = """
+You are a residence life supervisor. Review the following standard duty reports and summarize key events, staff actions, and any policy or safety concerns. Provide a concise summary for the leadership team.
+{reports_text}
+"""
+        default_staff_recognition_prompt = """
+You are writing a weekly staff recognition summary. From the following staff reports, identify and highlight outstanding contributions, teamwork, and positive impact. Use a warm, professional tone and format as a list of recognitions with staff names and specific actions.
+{reports_text}
+"""
+        # Load from DB or use defaults
+        weekly_duty_prompt = ""
+        standard_duty_prompt = ""
+        staff_recognition_prompt = ""
+        try:
+            row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "weekly_duty_prompt").single().execute()
+            if row.data and row.data.get("setting_value"):
+                weekly_duty_prompt = row.data.get("setting_value", "")
+            else:
+                weekly_duty_prompt = default_weekly_duty_prompt
+        except Exception:
+            weekly_duty_prompt = default_weekly_duty_prompt
+        try:
+            row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "standard_duty_prompt").single().execute()
+            if row.data and row.data.get("setting_value"):
+                standard_duty_prompt = row.data.get("setting_value", "")
+            else:
+                standard_duty_prompt = default_standard_duty_prompt
+        except Exception:
+            standard_duty_prompt = default_standard_duty_prompt
+        try:
+            row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "staff_recognition_prompt").single().execute()
+            if row.data and row.data.get("setting_value"):
+                staff_recognition_prompt = row.data.get("setting_value", "")
+            else:
+                staff_recognition_prompt = default_staff_recognition_prompt
+        except Exception:
+            staff_recognition_prompt = default_staff_recognition_prompt
         with st.form("ai_prompt_templates_form"):
             dashboard_prompt_edit = st.text_area("Admin Dashboard Summary Prompt", value=dashboard_prompt, height=200)
             individual_prompt_edit = st.text_area("Individual Report Summary Prompt", value=individual_prompt, height=200)
+            weekly_duty_prompt_edit = st.text_area("Weekly Duty Analysis Prompt", value=weekly_duty_prompt, height=200)
+            standard_duty_prompt_edit = st.text_area("Standard Duty Analysis Prompt", value=standard_duty_prompt, height=200)
+            staff_recognition_prompt_edit = st.text_area("Weekly Staff Recognition Prompt", value=staff_recognition_prompt, height=200)
             if st.form_submit_button("Save AI Prompts", type="primary"):
                 admin_user_id = st.session_state["user"].id
                 try:
@@ -83,6 +127,21 @@ Well-being Rating: {well_being_rating}
                         supabase.table("admin_settings").upsert({
                             "setting_name": "individual_prompt",
                             "setting_value": individual_prompt_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "weekly_duty_prompt",
+                            "setting_value": weekly_duty_prompt_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "standard_duty_prompt",
+                            "setting_value": standard_duty_prompt_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "staff_recognition_prompt",
+                            "setting_value": staff_recognition_prompt_edit,
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                     st.success("✅ AI prompt templates saved successfully!")

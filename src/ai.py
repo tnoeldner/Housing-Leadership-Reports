@@ -690,75 +690,34 @@ def create_duty_report_summary(selected_forms, start_date, end_date):
         return {"summary": "No duty reports selected for analysis."}
     
     try:
+        from src.ai_prompts import get_weekly_duty_prompt
         # Prepare duty report data for AI analysis
         reports_text = f"\n=== DUTY REPORTS ANALYSIS ===\n"
         reports_text += f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
         reports_text += f"Total Reports: {len(selected_forms)}\n\n"
-        
         for i, form in enumerate(selected_forms, 1):
             current_revision = form.get('current_revision', {})
             form_name = form.get('form_template_name', 'Unknown Form')
             author = current_revision.get('author', 'Unknown')
             date_str = current_revision.get('date', 'Unknown date')
-            
             reports_text += f"\n--- REPORT {i}: {form_name} ---\n"
             reports_text += f"Staff: {author}\n"
             reports_text += f"Date: {date_str}\n\n"
-            
             # Process responses
             responses = current_revision.get('responses', [])
             for response in responses:
                 field_label = response.get('field_label', 'Unknown Field')
                 field_response = response.get('response', '')
-                
                 if field_response and str(field_response).strip():
                     reports_text += f"**{field_label}:** {field_response}\n"
-            
             reports_text += "\n" + "="*50 + "\n"
-        
-        # Create comprehensive duty report AI prompt
-        prompt = f"""
-You are a senior residence life administrator analyzing duty reports for supervisory insights. Provide a comprehensive analysis that covers:
-
-1. **EXECUTIVE SUMMARY**
-   - Overview of reporting period and scope
-   - Key findings and trends identified
-   - Overall staff performance assessment
-
-2. **INCIDENT ANALYSIS**
-   - Categorized breakdown of all incidents reported
-   - Severity assessment and patterns identified
-   - Safety and security concerns highlighted
-
-3. **OPERATIONAL INSIGHTS**
-   - Staff response effectiveness and timeliness
-   - Policy compliance observations
-   - Training or procedural recommendations
-
-4. **FACILITY & MAINTENANCE TRENDS**
-   - Recurring facility issues requiring attention
-   - Maintenance response effectiveness
-   - Preventive action recommendations
-
-5. **SUPERVISORY RECOMMENDATIONS**
-   - Immediate action items requiring administrative follow-up
-   - Staff development opportunities identified
-   - Policy or procedural improvements suggested
-
-6. **COMMUNITY IMPACT ASSESSMENT**
-   - Resident satisfaction and engagement indicators
-   - Community standards enforcement patterns
-   - Educational programming opportunities identified
-
-Provide specific examples and data-driven insights while maintaining appropriate confidentiality. Focus on actionable recommendations for residence life leadership.
-
-DUTY REPORTS DATA:
-{reports_text}
-
-Please provide a comprehensive supervisory analysis:
-"""
-
-        # Use Gemini 2.5 Flash for better quota efficiency  
+        # Use admin-edited prompt template
+        import streamlit as st
+        from src.database import get_supabase_client
+        supabase = get_supabase_client()
+        prompt_template = get_weekly_duty_prompt(supabase)
+        prompt = prompt_template.format(reports_text=reports_text)
+        # Use Gemini 2.5 Flash for better quota efficiency
         global client
         if client is None:
             init_ai()
@@ -771,7 +730,6 @@ Please provide a comprehensive supervisory analysis:
             if not response_text or not response_text.strip():
                 return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
             return {"summary": response_text}
-            
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg or "quota" in error_msg.lower():
@@ -784,9 +742,9 @@ def summarize_form_submissions(selected_forms, max_forms=10):
         return "No forms selected for summarization."
     
     try:
+        from src.ai_prompts import get_staff_recognition_prompt
         # Limit to prevent token overflow
         forms_to_process = selected_forms[:max_forms]
-        
         # Prepare form data for AI analysis
         forms_text = ""
         for i, form in enumerate(forms_to_process, 1):
@@ -794,29 +752,22 @@ def summarize_form_submissions(selected_forms, max_forms=10):
             form_name = form.get('form_template_name', 'Unknown Form')
             author = current_revision.get('author', 'Unknown')
             date = current_revision.get('date', 'Unknown date')
-            
             forms_text += f"\n=== FORM {i}: {form_name} ===\n"
             forms_text += f"Submitted by: {author}\n"
             forms_text += f"Date: {date}\n\n"
-            
             # Process responses
             responses = current_revision.get('responses', [])
             for response in responses:
                 field_label = response.get('field_label', 'Unknown Field')
                 field_response = response.get('response', '')
-                
                 if field_response and str(field_response).strip():
                     forms_text += f"**{field_label}:** {field_response}\n"
-        
-        # Create AI prompt for summarization
-        prompt = f"""
-Analyze the following form submissions and provide a summary:
-
-{forms_text}
-
-Format the response in clear markdown with headers and bullet points. Focus on actionable insights that help supervisors make informed decisions about their teams and operations.
-"""
-
+        # Use admin-edited prompt template for staff recognition
+        import streamlit as st
+        from src.database import get_supabase_client
+        supabase = get_supabase_client()
+        prompt_template = get_staff_recognition_prompt(supabase)
+        prompt = prompt_template.format(reports_text=forms_text)
         # Use the same AI configuration as the rest of the app
         global client
         if client is None:
@@ -834,6 +785,5 @@ Format the response in clear markdown with headers and bullet points. Focus on a
                 st.code(forms_text)
                 return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
             return response_text
-            
     except Exception as e:
         return f"Error generating AI summary: {str(e)}"
