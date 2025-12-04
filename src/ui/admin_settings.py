@@ -19,20 +19,55 @@ def admin_settings_page():
         st.subheader("AI Prompt Templates")
         st.write("Edit the prompt templates used for AI-generated summaries. Changes take effect immediately for all users.")
         # Load current prompts from admin_settings table
+        # Default prompts (should match those in ai.py)
+        default_dashboard_prompt = """
+You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
+
+IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like \"Here is the comprehensive summary report\" or \"Weekly Summary Report: Housing & Residence Life\". Begin directly with the Executive Summary section.
+
+DATA SOURCES AVAILABLE:
+1. Weekly staff reports from residence life team members
+2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
+3. Weekly engagement analysis (if available) - event programming, attendance data, community engagement activities
+
+... (rest of your default prompt here) ...
+"""
+        default_individual_prompt = """
+You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise, director-focused summary for the week ending {week_ending_date}. Your summary should:
+- Reference the staff member by name: {team_member}
+- Highlight professional development, engagement, successes, and challenges
+- Include any personal well-being check-in and overall well-being score ({well_being_rating}/5)
+- Note any concerns for the director and key topics/lookahead
+- Use clear, professional language and reference specific activities where possible
+- Be written for the director to quickly understand the staff member's overall week and priorities
+
+STAFF REPORT DATA:
+{report_json}
+
+Professional Development: {professional_development}
+Key Topics & Lookahead: {key_topics_lookahead}
+Personal Check-in: {personal_check_in}
+Director Concerns: {director_concerns}
+Well-being Rating: {well_being_rating}
+"""
         dashboard_prompt = ""
         individual_prompt = ""
         try:
             dashboard_row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "dashboard_prompt").single().execute()
-            if dashboard_row.data:
+            if dashboard_row.data and dashboard_row.data.get("setting_value"):
                 dashboard_prompt = dashboard_row.data.get("setting_value", "")
+            else:
+                dashboard_prompt = default_dashboard_prompt
         except Exception:
-            dashboard_prompt = ""
+            dashboard_prompt = default_dashboard_prompt
         try:
             individual_row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "individual_prompt").single().execute()
-            if individual_row.data:
+            if individual_row.data and individual_row.data.get("setting_value"):
                 individual_prompt = individual_row.data.get("setting_value", "")
+            else:
+                individual_prompt = default_individual_prompt
         except Exception:
-            individual_prompt = ""
+            individual_prompt = default_individual_prompt
         with st.form("ai_prompt_templates_form"):
             dashboard_prompt_edit = st.text_area("Admin Dashboard Summary Prompt", value=dashboard_prompt, height=200)
             individual_prompt_edit = st.text_area("Individual Report Summary Prompt", value=individual_prompt, height=200)
