@@ -135,8 +135,8 @@ STAFF REPORTS DATA:
         response = None
         response_text = None
         response = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
-        st.info(f"DEBUG: Gemini raw response:\n{response}")
-        print("DEBUG: Gemini raw response:\n", response)
+        st.info(f"DEBUG: Gemini raw response (always shown):\n{response}")
+        print("DEBUG: Gemini raw response (always shown):\n", response)
         response_text = None
         # Try extracting text from different possible response formats
         if response is None:
@@ -160,8 +160,8 @@ STAFF REPORTS DATA:
             elif isinstance(first, str):
                 response_text = first
         # Log what was extracted
-        st.info(f"DEBUG: Extracted response_text:\n{response_text}")
-        print("DEBUG: Extracted response_text:\n", response_text)
+        st.info(f"DEBUG: Extracted response_text (always shown):\n{response_text}")
+        print("DEBUG: Extracted response_text (always shown):\n", response_text)
         if not response_text or not str(response_text).strip():
             return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
         return clean_summary_response(response_text)
