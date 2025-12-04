@@ -514,13 +514,18 @@ def submit_and_edit_page():
             st.divider()
             st.subheader("Editable Individual Summary")
             # Show RAW AI debug info above the editable summary
+            raw_ai_debug = st.session_state.get("raw_ai_debug")
             raw_ai = st.session_state.get("raw_ai_response")
-            if raw_ai:
+            if raw_ai_debug:
+                st.warning("DEBUG: RAW AI DEBUG INFO FOUND. See expander below.")
+                with st.expander("--- RAW AI DEBUG INFO ---", expanded=True):
+                    st.write(raw_ai_debug)
+            elif raw_ai:
                 st.warning("DEBUG: RAW AI RESPONSE FOUND. See expander below.")
                 with st.expander("--- RAW AI RESPONSE ---", expanded=True):
                     st.write(raw_ai)
             else:
-                st.error("DEBUG: No RAW AI debug info found in session. If you see this, please report it to the developer.")
+                st.info("No AI debug info available for this session. If the summary is working, you can ignore this message.")
             st.text_area("AI-Generated Summary", value=draft.get("individual_summary", ""), key="review_summary", height=150)
             st.divider()
             col1, col2 = st.columns([3, 1])
