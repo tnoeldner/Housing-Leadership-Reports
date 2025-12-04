@@ -196,9 +196,7 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
-        # Use the correct prompt format for the latest Gemini SDK
-        gemini_prompt = [{"role": "user", "parts": [{"text": prompt}]}]
-        response = model.generate_content(gemini_prompt)
+            response = model.generate_content([{"role": "user", "parts": [{"text": prompt}]}])
         st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
         st.info(f"DEBUG: Gemini response object:\n{response}")
         print("DEBUG: Gemini prompt sent:\n", prompt)
