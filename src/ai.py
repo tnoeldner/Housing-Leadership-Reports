@@ -13,7 +13,7 @@ import json
 import google.generativeai as genai
 from src.config import get_secret
 
-def call_gemini_ai(prompt, model_name="gemini-1.5-pro"):
+def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
@@ -22,9 +22,18 @@ def call_gemini_ai(prompt, model_name="gemini-1.5-pro"):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
+        st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
+        st.info(f"DEBUG: Gemini response object:\n{response}")
+        print("DEBUG: Gemini prompt sent:\n", prompt)
+        print("DEBUG: Gemini response object:\n", response)
         return getattr(response, "text", None)
     except Exception as e:
+        import traceback
         st.error(f"AI error: {e}")
+        st.info(f"DEBUG: Gemini prompt sent (exception):\n{prompt}")
+        st.info(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
+        print("DEBUG: Gemini prompt sent (exception):\n", prompt)
+        print("DEBUG: Exception traceback:\n", traceback.format_exc())
         return None
 
 def clean_summary_response(text):

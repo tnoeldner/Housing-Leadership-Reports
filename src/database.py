@@ -76,27 +76,30 @@ def get_user_client():
         client.auth.set_session(access_token, access_token)
     return client
 
-def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None, db_client=None):
+def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None):
     """Save a duty analysis report to the database for permanent storage"""
     try:
         # Determine report type
         report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']
         end_date = analysis_data['filter_info']['end_date']
+        
         # Convert to ISO format strings if they're date objects
         if hasattr(start_date, 'isoformat'):
             start_date = start_date.isoformat()
         if hasattr(end_date, 'isoformat'):
             end_date = end_date.isoformat()
-        # Use provided db_client or fallback to supabase
-        client = db_client if db_client is not None else supabase
+        
         # Check for existing analysis with same week ending date and user
-        existing_query = client.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
+        existing_query = supabase.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
         if created_by_user_id:
             existing_query = existing_query.eq("created_by", created_by_user_id)
+        
         existing_response = existing_query.execute()
         existing_records = existing_response.data if existing_response.data else []
+        
         # Prepare data for saving
         now = datetime.now().isoformat()
         save_data = {
@@ -111,9 +114,6 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None,
             'created_at': now,
             'updated_at': now
         }
-        print("[DEBUG] save_data to Supabase:", save_data)
-        # Attach save_data to result for UI debug
-        debug_save_data = save_data.copy()
         
         # Save to database with enhanced duplicate detection
         if existing_records:
@@ -122,42 +122,41 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None,
                 "success": True,
                 "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
                 "existing_id": existing_records[0]['id'],
-                "action": "duplicate_prevented",
-                "debug_save_data": debug_save_data
+                "action": "duplicate_prevented"
             }
         else:
             # No existing record, safe to insert
             try:
-                response = client.table("saved_duty_analyses").insert(save_data).execute()
+                response = supabase.table("saved_duty_analyses").insert(save_data).execute()
+                
                 if response.data:
                     return {
                         "success": True, 
                         "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
                         "saved_id": response.data[0]['id'],
-                        "action": "created_new",
-                        "debug_save_data": debug_save_data
+                        "action": "created_new"
                     }
                 else:
-                    return {"success": False, "message": "Failed to save duty analysis - no data returned", "debug_save_data": debug_save_data}
+                    return {"success": False, "message": "Failed to save duty analysis - no data returned"}
+                    
             except Exception as e:
                 error_msg = str(e)
+                
                 # Check if it's a table doesn't exist error
                 if "does not exist" in error_msg or "relation" in error_msg:
                     return {
                         "success": False, 
-                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql",
-                        "debug_save_data": debug_save_data
+                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
                     }
                 # Check if it's a duplicate key error (fallback)
                 elif "duplicate key" in error_msg or "already exists" in error_msg or "violates unique constraint" in error_msg:
                     return {
                         "success": True,
                         "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
-                        "action": "duplicate_prevented",
-                        "debug_save_data": debug_save_data
+                        "action": "duplicate_prevented"
                     }
                 else:
-                    return {"success": False, "message": f"Database error: {error_msg}", "debug_save_data": debug_save_data}
+                    return {"success": False, "message": f"Database error: {error_msg}"}
                 
     except Exception as e:
         return {"success": False, "message": f"Error saving duty analysis: {str(e)}"}

@@ -197,9 +197,6 @@ def weekly_reports_viewer():
             except Exception as e:
                 st.error(f"Error fetching reports: {str(e)}")
 
-def to_iso(val):
-    return val.isoformat() if hasattr(val, 'isoformat') else val
-
 def duty_analysis_section():
     """Specialized section for duty report analysis"""
     st.subheader("🛡️ Duty Analysis")
@@ -433,39 +430,25 @@ def duty_analysis_section():
             # Save button for analysis
             if analysis_type == "📊 Standard Analysis":
                 if st.button("💾 Save Analysis", key="save_duty_analysis"):
-                    from src.database import save_duty_analysis, get_admin_client, supabase
+                    from src.database import save_duty_analysis
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
-                    role = st.session_state.get('role', 'staff')
-                    if role == 'admin':
-                        db_client = get_admin_client()
-                        # Print first 8 chars of key for debug (do not print full key)
-                        from src.config import get_secret
-                        admin_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
-                        st.markdown(f"**Debug:** Using ADMIN client. Key prefix: `{admin_key[:8]}`")
-                    else:
-                        db_client = supabase
-                        from src.config import get_secret
-                        anon_key = get_secret("SUPABASE_KEY")
-                        st.markdown(f"**Debug:** Using ANON client. Key prefix: `{anon_key[:8]}`")
-                    st.markdown(f"**Debug:** User ID to be sent: `{user_id}` (type: `{type(user_id)}`)")
-                    if user_id == 'Unknown' or not user_id:
-                        st.markdown(f"**Debug:** Full user object: `{user}`")
-                    # Convert date fields to ISO strings
-                    week_ending = to_iso(filter_info.get('end_date'))
-                    filter_info_serialized = dict(filter_info)
-                    if 'start_date' in filter_info_serialized:
-                        filter_info_serialized['start_date'] = to_iso(filter_info_serialized['start_date'])
-                    if 'end_date' in filter_info_serialized:
-                        filter_info_serialized['end_date'] = to_iso(filter_info_serialized['end_date'])
                     analysis_data = {
                         'report_type': '📊 Standard Analysis',
-                        'filter_info': filter_info_serialized,
+                        'filter_info': filter_info,
                         'selected_forms': selected_forms,
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
-                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id, db_client=db_client)
+                    week_ending = filter_info.get('end_date')
+                    # Convert date fields to ISO strings if needed
+                    if hasattr(week_ending, 'isoformat'):
+                        week_ending = week_ending.isoformat()
+                    if 'start_date' in filter_info and hasattr(filter_info['start_date'], 'isoformat'):
+                        analysis_data['filter_info']['start_date'] = filter_info['start_date'].isoformat()
+                    if 'end_date' in filter_info and hasattr(filter_info['end_date'], 'isoformat'):
+                        analysis_data['filter_info']['end_date'] = filter_info['end_date'].isoformat()
+                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
                         st.success(result.get('message', 'Duty analysis saved.'))
@@ -473,38 +456,27 @@ def duty_analysis_section():
                         st.error(result.get('message', 'Failed to save duty analysis.'))
             else:
                 if st.button("💾 Save Weekly Duty Analysis", key="save_weekly_duty_analysis"):
-                    from src.database import save_duty_analysis, get_admin_client, supabase
+                    from src.database import save_duty_analysis
                     user = st.session_state.get('user')
                     user_id = getattr(user, 'id', 'Unknown') if user else 'Unknown'
-                    role = st.session_state.get('role', 'staff')
-                    db_client = get_admin_client() if role == 'admin' else supabase
-                    # Convert date fields to ISO strings
-                    week_ending = to_iso(filter_info.get('end_date'))
-                    filter_info_serialized = dict(filter_info)
-                    if 'start_date' in filter_info_serialized:
-                        filter_info_serialized['start_date'] = to_iso(filter_info_serialized['start_date'])
-                    if 'end_date' in filter_info_serialized:
-                        filter_info_serialized['end_date'] = to_iso(filter_info_serialized['end_date'])
                     analysis_data = {
                         'report_type': '📅 Weekly Summary Report',
-                        'filter_info': filter_info_serialized,
+                        'filter_info': filter_info,
                         'selected_forms': selected_forms,
                         'all_selected_forms': selected_forms,
                         'summary': summary
                     }
-                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id, db_client=db_client)
+                    week_ending = filter_info.get('end_date')
+                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
                         st.success(result.get('message', 'Duty analysis saved.'))
                     else:
                         st.error(result.get('message', 'Failed to save duty analysis.'))
-                    # Show debug info if available
-                    if 'last_save_result' in st.session_state:
-                        st.markdown("**Debug Save Result:**")
-                        st.write(st.session_state['last_save_result'])
-                        if 'debug_save_data' in st.session_state['last_save_result']:
-                            st.markdown("**Debug: Payload sent to Supabase:**")
-                            st.json(st.session_state['last_save_result']['debug_save_data'])
+            # Show debug info if available
+            if 'last_save_result' in st.session_state:
+                st.markdown("**Debug Save Result:**")
+                st.write(st.session_state['last_save_result'])
 
 
 def engagement_analysis_section():
