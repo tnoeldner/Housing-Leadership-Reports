@@ -14,7 +14,46 @@ def admin_settings_page():
         st.stop()
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
-    tab1, tab2, tab3 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "📝 AI Prompt Templates"])
+    with tab4:
+        st.subheader("AI Prompt Templates")
+        st.write("Edit the prompt templates used for AI-generated summaries. Changes take effect immediately for all users.")
+        # Load current prompts from admin_settings table
+        dashboard_prompt = ""
+        individual_prompt = ""
+        try:
+            dashboard_row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "dashboard_prompt").single().execute()
+            if dashboard_row.data:
+                dashboard_prompt = dashboard_row.data.get("setting_value", "")
+        except Exception:
+            dashboard_prompt = ""
+        try:
+            individual_row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "individual_prompt").single().execute()
+            if individual_row.data:
+                individual_prompt = individual_row.data.get("setting_value", "")
+        except Exception:
+            individual_prompt = ""
+        with st.form("ai_prompt_templates_form"):
+            dashboard_prompt_edit = st.text_area("Admin Dashboard Summary Prompt", value=dashboard_prompt, height=200)
+            individual_prompt_edit = st.text_area("Individual Report Summary Prompt", value=individual_prompt, height=200)
+            if st.form_submit_button("Save AI Prompts", type="primary"):
+                admin_user_id = st.session_state["user"].id
+                try:
+                    with st.spinner("Saving AI prompts to database..."):
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "dashboard_prompt",
+                            "setting_value": dashboard_prompt_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "individual_prompt",
+                            "setting_value": individual_prompt_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                    st.success("✅ AI prompt templates saved successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save AI prompts: {e}")
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
