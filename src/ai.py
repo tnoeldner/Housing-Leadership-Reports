@@ -194,14 +194,13 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(model_name, api_key=api_key)
         response = model.generate_content(prompt)
         st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
         st.info(f"DEBUG: Gemini response object:\n{response}")
         print("DEBUG: Gemini prompt sent:\n", prompt)
         print("DEBUG: Gemini response object:\n", response)
-        return getattr(response, "text", None)
+        return response
     except Exception as e:
         import traceback
         st.error(f"AI error: {e}")
