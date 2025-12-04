@@ -277,8 +277,15 @@ def generate_individual_report_summary(items_to_categorize):
     well_being_rating = st.session_state.get("well_being_rating", "")
     director_concerns = st.session_state.get("director_concerns", "")
     report_json = json.dumps(items_to_categorize, indent=2)
-    prompt = f"""
+    from src.ai_prompts import get_admin_prompt
+    default_individual_prompt = """
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise, director-focused summary for the week ending {week_ending_date}. Your summary should:
+- Reference the staff member by name: {team_member}
+- Highlight professional development, engagement, successes, and challenges
+- Include any personal well-being check-in and overall well-being score ({well_being_rating}/5)
+- Note any concerns for the director and key topics/lookahead
+- Use clear, professional language and reference specific activities where possible
+- Be written for the director to quickly understand the staff member's overall week and priorities
 
 STAFF REPORT DATA:
 {report_json}
@@ -289,36 +296,17 @@ Personal Check-in: {personal_check_in}
 Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
-        from src.ai_prompts import get_admin_prompt
-        default_individual_prompt = f"""
-    You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise, director-focused summary for the week ending {{week_ending_date}}. Your summary should:
-    - Reference the staff member by name: {{team_member}}
-    - Highlight professional development, engagement, successes, and challenges
-    - Include any personal well-being check-in and overall well-being score ({{well_being_rating}}/5)
-    - Note any concerns for the director and key topics/lookahead
-    - Use clear, professional language and reference specific activities where possible
-    - Be written for the director to quickly understand the staff member's overall week and priorities
-
-    STAFF REPORT DATA:
-    {{report_json}}
-
-    Professional Development: {{professional_development}}
-    Key Topics & Lookahead: {{key_topics_lookahead}}
-    Personal Check-in: {{personal_check_in}}
-    Director Concerns: {{director_concerns}}
-    Well-being Rating: {{well_being_rating}}
-    """
-        prompt_template = get_admin_prompt("individual_prompt", default_individual_prompt)
-        prompt = prompt_template.format(
-            week_ending_date=week_ending_date,
-            team_member=team_member,
-            well_being_rating=well_being_rating,
-            report_json=report_json,
-            professional_development=professional_development,
-            key_topics_lookahead=key_topics_lookahead,
-            personal_check_in=personal_check_in,
-            director_concerns=director_concerns
-        )
+    prompt_template = get_admin_prompt("individual_prompt", default_individual_prompt)
+    prompt = prompt_template.format(
+        week_ending_date=week_ending_date,
+        team_member=team_member,
+        well_being_rating=well_being_rating,
+        report_json=report_json,
+        professional_development=professional_development,
+        key_topics_lookahead=key_topics_lookahead,
+        personal_check_in=personal_check_in,
+        director_concerns=director_concerns
+    )
     st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     with st.spinner("AI is generating your individual summary..."):
         response_text = call_gemini_ai(prompt)
