@@ -202,12 +202,19 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
         print("DEBUG: Gemini prompt sent:\n", prompt)
         print("DEBUG: Gemini response object:\n", response)
         # Extract text from response
+        response_text = None
         try:
             response_text = response.result.candidates[0].content.parts[0].text
-        except Exception:
-            response_text = None
+        except Exception as extract_exc:
+            st.warning(f"DEBUG: Could not extract text from Gemini response: {extract_exc}")
+            print(f"DEBUG: Could not extract text from Gemini response: {extract_exc}")
         st.info(f"DEBUG: Gemini raw response (always shown):\n{response_text}")
         print("DEBUG: Gemini raw response (always shown):\n", response_text)
+        # Save debug info to session state for UI
+        if 'raw_ai_debug' not in st.session_state:
+            st.session_state['raw_ai_debug'] = {}
+        st.session_state['raw_ai_debug']['response'] = str(response)
+        st.session_state['raw_ai_debug']['response_text'] = str(response_text)
         return response_text
     except Exception as e:
         import traceback
@@ -216,6 +223,12 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
         st.info(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
         print("DEBUG: Gemini prompt sent (exception):\n", prompt)
         print("DEBUG: Exception traceback:\n", traceback.format_exc())
+        # Save error info to session state for UI
+        if 'raw_ai_debug' not in st.session_state:
+            st.session_state['raw_ai_debug'] = {}
+        st.session_state['raw_ai_debug']['exception'] = str(e)
+        st.session_state['raw_ai_debug']['traceback'] = traceback.format_exc()
+        st.session_state['raw_ai_debug']['response_text'] = None
         return None
 
 def clean_summary_response(text):
