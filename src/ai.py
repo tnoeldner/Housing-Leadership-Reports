@@ -128,7 +128,7 @@ STAFF REPORTS DATA:
 
 {engagement_reports_section}
 """
-    response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash")
+    response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
     if not response_text or not response_text.strip():
         return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
     return clean_summary_response(response_text)
