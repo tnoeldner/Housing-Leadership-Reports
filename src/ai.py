@@ -114,12 +114,6 @@ Critical incidents and follow-up actions needed based on safety concerns identif
 Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
  
 CRITICAL FORMATTING REQUIREMENTS:
-- Use EXACTLY the markdown headings shown above (## for main sections, ### for subsections)
-- Follow the section structure precisely - do not skip sections or change the order
-- When summarizing activities under each framework/pillar, reference the team member name (e.g., "Ashley Vandal demonstrated Accountability by...")
-- For UND LEADS, actively look for activities that demonstrate Learning (training, development), Equity (diversity, inclusion), Affinity (relationship building), Discovery (innovation, research), and Service (helping others, community engagement)
-- Be concise and professional. Executive Summary must be 2-3 sentences. Other sections should use short paragraphs and bullets
-- Ensure every staff member's activities are analyzed for UND LEADS alignment - do not leave this section empty
 
 STAFF REPORTS DATA:
 {staff_reports_text}
@@ -128,6 +122,27 @@ STAFF REPORTS DATA:
 
 {engagement_reports_section}
 """
+        from src.ai_prompts import get_admin_prompt
+        default_dashboard_prompt = f"""
+    You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {{selected_date_for_summary}} into a single, comprehensive summary report.
+
+    IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
+
+    DATA SOURCES AVAILABLE:
+    1. Weekly staff reports from residence life team members
+    2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
+    3. Weekly engagement analysis (if available) - event programming, attendance data, community engagement activities
+
+    ... (rest of your default prompt here) ...
+    """
+        prompt_template = get_admin_prompt("dashboard_prompt", default_dashboard_prompt)
+        prompt = prompt_template.format(
+            selected_date_for_summary=selected_date_for_summary,
+            staff_reports_text=staff_reports_text,
+            duty_reports_section=duty_reports_section,
+            engagement_reports_section=engagement_reports_section,
+            average_score=average_score
+        )
     import streamlit as st
     try:
         st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
@@ -276,12 +291,6 @@ def generate_individual_report_summary(items_to_categorize):
     report_json = json.dumps(items_to_categorize, indent=2)
     prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise, director-focused summary for the week ending {week_ending_date}. Your summary should:
-- Reference the staff member by name: {team_member}
-- Highlight professional development, engagement, successes, and challenges
-- Include any personal well-being check-in and overall well-being score ({well_being_rating}/5)
-- Note any concerns for the director and key topics/lookahead
-- Use clear, professional language and reference specific activities where possible
-- Be written for the director to quickly understand the staff member's overall week and priorities
 
 STAFF REPORT DATA:
 {report_json}
@@ -292,6 +301,36 @@ Personal Check-in: {personal_check_in}
 Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
+        from src.ai_prompts import get_admin_prompt
+        default_individual_prompt = f"""
+    You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize the following individual staff report into a concise, director-focused summary for the week ending {{week_ending_date}}. Your summary should:
+    - Reference the staff member by name: {{team_member}}
+    - Highlight professional development, engagement, successes, and challenges
+    - Include any personal well-being check-in and overall well-being score ({{well_being_rating}}/5)
+    - Note any concerns for the director and key topics/lookahead
+    - Use clear, professional language and reference specific activities where possible
+    - Be written for the director to quickly understand the staff member's overall week and priorities
+
+    STAFF REPORT DATA:
+    {{report_json}}
+
+    Professional Development: {{professional_development}}
+    Key Topics & Lookahead: {{key_topics_lookahead}}
+    Personal Check-in: {{personal_check_in}}
+    Director Concerns: {{director_concerns}}
+    Well-being Rating: {{well_being_rating}}
+    """
+        prompt_template = get_admin_prompt("individual_prompt", default_individual_prompt)
+        prompt = prompt_template.format(
+            week_ending_date=week_ending_date,
+            team_member=team_member,
+            well_being_rating=well_being_rating,
+            report_json=report_json,
+            professional_development=professional_development,
+            key_topics_lookahead=key_topics_lookahead,
+            personal_check_in=personal_check_in,
+            director_concerns=director_concerns
+        )
     st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     with st.spinner("AI is generating your individual summary..."):
         response_text = call_gemini_ai(prompt)
