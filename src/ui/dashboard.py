@@ -587,7 +587,7 @@ def dashboard_page(supervisor_mode=False):
                     from src.ai import generate_admin_dashboard_summary
                     cleaned_text = generate_admin_dashboard_summary(
                         selected_date_for_summary=selected_date_for_summary,
-                        reports_text=reports_text,
+                        staff_reports_text=reports_text,
                         duty_reports_section=duty_reports_section,
                         engagement_reports_section=engagement_reports_section,
                         average_score=average_score
