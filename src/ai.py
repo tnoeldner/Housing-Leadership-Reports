@@ -128,10 +128,27 @@ STAFF REPORTS DATA:
 
 {engagement_reports_section}
 """
-    response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
-    if not response_text or not response_text.strip():
-        return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-    return clean_summary_response(response_text)
+    import streamlit as st
+    try:
+        st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
+        print("DEBUG: Gemini prompt sent:\n", prompt)
+        response = None
+        response_text = None
+        response = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
+        st.info(f"DEBUG: Gemini raw response:\n{response}")
+        print("DEBUG: Gemini raw response:\n", response)
+        response_text = response
+        if not response_text or not str(response_text).strip():
+            return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+        return clean_summary_response(response_text)
+    except Exception as e:
+        import traceback
+        st.error(f"AI error: {e}")
+        st.info(f"DEBUG: Gemini prompt sent (exception):\n{prompt}")
+        st.info(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
+        print("DEBUG: Gemini prompt sent (exception):\n", prompt)
+        print("DEBUG: Exception traceback:\n", traceback.format_exc())
+        return None
 import streamlit as st
 import json
 import re
