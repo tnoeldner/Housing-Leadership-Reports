@@ -69,6 +69,14 @@ Well-being Rating: {well_being_rating}
         except Exception:
             individual_prompt = default_individual_prompt
         # Duty analysis and staff recognition prompt defaults
+        from pathlib import Path
+        def load_file_or_default(path, default):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception:
+                return default
+
         default_weekly_duty_prompt = """
 You are a senior residence life administrator. Analyze the following weekly duty reports and provide a comprehensive summary for leadership, including key incidents, trends, staff response effectiveness, and recommendations for improvement. Use clear markdown with sections for Executive Summary, Incident Analysis, Operational Insights, Facility & Maintenance, and Recommendations. Include actionable insights and highlight any urgent issues.
 {reports_text}
@@ -81,44 +89,41 @@ You are a residence life supervisor. Review the following standard duty reports 
 You are writing a weekly staff recognition summary. From the following staff reports, identify and highlight outstanding contributions, teamwork, and positive impact. Use a warm, professional tone and format as a list of recognitions with staff names and specific actions.
 {reports_text}
 """
+        # Rubric defaults from files
+        ascend_rubric_path = Path("rubrics-integration/rubrics/ascend_rubric.md")
+        north_rubric_path = Path("rubrics-integration/rubrics/north_rubric.md")
+        staff_eval_rubric_path = Path("rubrics-integration/rubrics/staff_evaluation_prompt.txt")
+        default_ascend_rubric = load_file_or_default(ascend_rubric_path, "ASCEND rubric not found.")
+        default_north_rubric = load_file_or_default(north_rubric_path, "NORTH rubric not found.")
+        default_staff_eval_rubric = load_file_or_default(staff_eval_rubric_path, "Staff evaluation rubric not found.")
         # Load from DB or use defaults
-        weekly_duty_prompt = ""
-        standard_duty_prompt = ""
-        staff_recognition_prompt = ""
-        try:
-            row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "weekly_duty_prompt").single().execute()
-            if row.data and row.data.get("setting_value"):
-                weekly_duty_prompt = row.data.get("setting_value", "")
-            else:
-                weekly_duty_prompt = default_weekly_duty_prompt
-        except Exception:
-            weekly_duty_prompt = default_weekly_duty_prompt
-        try:
-            row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "standard_duty_prompt").single().execute()
-            if row.data and row.data.get("setting_value"):
-                standard_duty_prompt = row.data.get("setting_value", "")
-            else:
-                standard_duty_prompt = default_standard_duty_prompt
-        except Exception:
-            standard_duty_prompt = default_standard_duty_prompt
-        try:
-            row = supabase.table("admin_settings").select("setting_value").eq("setting_name", "staff_recognition_prompt").single().execute()
-            if row.data and row.data.get("setting_value"):
-                staff_recognition_prompt = row.data.get("setting_value", "")
-            else:
-                staff_recognition_prompt = default_staff_recognition_prompt
-        except Exception:
-            staff_recognition_prompt = default_staff_recognition_prompt
+        def get_setting_or_default(setting_name, default):
+            try:
+                row = supabase.table("admin_settings").select("setting_value").eq("setting_name", setting_name).single().execute()
+                if row.data and row.data.get("setting_value"):
+                    return row.data.get("setting_value", default)
+            except Exception:
+                pass
+            return default
+        weekly_duty_prompt = get_setting_or_default("weekly_duty_prompt", default_weekly_duty_prompt)
+        standard_duty_prompt = get_setting_or_default("standard_duty_prompt", default_standard_duty_prompt)
+        staff_recognition_prompt = get_setting_or_default("staff_recognition_prompt", default_staff_recognition_prompt)
+        ascend_rubric = get_setting_or_default("ascend_rubric", default_ascend_rubric)
+        north_rubric = get_setting_or_default("north_rubric", default_north_rubric)
+        staff_eval_rubric = get_setting_or_default("staff_eval_rubric", default_staff_eval_rubric)
         with st.form("ai_prompt_templates_form"):
             dashboard_prompt_edit = st.text_area("Admin Dashboard Summary Prompt", value=dashboard_prompt, height=200)
             individual_prompt_edit = st.text_area("Individual Report Summary Prompt", value=individual_prompt, height=200)
             weekly_duty_prompt_edit = st.text_area("Weekly Duty Analysis Prompt", value=weekly_duty_prompt, height=200)
             standard_duty_prompt_edit = st.text_area("Standard Duty Analysis Prompt", value=standard_duty_prompt, height=200)
             staff_recognition_prompt_edit = st.text_area("Weekly Staff Recognition Prompt", value=staff_recognition_prompt, height=200)
-            if st.form_submit_button("Save AI Prompts", type="primary"):
+            ascend_rubric_edit = st.text_area("ASCEND Rubric (Markdown)", value=ascend_rubric, height=200)
+            north_rubric_edit = st.text_area("NORTH Rubric (Markdown)", value=north_rubric, height=200)
+            staff_eval_rubric_edit = st.text_area("Staff Evaluation Rubric/Prompt", value=staff_eval_rubric, height=200)
+            if st.form_submit_button("Save AI Prompts & Rubrics", type="primary"):
                 admin_user_id = st.session_state["user"].id
                 try:
-                    with st.spinner("Saving AI prompts to database..."):
+                    with st.spinner("Saving AI prompts and rubrics to database..."):
                         supabase.table("admin_settings").upsert({
                             "setting_name": "dashboard_prompt",
                             "setting_value": dashboard_prompt_edit,
@@ -144,10 +149,25 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             "setting_value": staff_recognition_prompt_edit,
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
-                    st.success("✅ AI prompt templates saved successfully!")
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "ascend_rubric",
+                            "setting_value": ascend_rubric_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "north_rubric",
+                            "setting_value": north_rubric_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                        supabase.table("admin_settings").upsert({
+                            "setting_name": "staff_eval_rubric",
+                            "setting_value": staff_eval_rubric_edit,
+                            "updated_by": admin_user_id
+                        }, on_conflict="setting_name").execute()
+                    st.success("✅ AI prompt templates and rubrics saved successfully!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Failed to save AI prompts: {e}")
+                    st.error(f"Failed to save AI prompts or rubrics: {e}")
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
