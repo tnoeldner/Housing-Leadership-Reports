@@ -11,7 +11,8 @@ def generate_admin_dashboard_summary(selected_date_for_summary, staff_reports_te
     Returns:
         str: Cleaned summary response
     """
-    prompt = f"""
+    from src.ai_prompts import get_admin_prompt
+    default_dashboard_prompt = """
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
 
 IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
@@ -122,27 +123,14 @@ STAFF REPORTS DATA:
 
 {engagement_reports_section}
 """
-        from src.ai_prompts import get_admin_prompt
-        default_dashboard_prompt = f"""
-    You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {{selected_date_for_summary}} into a single, comprehensive summary report.
-
-    IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
-
-    DATA SOURCES AVAILABLE:
-    1. Weekly staff reports from residence life team members
-    2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
-    3. Weekly engagement analysis (if available) - event programming, attendance data, community engagement activities
-
-    ... (rest of your default prompt here) ...
-    """
-        prompt_template = get_admin_prompt("dashboard_prompt", default_dashboard_prompt)
-        prompt = prompt_template.format(
-            selected_date_for_summary=selected_date_for_summary,
-            staff_reports_text=staff_reports_text,
-            duty_reports_section=duty_reports_section,
-            engagement_reports_section=engagement_reports_section,
-            average_score=average_score
-        )
+    prompt_template = get_admin_prompt("dashboard_prompt", default_dashboard_prompt)
+    prompt = prompt_template.format(
+        selected_date_for_summary=selected_date_for_summary,
+        staff_reports_text=staff_reports_text,
+        duty_reports_section=duty_reports_section,
+        engagement_reports_section=engagement_reports_section,
+        average_score=average_score
+    )
     import streamlit as st
     try:
         st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
