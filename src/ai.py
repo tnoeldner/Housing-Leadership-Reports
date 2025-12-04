@@ -395,7 +395,7 @@ client = None
 def init_ai():
     global client
     api_key = get_secret("GOOGLE_API_KEY")
-import google.generativeai as genai
+    if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
