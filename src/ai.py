@@ -7,14 +7,19 @@ from src.config import get_secret
 
 client = None
 
+import streamlit as st
+import json
+import re
+from google import genai
+from src.config import get_secret
+
 def init_ai():
-    global client
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
-        client = genai.Client(api_key=api_key)
+        genai.configure(api_key=api_key)
         return True
     except Exception as e:
         st.error(f"❌ Google AI API key configuration failed: {e}")
@@ -29,16 +34,12 @@ def clean_summary_response(text):
     return cleaned_text
 
 def generate_individual_report_summary(items_to_categorize):
-        print("DEBUG: Entered generate_individual_report_summary with items_to_categorize:", items_to_categorize)
-        st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     """
     Generate a unique summary for an individual report using Gemini AI.
     items_to_categorize: list of dicts representing report items (successes/challenges/events)
     Returns a cleaned summary string.
     """
-    global client
-    if client is None:
-        init_ai()
+    init_ai()
     # Accept additional context via st.session_state for richer prompt
     team_member = st.session_state.get("full_name") or st.session_state.get("title") or st.session_state.get("user", {}).get("email", "Unknown")
     week_ending_date = st.session_state.get("active_saturday") or st.session_state.get("week_ending_date")
@@ -66,25 +67,17 @@ Personal Check-in: {personal_check_in}
 Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
-    # (Removed duplicate global client)
+    print("DEBUG: Entered generate_individual_report_summary with items_to_categorize:", items_to_categorize)
+    st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     try:
         with st.spinner("AI is generating your individual summary..."):
-            # Debug: print and show type and dir of client
-            client_type = str(type(client))
-            client_dir = dir(client)
-            print("DEBUG: client type:", client_type)
-            print("DEBUG: client dir:", client_dir)
-            st.info(f"DEBUG: client type: {client_type}")
-            st.info(f"DEBUG: client dir: {client_dir}")
-            result = client.generate_content(
-                model="gemini-2.5-pro",
-                contents=prompt
-            )
-            response_text = getattr(result, "text", None)
+            model = genai.GenerativeModel("models/gemini-2.5-pro")
+            response = model.generate_content(prompt)
+            response_text = getattr(response, "text", None)
             import datetime, pprint
             raw_debug = (
                 f"[SUCCESS] {datetime.datetime.now().isoformat()}\n"
-                f"Result object: {pprint.pformat(result)}\n"
+                f"Response object: {pprint.pformat(response)}\n"
                 f"Summary text: {repr(response_text)}"
             )
             st.session_state["raw_ai_response"] = raw_debug
@@ -103,13 +96,6 @@ Well-being Rating: {well_being_rating}
         print("STREAMLIT RAW AI RESPONSE (EXCEPTION):", raw_debug)
         st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
         return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
-def generate_admin_dashboard_summary(
-    selected_date_for_summary,
-    reports_text,
-    duty_reports_section,
-    engagement_reports_section,
-    average_score
-):
     """Generate the admin dashboard summary using Gemini AI."""
     prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
