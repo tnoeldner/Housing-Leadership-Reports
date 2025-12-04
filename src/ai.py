@@ -254,9 +254,10 @@ Well-being Rating: {well_being_rating}
     st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     with st.spinner("AI is generating your individual summary..."):
         response_text = call_gemini_ai(prompt)
-    if not response_text or not response_text.strip():
+    # Ensure response_text is a string before calling .strip()
+    if not response_text or not str(response_text).strip():
         return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-    return clean_summary_response(response_text)
+    return clean_summary_response(str(response_text))
     """Generate the admin dashboard summary using Gemini AI."""
     prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
