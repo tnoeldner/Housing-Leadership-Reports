@@ -196,12 +196,19 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
-            response = model.generate_content([{"role": "user", "parts": [{"text": prompt}]}])
+        response = model.generate_content([{"role": "user", "parts": [{"text": prompt}]}])
         st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
         st.info(f"DEBUG: Gemini response object:\n{response}")
         print("DEBUG: Gemini prompt sent:\n", prompt)
         print("DEBUG: Gemini response object:\n", response)
-        return response
+        # Extract text from response
+        try:
+            response_text = response.result.candidates[0].content.parts[0].text
+        except Exception:
+            response_text = None
+        st.info(f"DEBUG: Gemini raw response (always shown):\n{response_text}")
+        print("DEBUG: Gemini raw response (always shown):\n", response_text)
+        return response_text
     except Exception as e:
         import traceback
         st.error(f"AI error: {e}")
