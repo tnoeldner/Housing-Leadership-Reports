@@ -194,7 +194,8 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
-        model = genai.GenerativeModel(model_name, api_key=api_key)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
         # Use the correct prompt format for the latest Gemini SDK
         gemini_prompt = [{"role": "user", "parts": [{"text": prompt}]}]
         response = model.generate_content(gemini_prompt)
