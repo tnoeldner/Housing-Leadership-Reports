@@ -67,6 +67,13 @@ Well-being Rating: {well_being_rating}
     # (Removed duplicate global client)
     try:
         with st.spinner("AI is generating your individual summary..."):
+            # Debug: print and show type and dir of client
+            client_type = str(type(client))
+            client_dir = dir(client)
+            print("DEBUG: client type:", client_type)
+            print("DEBUG: client dir:", client_dir)
+            st.info(f"DEBUG: client type: {client_type}")
+            st.info(f"DEBUG: client dir: {client_dir}")
             result = client.generate_content(
                 model="gemini-2.5-pro",
                 contents=prompt
