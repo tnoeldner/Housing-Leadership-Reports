@@ -7,24 +7,25 @@ from src.config import get_secret
 
 client = None
 
+
 import streamlit as st
 import json
-import re
-from google import genai
+import google.generativeai as genai
 from src.config import get_secret
 
-def init_ai():
+def call_gemini_ai(prompt, model_name="gemini-1.5-pro"):
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
         genai.configure(api_key=api_key)
-        return True
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        return getattr(response, "text", None)
     except Exception as e:
-        st.error(f"❌ Google AI API key configuration failed: {e}")
-        st.info("Please update your Google AI API key in secrets or environment variables.")
-        st.stop()
+        st.error(f"AI error: {e}")
+        return None
 
 def clean_summary_response(text):
     if not text:
@@ -39,7 +40,6 @@ def generate_individual_report_summary(items_to_categorize):
     items_to_categorize: list of dicts representing report items (successes/challenges/events)
     Returns a cleaned summary string.
     """
-    init_ai()
     # Accept additional context via st.session_state for richer prompt
     team_member = st.session_state.get("full_name") or st.session_state.get("title") or st.session_state.get("user", {}).get("email", "Unknown")
     week_ending_date = st.session_state.get("active_saturday") or st.session_state.get("week_ending_date")
@@ -67,35 +67,12 @@ Personal Check-in: {personal_check_in}
 Director Concerns: {director_concerns}
 Well-being Rating: {well_being_rating}
 """
-    print("DEBUG: Entered generate_individual_report_summary with items_to_categorize:", items_to_categorize)
     st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
-    try:
-        with st.spinner("AI is generating your individual summary..."):
-            model = genai.GenerativeModel("gemini-1.5-pro")
-            response = model.generate_content(prompt)
-            response_text = getattr(response, "text", None)
-            import datetime, pprint
-            raw_debug = (
-                f"[SUCCESS] {datetime.datetime.now().isoformat()}\n"
-                f"Response object: {pprint.pformat(response)}\n"
-                f"Summary text: {repr(response_text)}"
-            )
-            st.session_state["raw_ai_response"] = raw_debug
-            print("STREAMLIT RAW AI RESPONSE (SUCCESS):", raw_debug)
-            if not response_text or not response_text.strip():
-                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return clean_summary_response(response_text)
-    except Exception as e:
-        import datetime, traceback
-        raw_debug = (
-            f"[EXCEPTION] {datetime.datetime.now().isoformat()}\n"
-            f"Exception: {e}\n"
-            f"Traceback:\n{traceback.format_exc()}\n"
-        )
-        st.session_state["raw_ai_response"] = raw_debug
-        print("STREAMLIT RAW AI RESPONSE (EXCEPTION):", raw_debug)
-        st.info(f"ℹ️ AI fallback used due to error: {e}. You can manually review and adjust summary if needed.")
-        return "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
+    with st.spinner("AI is generating your individual summary..."):
+        response_text = call_gemini_ai(prompt)
+    if not response_text or not response_text.strip():
+        return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+    return clean_summary_response(response_text)
     """Generate the admin dashboard summary using Gemini AI."""
     prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
