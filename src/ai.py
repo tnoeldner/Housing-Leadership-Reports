@@ -71,7 +71,7 @@ Well-being Rating: {well_being_rating}
     st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     try:
         with st.spinner("AI is generating your individual summary..."):
-            model = genai.GenerativeModel("models/gemini-2.5-pro")
+            model = genai.GenerativeModel("gemini-1.5-pro")
             response = model.generate_content(prompt)
             response_text = getattr(response, "text", None)
             import datetime, pprint
