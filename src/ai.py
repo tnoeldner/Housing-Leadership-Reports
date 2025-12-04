@@ -189,9 +189,19 @@ import google.generativeai as genai
 from src.config import get_secret
 
 def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
+    # Always initialize debug info in session state
+    if 'raw_ai_debug' not in st.session_state:
+        st.session_state['raw_ai_debug'] = {}
+    st.session_state['raw_ai_debug']['prompt'] = str(prompt)
+    st.session_state['raw_ai_debug']['response'] = None
+    st.session_state['raw_ai_debug']['response_text'] = None
+    st.session_state['raw_ai_debug']['exception'] = None
+    st.session_state['raw_ai_debug']['traceback'] = None
+
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+        st.session_state['raw_ai_debug']['exception'] = "Missing Google AI API key"
         st.stop()
     try:
         genai.configure(api_key=api_key)
