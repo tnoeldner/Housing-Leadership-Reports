@@ -29,6 +29,8 @@ def clean_summary_response(text):
     return cleaned_text
 
 def generate_individual_report_summary(items_to_categorize):
+        print("DEBUG: Entered generate_individual_report_summary with items_to_categorize:", items_to_categorize)
+        st.info(f"DEBUG: Entered generate_individual_report_summary. items_to_categorize: {items_to_categorize}")
     """
     Generate a unique summary for an individual report using Gemini AI.
     items_to_categorize: list of dicts representing report items (successes/challenges/events)
