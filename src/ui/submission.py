@@ -188,8 +188,6 @@ def submit_and_edit_page():
                         st.warning("DEBUG: RAW AI RESPONSE FOUND IN REPORT. See expander below.")
                         with st.expander("--- RAW AI RESPONSE (from report) ---", expanded=True):
                             st.write(selected_report["raw_ai_response"])
-                    else:
-                        st.error("DEBUG: No RAW AI debug info found in session or report. If you see this, please report it to the developer.")
                 st.info(f"**Your AI-Generated Summary:**\n\n{clean_summary_response(selected_report.get('individual_summary'))}")
             report_body = selected_report.get("report_body") or {}
             for section_key, section_name in CORE_SECTIONS.items():
