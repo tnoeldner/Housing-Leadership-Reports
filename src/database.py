@@ -1,7 +1,7 @@
-from datetime import datetime, date
 import streamlit as st
 from supabase import create_client, Client
 import time
+from datetime import datetime
 import json
 from src.config import get_secret, CORE_SECTIONS
 from src.utils import extract_upcoming_events
@@ -76,44 +76,34 @@ def get_user_client():
         client.auth.set_session(access_token, access_token)
     return client
 
-def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None):
+def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None, db_client=None):
     """Save a duty analysis report to the database for permanent storage"""
     try:
         # Determine report type
         report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
-        
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']
         end_date = analysis_data['filter_info']['end_date']
-        
         # Convert to ISO format strings if they're date objects
         if hasattr(start_date, 'isoformat'):
             start_date = start_date.isoformat()
         if hasattr(end_date, 'isoformat'):
             end_date = end_date.isoformat()
-        
+        # Use provided db_client or fallback to supabase
+        client = db_client if db_client is not None else supabase
         # Check for existing analysis with same week ending date and user
-        existing_query = supabase.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
+        existing_query = client.table("saved_duty_analyses").select("*").eq("week_ending_date", week_ending_date)
         if created_by_user_id:
             existing_query = existing_query.eq("created_by", created_by_user_id)
-        
         existing_response = existing_query.execute()
         existing_records = existing_response.data if existing_response.data else []
-        
         # Prepare data for saving
-        import json
-        def safe_json_dumps(obj):
-            def default(o):
-                if isinstance(o, (date, datetime)):
-                    return o.isoformat()
-                return str(o)
-            return json.dumps(obj, default=default)
         now = datetime.now().isoformat()
         save_data = {
-            'week_ending_date': week_ending_date.isoformat() if isinstance(week_ending_date, (date, datetime)) else week_ending_date,
+            'week_ending_date': week_ending_date,
             'report_type': report_type,
-            'date_range_start': start_date.isoformat() if isinstance(start_date, (date, datetime)) else start_date,
-            'date_range_end': end_date.isoformat() if isinstance(end_date, (date, datetime)) else end_date,
+            'date_range_start': start_date,
+            'date_range_end': end_date,
             'reports_analyzed': len(analysis_data['selected_forms']),
             'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
             'analysis_text': analysis_data['summary'],
@@ -121,6 +111,9 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
             'created_at': now,
             'updated_at': now
         }
+        print("[DEBUG] save_data to Supabase:", save_data)
+        # Attach save_data to result for UI debug
+        debug_save_data = save_data.copy()
         
         # Save to database with enhanced duplicate detection
         if existing_records:
@@ -129,41 +122,42 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
                 "success": True,
                 "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
                 "existing_id": existing_records[0]['id'],
-                "action": "duplicate_prevented"
+                "action": "duplicate_prevented",
+                "debug_save_data": debug_save_data
             }
         else:
             # No existing record, safe to insert
             try:
-                response = supabase.table("saved_duty_analyses").insert(save_data).execute()
-                
+                response = client.table("saved_duty_analyses").insert(save_data).execute()
                 if response.data:
                     return {
                         "success": True, 
                         "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
                         "saved_id": response.data[0]['id'],
-                        "action": "created_new"
+                        "action": "created_new",
+                        "debug_save_data": debug_save_data
                     }
                 else:
-                    return {"success": False, "message": "Failed to save duty analysis - no data returned"}
-                    
+                    return {"success": False, "message": "Failed to save duty analysis - no data returned", "debug_save_data": debug_save_data}
             except Exception as e:
                 error_msg = str(e)
-                
                 # Check if it's a table doesn't exist error
                 if "does not exist" in error_msg or "relation" in error_msg:
                     return {
                         "success": False, 
-                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql"
+                        "message": "Database tables not found. Please run the database schema setup first. See database_schema_saved_reports.sql",
+                        "debug_save_data": debug_save_data
                     }
                 # Check if it's a duplicate key error (fallback)
                 elif "duplicate key" in error_msg or "already exists" in error_msg or "violates unique constraint" in error_msg:
                     return {
                         "success": True,
                         "message": f"Duty analysis for week ending {week_ending_date} already exists (no duplicate created)",
-                        "action": "duplicate_prevented"
+                        "action": "duplicate_prevented",
+                        "debug_save_data": debug_save_data
                     }
                 else:
-                    return {"success": False, "message": f"Database error: {error_msg}"}
+                    return {"success": False, "message": f"Database error: {error_msg}", "debug_save_data": debug_save_data}
                 
     except Exception as e:
         return {"success": False, "message": f"Error saving duty analysis: {str(e)}"}
@@ -211,19 +205,10 @@ def save_staff_recognition(recognition_data, week_ending_date, created_by_user_i
 Generated by UND Housing & Residence Life Weekly Reporting Tool - Staff Recognition System"""
         
         # Prepare data for saving
-        import json
-        def safe_json_dumps(obj):
-            from datetime import date, datetime
-            def default(o):
-                if isinstance(o, (date, datetime)):
-                    return o.isoformat()
-                return str(o)
-            return json.dumps(obj, default=default)
-        from datetime import date, datetime
         save_data = {
-            'week_ending_date': week_ending_date.isoformat() if isinstance(week_ending_date, (date, datetime)) else week_ending_date,
-            'ascend_recognition': safe_json_dumps(ascend_rec) if ascend_rec else None,
-            'north_recognition': safe_json_dumps(north_rec) if north_rec else None,
+            'week_ending_date': week_ending_date,
+            'ascend_recognition': json.dumps(ascend_rec) if ascend_rec else None,
+            'north_recognition': json.dumps(north_rec) if north_rec else None,
             'recognition_text': recognition_text,
             'created_by': created_by_user_id,
             'updated_at': datetime.now().isoformat()
