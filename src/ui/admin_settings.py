@@ -10,13 +10,13 @@ import streamlit as st
 import json
 
 def admin_settings_page():
-        def safe_json_dumps(obj):
-            import datetime
-            def default(o):
-                if isinstance(o, (datetime.date, datetime.datetime)):
-                    return o.isoformat()
-                return str(o)
-            return json.dumps(obj, default=default)
+    def safe_json_dumps(obj):
+        import datetime
+        def default(o):
+            if isinstance(o, (datetime.date, datetime.datetime)):
+                return o.isoformat()
+            return str(o)
+        return json.dumps(obj, default=default)
     if "user" not in st.session_state:
         st.warning("You must be logged in to view this page.")
         st.stop()
