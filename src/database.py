@@ -103,14 +103,12 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
         # Prepare data for saving
         import json
         def safe_json_dumps(obj):
-            from datetime import date, datetime
             def default(o):
                 if isinstance(o, (date, datetime)):
                     return o.isoformat()
                 return str(o)
             return json.dumps(obj, default=default)
         now = datetime.now().isoformat()
-        from datetime import date, datetime
         save_data = {
             'week_ending_date': week_ending_date.isoformat() if isinstance(week_ending_date, (date, datetime)) else week_ending_date,
             'report_type': report_type,
