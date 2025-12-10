@@ -448,7 +448,14 @@ def duty_analysis_section():
                         analysis_data['filter_info']['start_date'] = filter_info['start_date'].isoformat()
                     if 'end_date' in filter_info and hasattr(filter_info['end_date'], 'isoformat'):
                         analysis_data['filter_info']['end_date'] = filter_info['end_date'].isoformat()
-                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
+                    # Use admin client for admins
+                    role = st.session_state.get('role', 'staff')
+                    if role == 'admin':
+                        admin_client = get_admin_client()
+                        db_client = admin_client
+                    else:
+                        db_client = None
+                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id, db_client=db_client)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
                         st.success(result.get('message', 'Duty analysis saved.'))
@@ -467,7 +474,14 @@ def duty_analysis_section():
                         'summary': summary
                     }
                     week_ending = filter_info.get('end_date')
-                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id)
+                    # Use admin client for admins
+                    role = st.session_state.get('role', 'staff')
+                    if role == 'admin':
+                        admin_client = get_admin_client()
+                        db_client = admin_client
+                    else:
+                        db_client = None
+                    result = save_duty_analysis(analysis_data, week_ending_date=week_ending, created_by_user_id=user_id, db_client=db_client)
                     st.session_state['last_save_result'] = result
                     if result.get('success'):
                         st.success(result.get('message', 'Duty analysis saved.'))
