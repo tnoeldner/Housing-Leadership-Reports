@@ -1,7 +1,7 @@
+from datetime import datetime, date
 import streamlit as st
 from supabase import create_client, Client
 import time
-from datetime import datetime
 import json
 from src.config import get_secret, CORE_SECTIONS
 from src.utils import extract_upcoming_events
