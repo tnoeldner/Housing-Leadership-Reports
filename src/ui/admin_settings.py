@@ -10,6 +10,13 @@ import streamlit as st
 import json
 
 def admin_settings_page():
+        def safe_json_dumps(obj):
+            import datetime
+            def default(o):
+                if isinstance(o, (datetime.date, datetime.datetime)):
+                    return o.isoformat()
+                return str(o)
+            return json.dumps(obj, default=default)
     if "user" not in st.session_state:
         st.warning("You must be logged in to view this page.")
         st.stop()
@@ -127,42 +134,42 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     with st.spinner("Saving AI prompts and rubrics to database..."):
                         supabase.table("admin_settings").upsert({
                             "setting_name": "dashboard_prompt",
-                            "setting_value": json.dumps(dashboard_prompt_edit),
+                            "setting_value": safe_json_dumps(dashboard_prompt_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "individual_prompt",
-                            "setting_value": json.dumps(individual_prompt_edit),
+                            "setting_value": safe_json_dumps(individual_prompt_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "weekly_duty_prompt",
-                            "setting_value": json.dumps(weekly_duty_prompt_edit),
+                            "setting_value": safe_json_dumps(weekly_duty_prompt_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "standard_duty_prompt",
-                            "setting_value": json.dumps(standard_duty_prompt_edit),
+                            "setting_value": safe_json_dumps(standard_duty_prompt_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "staff_recognition_prompt",
-                            "setting_value": json.dumps(staff_recognition_prompt_edit),
+                            "setting_value": safe_json_dumps(staff_recognition_prompt_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "ascend_rubric",
-                            "setting_value": json.dumps(ascend_rubric_edit),
+                            "setting_value": safe_json_dumps(ascend_rubric_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "north_rubric",
-                            "setting_value": json.dumps(north_rubric_edit),
+                            "setting_value": safe_json_dumps(north_rubric_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                         supabase.table("admin_settings").upsert({
                             "setting_name": "staff_eval_rubric",
-                            "setting_value": json.dumps(staff_eval_rubric_edit),
+                            "setting_value": safe_json_dumps(staff_eval_rubric_edit),
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
                     st.success("✅ AI prompt templates and rubrics saved successfully!")
