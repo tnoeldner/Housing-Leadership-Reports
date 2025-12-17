@@ -131,15 +131,8 @@ STAFF REPORTS DATA:
         engagement_reports_section=engagement_reports_section,
         average_score=average_score
     )
-    import streamlit as st
     try:
-        st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
-        print("DEBUG: Gemini prompt sent:\n", prompt)
-        response = None
-        response_text = None
         response = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
-        st.info(f"DEBUG: Gemini raw response (always shown):\n{response}")
-        print("DEBUG: Gemini raw response (always shown):\n", response)
         response_text = None
         # Try extracting text from different possible response formats
         if response is None:
@@ -149,33 +142,24 @@ STAFF REPORTS DATA:
         elif hasattr(response, "text") and isinstance(response.text, str):
             response_text = response.text
         elif hasattr(response, "candidates") and isinstance(response.candidates, list) and response.candidates:
-            # Some Gemini SDKs return a list of candidates
             candidate = response.candidates[0]
             if hasattr(candidate, "text"):
                 response_text = candidate.text
             elif isinstance(candidate, str):
                 response_text = candidate
         elif isinstance(response, list) and response:
-            # If response is a list, try first item
             first = response[0]
             if hasattr(first, "text"):
                 response_text = first.text
             elif isinstance(first, str):
                 response_text = first
-        # Log what was extracted
-        st.info(f"DEBUG: Extracted response_text (always shown):\n{response_text}")
-        print("DEBUG: Extracted response_text (always shown):\n", response_text)
         if not response_text or not str(response_text).strip():
             return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
         return clean_summary_response(response_text)
     except Exception as e:
         import traceback
-        st.error(f"AI error: {e}")
-        st.info(f"DEBUG: Gemini prompt sent (exception):\n{prompt}")
-        st.info(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
-        print("DEBUG: Gemini prompt sent (exception):\n", prompt)
-        print("DEBUG: Exception traceback:\n", traceback.format_exc())
-        return None
+        # Return error string for UI to handle
+        return f"AI error: {e}\nTraceback:\n{traceback.format_exc()}"
 import streamlit as st
 import json
 import re
@@ -193,67 +177,31 @@ from src.config import get_secret
 
 def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
     # Always initialize debug info in session state
-    if 'raw_ai_debug' not in st.session_state:
-        st.session_state['raw_ai_debug'] = {}
-    st.session_state['raw_ai_debug']['prompt'] = str(prompt)
-    st.session_state['raw_ai_debug']['response'] = None
-    st.session_state['raw_ai_debug']['response_text'] = None
-    st.session_state['raw_ai_debug']['exception'] = None
-    st.session_state['raw_ai_debug']['traceback'] = None
-
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
-        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
-        st.session_state['raw_ai_debug']['exception'] = "Missing Google AI API key"
-        st.stop()
+        raise RuntimeError("Missing Google AI API key. Please check your secrets or environment variables.")
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
-        response = model.generate_content([{"role": "user", "parts": [{"text": prompt}]}])
-        st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
-        st.info(f"DEBUG: Gemini response object:\n{response}")
-        print("DEBUG: Gemini prompt sent:\n", prompt)
-        print("DEBUG: Gemini response object:\n", response)
+        response = model.generate_content([{"role": "user", "parts": [{"text": prompt}] }])
         # Extract text from response
         response_text = None
-        # Try to extract text using the most common Gemini SDK patterns
         try:
-            # Try .text (most recent SDKs)
             if hasattr(response, 'text') and response.text:
                 response_text = response.text
-            # Try .candidates[0].content.parts[0].text (older SDKs)
             elif hasattr(response, 'candidates') and response.candidates:
                 response_text = response.candidates[0].content.parts[0].text
-            # Try .result.candidates[0].content.parts[0].text (legacy, fallback)
             elif hasattr(response, 'result') and hasattr(response.result, 'candidates'):
                 response_text = response.result.candidates[0].content.parts[0].text
             else:
                 response_text = str(response)
-        except Exception as extract_exc:
-            st.warning(f"DEBUG: Could not extract text from Gemini response: {extract_exc}")
-            print(f"DEBUG: Could not extract text from Gemini response: {extract_exc}")
-        st.info(f"DEBUG: Gemini raw response (always shown):\n{response_text}")
-        print("DEBUG: Gemini raw response (always shown):\n", response_text)
-        # Save debug info to session state for UI
-        if 'raw_ai_debug' not in st.session_state:
-            st.session_state['raw_ai_debug'] = {}
-        st.session_state['raw_ai_debug']['response'] = str(response)
-        st.session_state['raw_ai_debug']['response_text'] = str(response_text)
+        except Exception:
+            response_text = str(response)
         return response_text
     except Exception as e:
         import traceback
-        st.error(f"AI error: {e}")
-        st.info(f"DEBUG: Gemini prompt sent (exception):\n{prompt}")
-        st.info(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
-        print("DEBUG: Gemini prompt sent (exception):\n", prompt)
-        print("DEBUG: Exception traceback:\n", traceback.format_exc())
-        # Save error info to session state for UI
-        if 'raw_ai_debug' not in st.session_state:
-            st.session_state['raw_ai_debug'] = {}
-        st.session_state['raw_ai_debug']['exception'] = str(e)
-        st.session_state['raw_ai_debug']['traceback'] = traceback.format_exc()
-        st.session_state['raw_ai_debug']['response_text'] = None
-        return None
+        # Raise error to be handled by caller
+        raise RuntimeError(f"AI error: {e}\nTraceback:\n{traceback.format_exc()}")
 
 def clean_summary_response(text):
     if not text:
