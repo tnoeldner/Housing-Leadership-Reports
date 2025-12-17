@@ -133,6 +133,7 @@ STAFF REPORTS DATA:
     )
     import streamlit as st
     try:
+        st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
         st.info(f"DEBUG: Gemini prompt sent:\n{prompt}")
         print("DEBUG: Gemini prompt sent:\n", prompt)
         response = None
