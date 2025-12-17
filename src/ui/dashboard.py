@@ -584,6 +584,8 @@ def dashboard_page(supervisor_mode=False):
                                         reports_text += f"    - {text}\n"
                         reports_text += "\n"
 
+                    st.info("DEBUG: Entered dashboard summary generation block (before AI call)")
+                    print("DEBUG: Entered dashboard summary generation block (before AI call)")
                     st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
                     print("DEBUG: About to call generate_admin_dashboard_summary...")
                     st.info("DEBUG: About to call generate_admin_dashboard_summary...")
