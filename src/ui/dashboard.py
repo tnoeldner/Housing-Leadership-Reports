@@ -22,6 +22,10 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
+        # Persistent debug: show if summary generation button was pressed
+        if st.session_state.get('debug_summary_button_pressed'):
+            st.info("DEBUG: Summary generation button was pressed. This message persists across reruns.")
+
     # Auto-load all saved duty analyses into session state if not already set
     if 'weekly_duty_reports' not in st.session_state or not st.session_state['weekly_duty_reports']:
         duty_admin_client = get_admin_client()
@@ -432,6 +436,7 @@ def dashboard_page(supervisor_mode=False):
         with st.expander("View existing saved summary"): st.markdown(clean_summary_response(saved_summaries[selected_date_for_summary]))
         button_text = "🔄 Regenerate Weekly Summary"
     if st.button(button_text):
+        st.session_state['debug_summary_button_pressed'] = True
 
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
