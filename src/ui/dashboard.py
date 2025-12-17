@@ -584,15 +584,19 @@ def dashboard_page(supervisor_mode=False):
                                         reports_text += f"    - {text}\n"
                         reports_text += "\n"
 
-                    from src.ai import generate_admin_dashboard_summary
-                    cleaned_text = generate_admin_dashboard_summary(
-                        selected_date_for_summary=selected_date_for_summary,
-                        staff_reports_text=reports_text,
-                        duty_reports_section=duty_reports_section,
-                        engagement_reports_section=engagement_reports_section,
-                        average_score=average_score
-                    )
-                    st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}; st.rerun()
+                    import streamlit as st
+                    st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
+                    with st.spinner("AI is generating the admin dashboard summary..."):
+                        from src.ai import generate_admin_dashboard_summary
+                        cleaned_text = generate_admin_dashboard_summary(
+                            selected_date_for_summary=selected_date_for_summary,
+                            staff_reports_text=reports_text,
+                            duty_reports_section=duty_reports_section,
+                            engagement_reports_section=engagement_reports_section,
+                            average_score=average_score
+                        )
+                    st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
+                    # Do not rerun immediately; let the user see the result and progress messages
             except Exception as e:
                 st.error(f"An error occurred while generating the summary: {e}")
 
