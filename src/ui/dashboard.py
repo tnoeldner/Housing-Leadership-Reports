@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit as st
 import pandas as pd
 import json
 import time
@@ -585,7 +584,6 @@ def dashboard_page(supervisor_mode=False):
                                         reports_text += f"    - {text}\n"
                         reports_text += "\n"
 
-                    import streamlit as st
                     st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
                     with st.spinner("AI is generating the admin dashboard summary..."):
                         from src.ai import generate_admin_dashboard_summary
