@@ -598,6 +598,8 @@ def dashboard_page(supervisor_mode=False):
                     st.info("DEBUG: Returned from generate_admin_dashboard_summary.")
                     if not cleaned_text or not str(cleaned_text).strip():
                         st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
+                    elif str(cleaned_text).strip().lower().startswith("error:") or str(cleaned_text).strip().lower().startswith("ai error:"):
+                        st.error(f"❌ {cleaned_text}")
                     else:
                         st.success("✅ Summary generated successfully.")
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
