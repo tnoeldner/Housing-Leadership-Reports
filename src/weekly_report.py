@@ -4,16 +4,15 @@ import streamlit as st
 from datetime import datetime
 
 def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
-    st.info(f"[DEBUG] Entered create_weekly_duty_report_summary with {len(selected_forms)} forms, start_date={start_date}, end_date={end_date}")
     """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
-        # Prepare comprehensive report data for AI analysis
-        reports_text = f"\n=== WEEKLY DUTY REPORTS ANALYSIS ===\n"
-        reports_text += f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
-        reports_text += f"Total Reports: {len(selected_forms)}\n\n"
-        # ...existing code for building reports_text...
-        st.info(f"[DEBUG] Prepared reports_text for AI:")
-        st.code(reports_text)
-    
+    st.info(f"[DEBUG] Entered create_weekly_duty_report_summary with {len(selected_forms)} forms, start_date={start_date}, end_date={end_date}")
+    # ...existing code for building reports_text...
+    # Prepare comprehensive report data for AI analysis (move after data is built)
+    reports_text = f"\n=== WEEKLY DUTY REPORTS ANALYSIS ===\n"
+    reports_text += f"Date Range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
+    reports_text += f"Total Reports: {len(selected_forms)}\n\n"
+    st.info(f"[DEBUG] Prepared reports_text for AI:")
+    st.code(reports_text)
 
     if not selected_forms:
         return {"summary": "No duty reports selected for analysis."}
