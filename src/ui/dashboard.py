@@ -22,6 +22,21 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
+        # Persistent debug: after weekly_reports filter
+        if st.session_state.get('debug_after_weekly_reports'):
+            st.info("DEBUG: After filtering weekly_reports (persistent checkpoint)")
+        # Persistent debug: after draft_reports check
+        if st.session_state.get('debug_after_draft_reports'):
+            st.info("DEBUG: After draft_reports check (persistent checkpoint)")
+        # Persistent debug: after duty_reports_section prep
+        if st.session_state.get('debug_after_duty_reports_section'):
+            st.info("DEBUG: After duty_reports_section prep (persistent checkpoint)")
+        # Persistent debug: after engagement_reports_section prep
+        if st.session_state.get('debug_after_engagement_reports_section'):
+            st.info("DEBUG: After engagement_reports_section prep (persistent checkpoint)")
+        # Persistent debug: after reports_text prep
+        if st.session_state.get('debug_after_reports_text'):
+            st.info("DEBUG: After reports_text prep (persistent checkpoint)")
     # Persistent debug: show if about to call AI summary function
     if st.session_state.get('debug_about_to_call_ai_summary'):
         st.info("DEBUG: About to call generate_admin_dashboard_summary (persistent checkpoint)")
@@ -444,6 +459,8 @@ def dashboard_page(supervisor_mode=False):
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
+                st.session_state['debug_after_weekly_reports'] = True
+                st.session_state['debug_after_draft_reports'] = True
                 if draft_reports:
                     st.write(f"Found {len(draft_reports)} draft report(s) for week ending {draft_unlock_week}:")
                     if deadline_passed:
@@ -486,6 +503,7 @@ def dashboard_page(supervisor_mode=False):
 
                     # Check for saved weekly duty reports to integrate (filter by selected week)
                     duty_reports_section = ""
+                    st.session_state['debug_after_duty_reports_section'] = True
                     if 'weekly_duty_reports' not in st.session_state:
                         st.warning("No 'weekly_duty_reports' found in session state. Duty analysis integration skipped.")
                     elif not st.session_state['weekly_duty_reports']:
@@ -547,6 +565,7 @@ def dashboard_page(supervisor_mode=False):
 
                     # Check for saved weekly engagement reports to integrate
                     engagement_reports_section = ""
+                    st.session_state['debug_after_engagement_reports_section'] = True
                     if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
                         st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
                         engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
@@ -564,6 +583,7 @@ def dashboard_page(supervisor_mode=False):
                             
                             engagement_reports_section += "\n" + "="*50 + "\n"
 
+                    st.session_state['debug_after_reports_text'] = True
                     # Calculate average_score for the week
                     well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
                     average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
