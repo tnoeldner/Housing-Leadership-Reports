@@ -1,12 +1,6 @@
 import streamlit as st
 import os
 
-# --- TEMPORARY: Generate and download exact-requirements.txt ---
-if st.button('Generate exact-requirements.txt'):
-    os.system('pip freeze > exact-requirements.txt')
-    st.success('exact-requirements.txt generated!')
-    with open('exact-requirements.txt', 'r') as f:
-        st.download_button('Download exact-requirements.txt', f.read(), file_name='exact-requirements.txt')
 import streamlit as st
 import pandas as pd
 import json
