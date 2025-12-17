@@ -585,6 +585,7 @@ def dashboard_page(supervisor_mode=False):
                         reports_text += "\n"
 
                     st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
+                    st.info("DEBUG: About to call generate_admin_dashboard_summary...")
                     with st.spinner("AI is generating the admin dashboard summary..."):
                         from src.ai import generate_admin_dashboard_summary
                         cleaned_text = generate_admin_dashboard_summary(
@@ -594,6 +595,11 @@ def dashboard_page(supervisor_mode=False):
                             engagement_reports_section=engagement_reports_section,
                             average_score=average_score
                         )
+                    st.info("DEBUG: Returned from generate_admin_dashboard_summary.")
+                    if not cleaned_text or not str(cleaned_text).strip():
+                        st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
+                    else:
+                        st.success("✅ Summary generated successfully.")
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
                     # Do not rerun immediately; let the user see the result and progress messages
             except Exception as e:
