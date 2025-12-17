@@ -4,6 +4,9 @@ import streamlit as st
 from datetime import datetime
 
 def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
+        st.info(f"[DEBUG] Entered create_weekly_duty_report_summary with {len(selected_forms)} forms, start_date={start_date}, end_date={end_date}")
+        st.info(f"[DEBUG] Prepared reports_text for AI:")
+        st.code(reports_text)
     """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
     
 
@@ -152,10 +155,13 @@ Generate the weekly duty analysis summary below:
         if not api_key:
             st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
             return {"summary": "Error: Missing Google AI API key."}
+        st.info(f"[DEBUG] Using Google API key: {api_key[:6]}... (truncated)")
         model = genai.GenerativeModel("models/gemini-2.5-pro")
         with st.spinner(f"AI is generating weekly duty report from {len(selected_forms)} reports..."):
             try:
+                st.info("[DEBUG] Sending prompt to Gemini AI model...")
                 result = model.generate_content(prompt)
+                st.info(f"[DEBUG] Gemini AI model returned: {getattr(result, 'text', None)[:500]}... (truncated)")
                 summary_text = result.text if result and hasattr(result, 'text') else None
                 if not summary_text or not summary_text.strip():
                     st.info("Prompt sent to AI:")
@@ -165,6 +171,8 @@ Generate the weekly duty analysis summary below:
                     return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
                 return {"summary": summary_text}
             except Exception as e:
+                st.error(f"[DEBUG] Exception during Gemini AI call: {e}")
                 return {"summary": f"Error generating weekly duty report summary: {str(e)}"}
     except Exception as e:
+        st.error(f"[DEBUG] Exception in create_weekly_duty_report_summary: {e}")
         return {"summary": f"Error generating weekly duty report summary: {str(e)}"}

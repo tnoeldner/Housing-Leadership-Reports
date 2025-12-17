@@ -179,7 +179,7 @@ STAFF REPORTS DATA:
 import streamlit as st
 import json
 import re
-from google import genai
+import google.generativeai as genai
 from google.genai import types
 from src.config import get_secret
 
