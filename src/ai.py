@@ -276,13 +276,16 @@ client = None
 
 # Initialize Google Gemini AI using google-genai SDK
 def init_ai():
-    global client
+    import streamlit as st
+    import google.generativeai as genai
+    from src.config import get_secret
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
         st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
-        client = genai.Client(api_key=api_key)
+        genai.configure(api_key=api_key)
+        # No client object needed for google-generativeai SDK
         return True
     except Exception as e:
         st.error(f"❌ Google AI API key configuration failed: {e}")
