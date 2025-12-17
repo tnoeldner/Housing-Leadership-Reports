@@ -131,26 +131,46 @@ STAFF REPORTS DATA:
         engagement_reports_section=engagement_reports_section,
         average_score=average_score
     )
+    import streamlit as st
     try:
+        st.info("DEBUG: Entered generate_admin_dashboard_summary")
+        print("DEBUG: Entered generate_admin_dashboard_summary")
         global client
         if client is None:
+            st.info("DEBUG: client is None, calling init_ai()")
+            print("DEBUG: client is None, calling init_ai()")
             from src.ai import init_ai
             init_ai()
-        import streamlit as st
+        st.info("DEBUG: About to call client.generate_content")
+        print("DEBUG: About to call client.generate_content")
         with st.spinner("AI is generating the admin dashboard summary..."):
             result = client.generate_content(
                 model="gemini-2.5-pro",
                 contents=prompt
             )
-            response_text = getattr(result, "text", None)
-            if not response_text or not response_text.strip():
-                st.info("Prompt sent to AI:")
-                st.code(prompt)
-                st.info("Input data summary:")
-                st.code(staff_reports_text)
-                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-            return clean_summary_response(response_text)
+        st.info(f"DEBUG: client.generate_content returned: {repr(result)}")
+        print(f"DEBUG: client.generate_content returned: {repr(result)}")
+        response_text = getattr(result, "text", None)
+        st.info(f"DEBUG: Extracted response_text: {repr(response_text)}")
+        print(f"DEBUG: Extracted response_text: {repr(response_text)}")
+        if not response_text or not response_text.strip():
+            st.info("Prompt sent to AI:")
+            st.code(prompt)
+            st.info("Input data summary:")
+            st.code(staff_reports_text)
+            st.error("DEBUG: AI did not return a summary.")
+            print("DEBUG: AI did not return a summary.")
+            return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+        cleaned = clean_summary_response(response_text)
+        st.info(f"DEBUG: Cleaned summary: {repr(cleaned)}")
+        print(f"DEBUG: Cleaned summary: {repr(cleaned)}")
+        return cleaned
     except Exception as e:
+        import traceback
+        st.error(f"Error generating AI summary: {e}")
+        st.info(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
+        print(f"Error generating AI summary: {e}")
+        print(f"DEBUG: Exception traceback:\n{traceback.format_exc()}")
         return f"Error generating AI summary: {str(e)}"
 import streamlit as st
 import json
