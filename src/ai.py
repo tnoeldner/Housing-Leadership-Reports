@@ -164,7 +164,6 @@ import streamlit as st
 import json
 import re
 import google.generativeai as genai
-from google.genai import types
 from src.config import get_secret
 
 client = None
@@ -257,7 +256,6 @@ Well-being Rating: {well_being_rating}
     )
     # ...existing code...
 from google import genai
-from google.genai import types
 import streamlit as st
 import re
 import google.generativeai as genai
