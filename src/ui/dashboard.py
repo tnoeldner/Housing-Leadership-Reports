@@ -22,9 +22,9 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
-        # Persistent debug: show if summary generation button was pressed
-        if st.session_state.get('debug_summary_button_pressed'):
-            st.info("DEBUG: Summary generation button was pressed. This message persists across reruns.")
+    # Persistent debug: show if summary generation button was pressed
+    if st.session_state.get('debug_summary_button_pressed'):
+        st.info("DEBUG: Summary generation button was pressed. This message persists across reruns.")
 
     # Auto-load all saved duty analyses into session state if not already set
     if 'weekly_duty_reports' not in st.session_state or not st.session_state['weekly_duty_reports']:
