@@ -132,34 +132,26 @@ STAFF REPORTS DATA:
         average_score=average_score
     )
     try:
-        response = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro")
-        response_text = None
-        # Try extracting text from different possible response formats
-        if response is None:
-            response_text = None
-        elif isinstance(response, str):
-            response_text = response
-        elif hasattr(response, "text") and isinstance(response.text, str):
-            response_text = response.text
-        elif hasattr(response, "candidates") and isinstance(response.candidates, list) and response.candidates:
-            candidate = response.candidates[0]
-            if hasattr(candidate, "text"):
-                response_text = candidate.text
-            elif isinstance(candidate, str):
-                response_text = candidate
-        elif isinstance(response, list) and response:
-            first = response[0]
-            if hasattr(first, "text"):
-                response_text = first.text
-            elif isinstance(first, str):
-                response_text = first
-        if not response_text or not str(response_text).strip():
-            return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
-        return clean_summary_response(response_text)
+        global client
+        if client is None:
+            from src.ai import init_ai
+            init_ai()
+        import streamlit as st
+        with st.spinner("AI is generating the admin dashboard summary..."):
+            result = client.generate_content(
+                model="gemini-2.5-pro",
+                contents=prompt
+            )
+            response_text = getattr(result, "text", None)
+            if not response_text or not response_text.strip():
+                st.info("Prompt sent to AI:")
+                st.code(prompt)
+                st.info("Input data summary:")
+                st.code(staff_reports_text)
+                return "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."
+            return clean_summary_response(response_text)
     except Exception as e:
-        import traceback
-        # Return error string for UI to handle
-        return f"AI error: {e}\nTraceback:\n{traceback.format_exc()}"
+        return f"Error generating AI summary: {str(e)}"
 import streamlit as st
 import json
 import re
