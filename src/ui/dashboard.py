@@ -452,8 +452,10 @@ def dashboard_page(supervisor_mode=False):
         with st.expander("View existing saved summary"): st.markdown(clean_summary_response(saved_summaries[selected_date_for_summary]))
         button_text = "🔄 Regenerate Weekly Summary"
     if st.button(button_text):
-        st.session_state['debug_summary_button_pressed'] = True
+        st.session_state['trigger_generate_summary'] = True
 
+    if st.session_state.get('trigger_generate_summary'):
+        # --- BEGIN summary generation logic (was inside button block) ---
         with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
@@ -499,157 +501,160 @@ def dashboard_page(supervisor_mode=False):
 - **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
 """
 
-                    # Check for saved weekly duty reports to integrate (filter by selected week)
-                    duty_reports_section = ""
-                    st.session_state['debug_after_duty_reports_section'] = True
-                    if 'weekly_duty_reports' not in st.session_state:
-                        st.warning("No 'weekly_duty_reports' found in session state. Duty analysis integration skipped.")
-                    elif not st.session_state['weekly_duty_reports']:
-                        st.warning("'weekly_duty_reports' in session state is empty. Duty analysis integration skipped.")
-                    else:
-                        # Try to match on week_ending_date or date_range
-                        filtered_duty_reports = []
-                        for dr in st.session_state['weekly_duty_reports']:
-                            week_match = False
-                            dr_week = dr.get('week_ending_date')
-                            debug_msg = ''
-                            try:
-                                # Allow ±1 day window for matching
-                                if dr_week:
-                                    dr_date = pd.to_datetime(str(dr_week)).date()
-                                    summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
-                                    diff_days = abs((dr_date - summary_date).days)
-                                    debug_msg = f"Duty analysis date: {dr_date}, summary week: {summary_date}, diff: {diff_days} days. "
-                                    if diff_days <= 1:
-                                        week_match = True
-                                        debug_msg += "INCLUDED (±1 day window)"
-                                    else:
-                                        debug_msg += "NOT included (outside ±1 day window)"
-                                elif dr.get('date_range'):
-                                    start, end = dr['date_range'].split(' to ')
-                                    start_date = pd.to_datetime(start).date()
-                                    end_date = pd.to_datetime(end).date()
-                                    summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
-                                    debug_msg = f"Duty analysis date range: {start_date} to {end_date}, summary week: {summary_date}. "
-                                    if start_date <= summary_date <= end_date:
-                                        week_match = True
-                                        debug_msg += "INCLUDED (within date range)"
-                                    else:
-                                        debug_msg += "NOT included (outside date range)"
-                            except Exception as e:
-                                debug_msg = f"ERROR parsing duty analysis date: {e}"
-                            st.info(debug_msg)
-                            if week_match:
-                                filtered_duty_reports.append(dr)
-                        if filtered_duty_reports:
-                            st.success(f"🛡️ Duty analysis FOUND for this week. It will be included in the summary.")
-                            duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
-                            for i, duty_report in enumerate(filtered_duty_reports, 1):
-                                duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
-                                duty_reports_section += f"Generated: {duty_report.get('date_generated', 'N/A')}\n"
-                                duty_reports_section += f"Date Range: {duty_report.get('date_range', 'N/A')}\n"
-                                duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
-                                # Include full analysis_text if present, otherwise fallback to analysis or summary
-                                if duty_report.get('analysis_text'):
-                                    duty_reports_section += duty_report.get('analysis_text')
-                                elif duty_report.get('analysis'):
-                                    duty_reports_section += duty_report.get('analysis')
+                # END OF draft_reports block
+                st.session_state['debug_after_draft_reports_block'] = True
+
+                # Check for saved weekly duty reports to integrate (filter by selected week)
+                duty_reports_section = ""
+                st.session_state['debug_after_duty_reports_section'] = True
+                if 'weekly_duty_reports' not in st.session_state:
+                    st.warning("No 'weekly_duty_reports' found in session state. Duty analysis integration skipped.")
+                elif not st.session_state['weekly_duty_reports']:
+                    st.warning("'weekly_duty_reports' in session state is empty. Duty analysis integration skipped.")
+                else:
+                    # Try to match on week_ending_date or date_range
+                    filtered_duty_reports = []
+                    for dr in st.session_state['weekly_duty_reports']:
+                        week_match = False
+                        dr_week = dr.get('week_ending_date')
+                        debug_msg = ''
+                        try:
+                            # Allow ±1 day window for matching
+                            if dr_week:
+                                dr_date = pd.to_datetime(str(dr_week)).date()
+                                summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
+                                diff_days = abs((dr_date - summary_date).days)
+                                debug_msg = f"Duty analysis date: {dr_date}, summary week: {summary_date}, diff: {diff_days} days. "
+                                if diff_days <= 1:
+                                    week_match = True
+                                    debug_msg += "INCLUDED (±1 day window)"
                                 else:
-                                    duty_reports_section += duty_report.get('summary', '')
-                                duty_reports_section += "\n" + "="*50 + "\n"
-                            st.session_state['last_duty_reports_section'] = duty_reports_section
-                        else:
-                            st.warning("⚠️ No duty analysis found for this week. None will be included in the summary.")
-
-                    # Check for saved weekly engagement reports to integrate
-                    engagement_reports_section = ""
-                    st.session_state['debug_after_engagement_reports_section'] = True
-                    if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
-                        st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
-                        engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
-                        for i, engagement_report in enumerate(st.session_state['weekly_engagement_reports'], 1):
-                            engagement_reports_section += f"\n--- ENGAGEMENT REPORT {i} ---\n"
-                            engagement_reports_section += f"Generated: {engagement_report['date_generated']}\n"
-                            engagement_reports_section += f"Date Range: {engagement_report['date_range']}\n"
-                            engagement_reports_section += f"Events Analyzed: {engagement_report['events_analyzed']}\n\n"
-                            engagement_reports_section += engagement_report['summary']
-                            
-                            # Include upcoming events if available
-                            if engagement_report.get('upcoming_events'):
-                                engagement_reports_section += f"\n\n--- UPCOMING EVENTS ---\n"
-                                engagement_reports_section += engagement_report['upcoming_events']
-                            
-                            engagement_reports_section += "\n" + "="*50 + "\n"
-
-                    st.session_state['debug_after_reports_text'] = True
-                    # Calculate average_score for the week
-                    well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
-                    average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
-
-                    # Build reports_text from weekly_reports
-                    reports_text = ""
-                    for r in weekly_reports:
-                        team_member = r.get("team_member", "Unknown")
-                        well_being = r.get("well_being_rating", "N/A")
-                        report_body = r.get("report_body", {})
-                        reports_text += f"\n---\n**Report from: {team_member}**\n"
-                        reports_text += f"Well-being Score: {well_being}/5\n"
-                        for section, section_data in report_body.items():
-                            if section_data:
-                                successes = section_data.get("successes", [])
-                                challenges = section_data.get("challenges", [])
-                                if successes:
-                                    reports_text += f"- {section} Successes:\n"
-                                    for s in successes:
-                                        text = s.get("text", "") if isinstance(s, dict) else str(s)
-                                        reports_text += f"    - {text}\n"
-                                if challenges:
-                                    reports_text += f"- {section} Challenges:\n"
-                                    for c in challenges:
-                                        text = c.get("text", "") if isinstance(c, dict) else str(c)
-                                        reports_text += f"    - {text}\n"
-                        reports_text += "\n"
-
-                    st.info("DEBUG: Entered dashboard summary generation block (before AI call)")
-                    print("DEBUG: Entered dashboard summary generation block (before AI call)")
-                    st.session_state['debug_about_to_call_ai_summary'] = True
-                    st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
-                    print("DEBUG: About to call generate_admin_dashboard_summary...")
-                    st.info("DEBUG: About to call generate_admin_dashboard_summary...")
-                    try:
-                        with st.spinner("AI is generating the admin dashboard summary..."):
-                            from src.ai import generate_admin_dashboard_summary
-                            cleaned_text = generate_admin_dashboard_summary(
-                                selected_date_for_summary=selected_date_for_summary,
-                                staff_reports_text=reports_text,
-                                duty_reports_section=duty_reports_section,
-                                engagement_reports_section=engagement_reports_section,
-                                average_score=average_score
-                            )
-                        print(f"DEBUG: Returned from generate_admin_dashboard_summary. cleaned_text: {repr(cleaned_text)}")
-                        st.info(f"DEBUG: Returned from generate_admin_dashboard_summary. cleaned_text: {repr(cleaned_text)}")
-                    except Exception as exc:
-                        print(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
-                        st.error(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
-                        cleaned_text = None
-                    if not cleaned_text or not str(cleaned_text).strip():
-                        st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
-                        print("DEBUG: cleaned_text is empty or None after AI call.")
-                    elif str(cleaned_text).strip().lower().startswith("error:") or str(cleaned_text).strip().lower().startswith("ai error:"):
-                        st.error(f"❌ {cleaned_text}")
-                        print(f"DEBUG: cleaned_text is error: {repr(cleaned_text)}")
+                                    debug_msg += "NOT included (outside ±1 day window)"
+                            elif dr.get('date_range'):
+                                start, end = dr['date_range'].split(' to ')
+                                start_date = pd.to_datetime(start).date()
+                                end_date = pd.to_datetime(end).date()
+                                summary_date = pd.to_datetime(str(selected_date_for_summary)).date()
+                                debug_msg = f"Duty analysis date range: {start_date} to {end_date}, summary week: {summary_date}. "
+                                if start_date <= summary_date <= end_date:
+                                    week_match = True
+                                    debug_msg += "INCLUDED (within date range)"
+                                else:
+                                    debug_msg += "NOT included (outside date range)"
+                        except Exception as e:
+                            debug_msg = f"ERROR parsing duty analysis date: {e}"
+                        st.info(debug_msg)
+                        if week_match:
+                            filtered_duty_reports.append(dr)
+                    if filtered_duty_reports:
+                        st.success(f"🛡️ Duty analysis FOUND for this week. It will be included in the summary.")
+                        duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
+                        for i, duty_report in enumerate(filtered_duty_reports, 1):
+                            duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
+                            duty_reports_section += f"Generated: {duty_report.get('date_generated', 'N/A')}\n"
+                            duty_reports_section += f"Date Range: {duty_report.get('date_range', 'N/A')}\n"
+                            duty_reports_section += f"Reports Analyzed: {duty_report.get('reports_analyzed', 'N/A')}\n\n"
+                            # Include full analysis_text if present, otherwise fallback to analysis or summary
+                            if duty_report.get('analysis_text'):
+                                duty_reports_section += duty_report.get('analysis_text')
+                            elif duty_report.get('analysis'):
+                                duty_reports_section += duty_report.get('analysis')
+                            else:
+                                duty_reports_section += duty_report.get('summary', '')
+                            duty_reports_section += "\n" + "="*50 + "\n"
+                        st.session_state['last_duty_reports_section'] = duty_reports_section
                     else:
-                        st.success("✅ Summary generated successfully.")
-                        print(f"DEBUG: cleaned_text is valid summary: {repr(cleaned_text)}")
-                    print(f"DEBUG: Setting st.session_state['last_summary'] to: {{'date': {selected_date_for_summary}, 'text': {repr(cleaned_text)}}}")
-                    st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
-                    # Fallback: If no Streamlit message was shown, show a generic error
-                    if not cleaned_text or not str(cleaned_text).strip():
-                        st.error("❌ Fallback: No summary or debug output was generated. There may be a silent failure in the AI call or Streamlit UI. Please check logs and input data.")
-                    # Do not rerun immediately; let the user see the result and progress messages
+                        st.warning("⚠️ No duty analysis found for this week. None will be included in the summary.")
+
+                # Check for saved weekly engagement reports to integrate
+                engagement_reports_section = ""
+                st.session_state['debug_after_engagement_reports_section'] = True
+                if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
+                    st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
+                    engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
+                    for i, engagement_report in enumerate(st.session_state['weekly_engagement_reports'], 1):
+                        engagement_reports_section += f"\n--- ENGAGEMENT REPORT {i} ---\n"
+                        engagement_reports_section += f"Generated: {engagement_report['date_generated']}\n"
+                        engagement_reports_section += f"Date Range: {engagement_report['date_range']}\n"
+                        engagement_reports_section += f"Events Analyzed: {engagement_report['events_analyzed']}\n\n"
+                        engagement_reports_section += engagement_report['summary']
+                        
+                        # Include upcoming events if available
+                        if engagement_report.get('upcoming_events'):
+                            engagement_reports_section += f"\n\n--- UPCOMING EVENTS ---\n"
+                            engagement_reports_section += engagement_report['upcoming_events']
+                        
+                        engagement_reports_section += "\n" + "="*50 + "\n"
+
+                st.session_state['debug_after_reports_text'] = True
+                # Calculate average_score for the week
+                well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
+                average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
+
+                # Build reports_text from weekly_reports
+                reports_text = ""
+                for r in weekly_reports:
+                    team_member = r.get("team_member", "Unknown")
+                    well_being = r.get("well_being_rating", "N/A")
+                    report_body = r.get("report_body", {})
+                    reports_text += f"\n---\n**Report from: {team_member}**\n"
+                    reports_text += f"Well-being Score: {well_being}/5\n"
+                    for section, section_data in report_body.items():
+                        if section_data:
+                            successes = section_data.get("successes", [])
+                            challenges = section_data.get("challenges", [])
+                            if successes:
+                                reports_text += f"- {section} Successes:\n"
+                                for s in successes:
+                                    text = s.get("text", "") if isinstance(s, dict) else str(s)
+                                    reports_text += f"    - {text}\n"
+                            if challenges:
+                                reports_text += f"- {section} Challenges:\n"
+                                for c in challenges:
+                                    text = c.get("text", "") if isinstance(c, dict) else str(c)
+                                    reports_text += f"    - {text}\n"
+                    reports_text += "\n"
+
+                st.info("DEBUG: Entered dashboard summary generation block (before AI call)")
+                print("DEBUG: Entered dashboard summary generation block (before AI call)")
+                st.session_state['debug_about_to_call_ai_summary'] = True
+                st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
+                print("DEBUG: About to call generate_admin_dashboard_summary...")
+                st.info("DEBUG: About to call generate_admin_dashboard_summary...")
+                try:
+                    with st.spinner("AI is generating the admin dashboard summary..."):
+                        from src.ai import generate_admin_dashboard_summary
+                        cleaned_text = generate_admin_dashboard_summary(
+                            selected_date_for_summary=selected_date_for_summary,
+                            staff_reports_text=reports_text,
+                            duty_reports_section=duty_reports_section,
+                            engagement_reports_section=engagement_reports_section,
+                            average_score=average_score
+                        )
+                    print(f"DEBUG: Returned from generate_admin_dashboard_summary. cleaned_text: {repr(cleaned_text)}")
+                    st.info(f"DEBUG: Returned from generate_admin_dashboard_summary. cleaned_text: {repr(cleaned_text)}")
+                except Exception as exc:
+                    print(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
+                    st.error(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
+                    cleaned_text = None
+                if not cleaned_text or not str(cleaned_text).strip():
+                    st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
+                    print("DEBUG: cleaned_text is empty or None after AI call.")
+                elif str(cleaned_text).strip().lower().startswith("error:") or str(cleaned_text).strip().lower().startswith("ai error:"):
+                    st.error(f"❌ {cleaned_text}")
+                    print(f"DEBUG: cleaned_text is error: {repr(cleaned_text)}")
+                else:
+                    st.success("✅ Summary generated successfully.")
+                    print(f"DEBUG: cleaned_text is valid summary: {repr(cleaned_text)}")
+                print(f"DEBUG: Setting st.session_state['last_summary'] to: {{'date': {selected_date_for_summary}, 'text': {repr(cleaned_text)}}}")
+                st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
+                # Fallback: If no Streamlit message was shown, show a generic error
+                if not cleaned_text or not str(cleaned_text).strip():
+                    st.error("❌ Fallback: No summary or debug output was generated. There may be a silent failure in the AI call or Streamlit UI. Please check logs and input data.")
             except Exception as e:
                 st.error(f"An error occurred while generating the summary: {e}")
 
+        # --- END summary generation logic ---
     if "last_summary" in st.session_state:
         summary_data = st.session_state["last_summary"]
         if summary_data.get("date") == selected_date_for_summary:
