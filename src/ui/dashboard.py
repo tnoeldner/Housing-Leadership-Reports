@@ -22,27 +22,27 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
-        # Persistent debug: after weekly_reports filter
-        if st.session_state.get('debug_after_weekly_reports'):
-            st.info("DEBUG: After filtering weekly_reports (persistent checkpoint)")
-        # Persistent debug: after draft_reports check
-        if st.session_state.get('debug_after_draft_reports'):
-            st.info("DEBUG: After draft_reports check (persistent checkpoint)")
-        # Persistent debug: after duty_reports_section prep
-        if st.session_state.get('debug_after_duty_reports_section'):
-            st.info("DEBUG: After duty_reports_section prep (persistent checkpoint)")
-        # Persistent debug: after engagement_reports_section prep
-        if st.session_state.get('debug_after_engagement_reports_section'):
-            st.info("DEBUG: After engagement_reports_section prep (persistent checkpoint)")
-        # Persistent debug: after reports_text prep
-        if st.session_state.get('debug_after_reports_text'):
-            st.info("DEBUG: After reports_text prep (persistent checkpoint)")
     # Persistent debug: show if about to call AI summary function
     if st.session_state.get('debug_about_to_call_ai_summary'):
         st.info("DEBUG: About to call generate_admin_dashboard_summary (persistent checkpoint)")
     # Persistent debug: show if summary generation button was pressed
     if st.session_state.get('debug_summary_button_pressed'):
         st.info("DEBUG: Summary generation button was pressed. This message persists across reruns.")
+    # Persistent debug: after weekly_reports filter
+    if st.session_state.get('debug_after_weekly_reports'):
+        st.info("DEBUG: After filtering weekly_reports (persistent checkpoint)")
+    # Persistent debug: after draft_reports check
+    if st.session_state.get('debug_after_draft_reports'):
+        st.info("DEBUG: After draft_reports check (persistent checkpoint)")
+    # Persistent debug: after duty_reports_section prep
+    if st.session_state.get('debug_after_duty_reports_section'):
+        st.info("DEBUG: After duty_reports_section prep (persistent checkpoint)")
+    # Persistent debug: after engagement_reports_section prep
+    if st.session_state.get('debug_after_engagement_reports_section'):
+        st.info("DEBUG: After engagement_reports_section prep (persistent checkpoint)")
+    # Persistent debug: after reports_text prep
+    if st.session_state.get('debug_after_reports_text'):
+        st.info("DEBUG: After reports_text prep (persistent checkpoint)")
 
     # Auto-load all saved duty analyses into session state if not already set
     if 'weekly_duty_reports' not in st.session_state or not st.session_state['weekly_duty_reports']:
@@ -284,8 +284,6 @@ def dashboard_page(supervisor_mode=False):
         # Fetch ALL reports (including drafts) for admin functions
         all_reports_response = admin_supabase.table("reports").select("*").order("created_at", desc=True).execute()
         all_reports_including_drafts = getattr(all_reports_response, "data", None) or []
-        
-        # ...existing code...
         
         # Get all unique dates from ALL reports (not just finalized ones)
         all_report_dates = [r.get("week_ending_date") for r in all_reports_including_drafts if r.get("week_ending_date")]
