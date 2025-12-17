@@ -605,11 +605,18 @@ def dashboard_page(supervisor_mode=False):
                         cleaned_text = None
                     if not cleaned_text or not str(cleaned_text).strip():
                         st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
+                        print("DEBUG: cleaned_text is empty or None after AI call.")
                     elif str(cleaned_text).strip().lower().startswith("error:") or str(cleaned_text).strip().lower().startswith("ai error:"):
                         st.error(f"❌ {cleaned_text}")
+                        print(f"DEBUG: cleaned_text is error: {repr(cleaned_text)}")
                     else:
                         st.success("✅ Summary generated successfully.")
+                        print(f"DEBUG: cleaned_text is valid summary: {repr(cleaned_text)}")
+                    print(f"DEBUG: Setting st.session_state['last_summary'] to: {{'date': {selected_date_for_summary}, 'text': {repr(cleaned_text)}}}")
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
+                    # Fallback: If no Streamlit message was shown, show a generic error
+                    if not cleaned_text or not str(cleaned_text).strip():
+                        st.error("❌ Fallback: No summary or debug output was generated. There may be a silent failure in the AI call or Streamlit UI. Please check logs and input data.")
                     # Do not rerun immediately; let the user see the result and progress messages
             except Exception as e:
                 st.error(f"An error occurred while generating the summary: {e}")
