@@ -22,6 +22,9 @@ from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
 def dashboard_page(supervisor_mode=False):
+        # Persistent debug: show if about to call AI summary function
+        if st.session_state.get('debug_about_to_call_ai_summary'):
+            st.info("DEBUG: About to call generate_admin_dashboard_summary (persistent checkpoint)")
     # Persistent debug: show if summary generation button was pressed
     if st.session_state.get('debug_summary_button_pressed'):
         st.info("DEBUG: Summary generation button was pressed. This message persists across reruns.")
@@ -591,6 +594,7 @@ def dashboard_page(supervisor_mode=False):
 
                     st.info("DEBUG: Entered dashboard summary generation block (before AI call)")
                     print("DEBUG: Entered dashboard summary generation block (before AI call)")
+                    st.session_state['debug_about_to_call_ai_summary'] = True
                     st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
                     print("DEBUG: About to call generate_admin_dashboard_summary...")
                     st.info("DEBUG: About to call generate_admin_dashboard_summary...")
