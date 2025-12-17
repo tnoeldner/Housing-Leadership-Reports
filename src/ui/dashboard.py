@@ -585,17 +585,24 @@ def dashboard_page(supervisor_mode=False):
                         reports_text += "\n"
 
                     st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
+                    print("DEBUG: About to call generate_admin_dashboard_summary...")
                     st.info("DEBUG: About to call generate_admin_dashboard_summary...")
-                    with st.spinner("AI is generating the admin dashboard summary..."):
-                        from src.ai import generate_admin_dashboard_summary
-                        cleaned_text = generate_admin_dashboard_summary(
-                            selected_date_for_summary=selected_date_for_summary,
-                            staff_reports_text=reports_text,
-                            duty_reports_section=duty_reports_section,
-                            engagement_reports_section=engagement_reports_section,
-                            average_score=average_score
-                        )
-                    st.info("DEBUG: Returned from generate_admin_dashboard_summary.")
+                    try:
+                        with st.spinner("AI is generating the admin dashboard summary..."):
+                            from src.ai import generate_admin_dashboard_summary
+                            cleaned_text = generate_admin_dashboard_summary(
+                                selected_date_for_summary=selected_date_for_summary,
+                                staff_reports_text=reports_text,
+                                duty_reports_section=duty_reports_section,
+                                engagement_reports_section=engagement_reports_section,
+                                average_score=average_score
+                            )
+                        print(f"DEBUG: Returned from generate_admin_dashboard_summary. cleaned_text: {repr(cleaned_text)}")
+                        st.info(f"DEBUG: Returned from generate_admin_dashboard_summary. cleaned_text: {repr(cleaned_text)}")
+                    except Exception as exc:
+                        print(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
+                        st.error(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
+                        cleaned_text = None
                     if not cleaned_text or not str(cleaned_text).strip():
                         st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
                     elif str(cleaned_text).strip().lower().startswith("error:") or str(cleaned_text).strip().lower().startswith("ai error:"):
