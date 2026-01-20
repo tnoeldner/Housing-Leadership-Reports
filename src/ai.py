@@ -28,31 +28,31 @@ The report MUST contain the following sections, in this order, using markdown he
 A 2-3 sentence high-level overview of the week's key takeaways.
 
 ## ASCEND Framework Summary
-Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name.
+Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name and the date of each activity (where applicable).
 
 ### Accountability
-[Include relevant staff activities and names]
+[Include relevant staff activities, names, and dates]
 
 ### Service
-[Include relevant staff activities and names]
+[Include relevant staff activities, names, and dates]
 
 ### Community
-[Include relevant staff activities and names]
+[Include relevant staff activities, names, and dates]
 
 ### Excellence
-[Include relevant staff activities and names]
+[Include relevant staff activities, names, and dates]
 
 ### Nurture
-[Include relevant staff activities and names]
+[Include relevant staff activities, names, and dates]
 
 ### Development
-[Include relevant staff activities and names]
+[Include relevant staff activities, names, and dates]
 
 ## Guiding NORTH Pillars Summary
-Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name.
+Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name and the date of each activity (where applicable).
 
 ## UND LEADS Summary
-Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names:
+Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names and the date of each activity (where applicable):
 
 ### Learning
 Professional development, training, skill building, educational initiatives, mentoring
