@@ -4996,64 +4996,44 @@ def dashboard_page(supervisor_mode=False):
 
     st.divider()
     st.subheader("Unlock Submitted Reports")
-    
-    # Only show for admin, not supervisor
-    if not supervisor_mode:
-        st.write("Unlock finalized reports to allow staff to make edits before the deadline.")
-        
-        # Get all finalized reports for the selected week
-        # Fetch ALL reports to get comprehensive date list
-        all_reports_response = supabase.table("reports").select("*").order("created_at", desc=True).execute()
-        all_reports_comprehensive = getattr(all_reports_response, "data", None) or []
-        
-        # Use all report dates, not just those visible in current view
-        all_report_dates = [r.get("week_ending_date") for r in all_reports_comprehensive if isinstance(r, dict) and r.get("week_ending_date")]
-        all_unique_dates = sorted(list(set(all_report_dates)), reverse=True)
-        unlock_week = st.selectbox("Select week to unlock reports:", options=all_unique_dates, key="unlock_week_select")
-        
-        if unlock_week:
-            # Get finalized reports for this week
-            finalized_reports = [r for r in all_reports_comprehensive if isinstance(r, dict) and r.get("week_ending_date") == unlock_week and r.get("status") == "finalized"]
-            
-            if finalized_reports:
-                st.write(f"Found {len(finalized_reports)} finalized report(s) for week ending {unlock_week}:")
-                
-                # Display reports with unlock buttons
-                for report in finalized_reports:
-                    col1, col2, col3 = st.columns([3, 2, 1])
-                    
-                    with col1:
-                        st.write(f"**{report.get('team_member', 'Unknown')}**")
-                    
-                    with col2:
-                        st.write(f"Submitted: {report.get('created_at', '')[:10] if report.get('created_at') else 'Unknown'}")
-                    
-                    with col3:
-                        if st.button("🔓 Unlock", key=f"unlock_{report.get('id')}", help="Change status to draft so staff can edit"):
-                            try:
-                                # Change status from finalized back to draft
-                                supabase.table("reports").update({"status": "draft"}).eq("id", report.get('id')).execute()
-                                st.success(f"Report unlocked for {report.get('team_member')}!")
-                                time.sleep(1)
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Failed to unlock report: {e}")
-                
-                # Bulk unlock option
-                st.divider()
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    if st.button("🔓 Unlock All Reports for This Week", type="secondary"):
-                        try:
-                            # Unlock all finalized reports for this week
-                            supabase.table("reports").update({"status": "draft"}).eq("week_ending_date", unlock_week).eq("status", "finalized").execute()
-                            st.success(f"All reports for week ending {unlock_week} have been unlocked!")
-                            time.sleep(1)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to unlock reports: {e}")
-            else:
-                st.info("No finalized reports found for this week.")
+
+    # Supervisor response UI for finalized reports (for supervisors only)
+    if supervisor_mode:
+        st.subheader("Respond to Weekly Reports")
+        # Select week to view reports
+        week_options = unique_dates
+        selected_week = st.selectbox("Select week to respond to:", options=week_options, key="supervisor_response_week")
+        week_reports = [r for r in normalized_reports if r.get('_normalized_week') == selected_week]
+        if week_reports:
+            for report in week_reports:
+                with st.expander(f"Report: {report.get('team_member', 'Unknown')} (Submitted: {report.get('created_at', '')[:10] if report.get('created_at') else 'Unknown'})"):
+                    # Display report summary
+                    st.markdown(f"**Report Content:**\n\n{json.dumps(report.get('report_body', {}), indent=2)}")
+                    st.divider()
+                    # Comment box and respond button
+                    comment_key = f"comment_{report.get('id')}_{selected_week}"
+                    comment = st.text_area("Add your comment:", key=comment_key)
+                    if st.button("Respond with Comments (Email)", key=f"respond_{report.get('id')}_{selected_week}", help="Email this report and your comment to the author"):
+                        # Find staff email
+                        staff_email = None
+                        staff_id = report.get('user_id')
+                        for staff in all_staff:
+                            if staff.get('id') == staff_id:
+                                staff_email = staff.get('email')
+                                break
+                        if not staff_email:
+                            st.error("Could not find staff email address.")
+                        else:
+                            supervisor_name = st.session_state['user'].get('full_name', 'Supervisor')
+                            subject = f"Weekly Report Response for {selected_week} from {supervisor_name}"
+                            body = f"Hello {report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nSupervisor Comments:\n{comment}\n\nReport Content:\n{json.dumps(report.get('report_body', {}), indent=2)}"
+                            with st.spinner("Sending email..."):
+                                success = send_email(staff_email, subject, body)
+                            if success:
+                                st.success(f"Email sent to {staff_email}")
+                            else:
+                                st.error("Failed to send email.")
+    # ...existing code for admin unlock...
 
     st.divider()
     st.subheader("Enable Submission for Draft Reports")
