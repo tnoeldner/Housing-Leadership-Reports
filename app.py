@@ -79,24 +79,24 @@ else:
     # Build pages based on user role
     pages = {
         "My Profile": profile_page,
-            "Submit / Edit Report": submit_and_edit_page,
-            "User Manual": user_manual_page,
-            "Saved Reports": saved_reports_page,
-            "Staff Recognition": staff_recognition_page,
-            "Supervisor Summaries": supervisor_summaries_page,
-            "Supervisors": supervisors_section_page,
-            "Admin Settings": admin_settings_page,
-            "Dashboard": dashboard_page,
-        }
-        # Add role-specific pages
-        if st.session_state.get("role") == "admin":
-            pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
-            pages["Admin Settings"] = admin_settings_page
-        if st.session_state.get("is_supervisor"):
-            pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
-            pages["My Team Summaries"] = supervisor_summaries_page
-        selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
-        pages[selected_page]()
+        "Submit / Edit Report": submit_and_edit_page,
+        "User Manual": user_manual_page,
+        "Saved Reports": saved_reports_page,
+        "Staff Recognition": staff_recognition_page,
+        "Supervisor Summaries": supervisor_summaries_page,
+        "Supervisors": supervisors_section_page,
+        "Admin Settings": admin_settings_page,
+        "Dashboard": dashboard_page,
+    }
+    # Add role-specific pages
+    if st.session_state.get("role") == "admin":
+        pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
+        pages["Admin Settings"] = admin_settings_page
+    if st.session_state.get("is_supervisor"):
+        pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
+        pages["My Team Summaries"] = supervisor_summaries_page
+    selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
+    pages[selected_page]()
 
 # --- Connections ---
 @st.cache_resource
