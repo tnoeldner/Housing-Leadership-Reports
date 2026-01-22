@@ -21,8 +21,6 @@ def supervisor_summaries_page():
         if not summaries:
             st.info("You have no saved team summaries yet.")
             return
-                                                        sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
-                                                        subject = f"Weekly Report Response for {selected_week} from {sender_name}"
                                                         body = f"Hello {selected_report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(selected_report.get('report_body', {}), indent=2)}"
                                                         st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
                                                         try:
