@@ -196,29 +196,32 @@ def weekly_reports_viewer():
                                         # --- Response Option ---
                                         # Only show for finalized reports
                                         if status_lower == "finalized":
-                                            comment_key = f"comment_{report.get('id', '')}_{week}"
-                                            comment = st.text_area("Add your comment:", key=comment_key)
-                                            if st.button("Respond with Comments (Email)", key=f"respond_{report.get('id', '')}_{week}", help="Email this report and your comment to the author"):
-                                                staff_email = report.get('email')
-                                                st.write(f"[DEBUG] Staff email: {staff_email}")
-                                                if not staff_email:
-                                                    st.error("Could not find staff email address.")
-                                                else:
-                                                    sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
-                                                    subject = f"Weekly Report Response for {week} from {sender_name}"
-                                                    body = f"Hello {report.get('team_member', 'Staff')},\n\nYour weekly report for {week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(report.get('report_body', {}), indent=2)}"
-                                                    st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
-                                                    try:
-                                                        with st.spinner("Sending email..."):
-                                                            from src.ui.dashboard import send_email
-                                                            success = send_email(staff_email, subject, body)
-                                                        st.write(f"[DEBUG] send_email returned: {success}")
-                                                        if success:
-                                                            st.success(f"Email sent to {staff_email}")
-                                                        else:
-                                                            st.error("Failed to send email.")
-                                                    except Exception as e:
-                                                        st.error(f"Exception during email send: {e}")
+                                            form_key = f"respond_form_{report.get('id', '')}_{week}"
+                                            with st.form(form_key):
+                                                comment_key = f"comment_{report.get('id', '')}_{week}"
+                                                comment = st.text_area("Add your comment:", key=comment_key)
+                                                submit = st.form_submit_button("Respond with Comments (Email)", help="Email this report and your comment to the author")
+                                                if submit:
+                                                    staff_email = report.get('email')
+                                                    st.write(f"[DEBUG] Staff email: {staff_email}")
+                                                    if not staff_email:
+                                                        st.error("Could not find staff email address.")
+                                                    else:
+                                                        sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
+                                                        subject = f"Weekly Report Response for {week} from {sender_name}"
+                                                        body = f"Hello {report.get('team_member', 'Staff')},\n\nYour weekly report for {week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(report.get('report_body', {}), indent=2)}"
+                                                        st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
+                                                        try:
+                                                            with st.spinner("Sending email..."):
+                                                                from src.ui.dashboard import send_email
+                                                                success = send_email(staff_email, subject, body)
+                                                            st.write(f"[DEBUG] send_email returned: {success}")
+                                                            if success:
+                                                                st.success(f"Email sent to {staff_email}")
+                                                            else:
+                                                                st.error("Failed to send email.")
+                                                        except Exception as e:
+                                                            st.error(f"Exception during email send: {e}")
             
             except Exception as e:
                 st.error(f"Error fetching reports: {str(e)}")
