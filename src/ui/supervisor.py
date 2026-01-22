@@ -72,52 +72,7 @@ def supervisor_summaries_page():
                                         st.error("Failed to send email.")
                                 except Exception as e:
                                     st.error(f"Exception during email send: {e}")
-                                name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
-                                status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
-                    
-                                with st.container(border=True):
-                                    st.markdown(f"#### {name}")
-                        
-                                    # Status Badge
-                                    status_lower = status.lower()
-                                    status_class = "status-submitted" if status_lower == "finalized" else ("status-approved" if status_lower == "approved" else "status-draft")
-                                    st.markdown(f'<div style="margin-bottom: 1rem;"><span class="status-badge {status_class}">{status}</span></div>', unsafe_allow_html=True)
-                        
-                                    # Well-being Metric
-                                    if report.get('well_being_rating'):
-                                        st.metric("Well-being", f"{report.get('well_being_rating')}/5")
-                        
-                                    # AI Summary Snippet
-                                    summary = report.get('individual_summary') if isinstance(report, dict) else None
-                                    clean_sum = None
-                                    if summary:
-                                        clean_sum = clean_summary_response(summary)
-                                        snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
-                                        st.info(snippet)
-                        
-                                    # View Details
-                                    with st.expander("View Full Report"):
-                                        # Full AI Summary
-                                        if clean_sum:
-                                            st.markdown("##### 🤖 AI Summary")
-                                            st.markdown(clean_sum)
-                                        # Director Concerns
-                                        if isinstance(report, dict) and report.get('director_concerns'):
-                                            st.error(f"**⚠️ Director Concerns:**\n{report.get('director_concerns')}")
-                            
-                                        # General Updates
-                                        st.markdown("##### 📝 General Updates")
-                                        st.markdown(f"**Professional Development:**\n{report.get('professional_development', 'None') if isinstance(report, dict) else 'None'}")
-                                        st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead', 'None') if isinstance(report, dict) else 'None'}")
-                                        st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in', 'None') if isinstance(report, dict) else 'None'}")
-                            
-                                        st.markdown("---")
-                                        st.markdown("##### 🎯 Core Activities")
-                            
-                                        # Report Body
-                                        body = report.get('report_body', {}) if isinstance(report, dict) else {}
-                            
-                                        for section_key, section_name in CORE_SECTIONS.items():
+                                # ...existing code for displaying report details...
                                             section_data = body.get(section_key, {}) if isinstance(body, dict) else {}
                                             if section_data and (section_data.get('successes') or section_data.get('challenges')):
                                                 st.markdown(f"**{section_name}**")
