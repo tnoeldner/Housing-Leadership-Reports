@@ -22,12 +22,6 @@ def supervisor_summaries_page():
             st.info("You have no saved team summaries yet.")
             return
         # ...existing code for displaying summaries...
-                                    if summary:
-                                        clean_sum = clean_summary_response(summary)
-                                        snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
-                                        st.info(snippet)
-                                    with st.expander("View Full Report"):
-                                        if clean_sum:
                                             st.markdown("##### 🤖 AI Summary")
                                             st.markdown(clean_sum)
                                         if isinstance(report, dict) and report.get('director_concerns'):
