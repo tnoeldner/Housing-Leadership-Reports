@@ -4997,8 +4997,9 @@ def dashboard_page(supervisor_mode=False):
     st.divider()
     st.subheader("Unlock Submitted Reports")
 
-    # Supervisor response UI for finalized reports (for supervisors only)
-    if supervisor_mode:
+    # Response UI for finalized reports (for supervisors and admins)
+    is_admin = st.session_state.get('role') == 'admin'
+    if supervisor_mode or is_admin:
         st.subheader("Respond to Weekly Reports")
         # Select week to view reports
         week_options = unique_dates
@@ -5024,9 +5025,9 @@ def dashboard_page(supervisor_mode=False):
                         if not staff_email:
                             st.error("Could not find staff email address.")
                         else:
-                            supervisor_name = st.session_state['user'].get('full_name', 'Supervisor')
-                            subject = f"Weekly Report Response for {selected_week} from {supervisor_name}"
-                            body = f"Hello {report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nSupervisor Comments:\n{comment}\n\nReport Content:\n{json.dumps(report.get('report_body', {}), indent=2)}"
+                            sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
+                            subject = f"Weekly Report Response for {selected_week} from {sender_name}"
+                            body = f"Hello {report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(report.get('report_body', {}), indent=2)}"
                             with st.spinner("Sending email..."):
                                 success = send_email(staff_email, subject, body)
                             if success:
