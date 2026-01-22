@@ -196,14 +196,15 @@ def weekly_reports_viewer():
                                         # --- Response Option ---
                                         # Only show for finalized reports
                                         if status_lower == "finalized":
-                                            form_key = f"respond_form_{report.get('id', '')}_{week}"
-                                            st.warning("[DEBUG] Response form is rendering. If you see this, the form logic is active.")
+                                            form_key = f"respond_form_{report.get('id', '')}_{week}_{name}_{status}"
+                                            st.warning(f"[DEBUG] Response form is rendering for report ID {report.get('id', '')}, week {week}, name {name}, status {status}. If you see this, the form logic is active.")
                                             with st.form(form_key):
-                                                comment_key = f"comment_{report.get('id', '')}_{week}"
+                                                comment_key = f"comment_{report.get('id', '')}_{week}_{name}_{status}"
                                                 comment = st.text_area("Add your comment:", key=comment_key)
                                                 submit = st.form_submit_button("Respond with Comments (Email)", help="Email this report and your comment to the author")
+                                                st.write(f"[DEBUG] Form key: {form_key}, Submit pressed: {submit}")
                                                 if submit:
-                                                    st.info("[DEBUG] Form submitted. This confirms the code path is reached.")
+                                                    st.info(f"[DEBUG] Form submitted for report ID {report.get('id', '')}, week {week}, name {name}, status {status}. This confirms the code path is reached.")
                                                     staff_email = report.get('email')
                                                     st.write(f"[DEBUG] Staff email: {staff_email}")
                                                     if not staff_email:
