@@ -21,22 +21,6 @@ def supervisor_summaries_page():
         if not summaries:
             st.info("You have no saved team summaries yet.")
             return
-                                                        body = f"Hello {selected_report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(selected_report.get('report_body', {}), indent=2)}"
-                                                        st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
-                                                        try:
-                                                            with st.spinner("Sending email..."):
-                                                                from src.ui.dashboard import send_email
-                                                                success = send_email(staff_email, subject, body)
-                                                            st.write(f"[DEBUG] send_email returned: {success}")
-                                                            if success:
-                                                                st.success(f"Email sent to {staff_email}")
-                                                            else:
-                                                                st.error("Failed to send email.")
-                                                        except Exception as e:
-                                                            st.error(f"Exception during email send: {e}")
-            
-            except Exception as e:
-                st.error(f"Error fetching reports: {str(e)}")
 
 def duty_analysis_section():
     """Specialized section for duty report analysis"""
