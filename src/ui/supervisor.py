@@ -22,8 +22,6 @@ def supervisor_summaries_page():
             st.info("You have no saved team summaries yet.")
             return
         # ...existing code for displaying summaries...
-                                            st.markdown("##### 🤖 AI Summary")
-                                            st.markdown(clean_sum)
                                         if isinstance(report, dict) and report.get('director_concerns'):
                                             st.markdown("##### Director Concerns")
                                             st.markdown(report.get('director_concerns'))
