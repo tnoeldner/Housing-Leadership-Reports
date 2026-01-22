@@ -21,23 +21,7 @@ def supervisor_summaries_page():
         if not summaries:
             st.info("You have no saved team summaries yet.")
             return
-                for week, week_reports in reports_by_week.items():
-                    with st.expander(f"Week Ending {week} ({len(week_reports)} reports)", expanded=False):
-                        # Create grid layout (3 columns)
-                        cols = st.columns(3)
-                        for i, report in enumerate(week_reports):
-                            with cols[i % 3]:
-                                name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
-                                status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
-                                with st.container(border=True):
-                                    st.markdown(f"#### {name}")
-                                    status_lower = status.lower()
-                                    status_class = "status-submitted" if status_lower == "finalized" else ("status-approved" if status_lower == "approved" else "status-draft")
-                                    st.markdown(f'<div style="margin-bottom: 1rem;"><span class="status-badge {status_class}">{status}</span></div>', unsafe_allow_html=True)
-                                    if report.get('well_being_rating'):
-                                        st.metric("Well-being", f"{report.get('well_being_rating')}/5")
-                                    summary = report.get('individual_summary') if isinstance(report, dict) else None
-                                    clean_sum = None
+        # ...existing code for displaying summaries...
                                     if summary:
                                         clean_sum = clean_summary_response(summary)
                                         snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
