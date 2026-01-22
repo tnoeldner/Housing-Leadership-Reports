@@ -196,23 +196,37 @@ def weekly_reports_viewer():
                                         # --- Response Option ---
                                         # Only show for finalized reports
                                         if status_lower == "finalized":
-                                            form_key = f"respond_form_{report.get('id', '')}_{week}_{name}_{status}"
-                                            st.warning(f"[DEBUG] Response form is rendering for report ID {report.get('id', '')}, week {week}, name {name}, status {status}. If you see this, the form logic is active.")
+                                            select_key = f"select_report_{report.get('id', '')}_{week}_{name}_{status}"
+                                            if st.button(f"Respond to {name}'s report", key=select_key):
+                                                st.session_state['selected_report_id'] = report.get('id', '')
+                                                st.session_state['selected_week'] = week
+                                                st.session_state['selected_name'] = name
+                                                st.session_state['selected_status'] = status
+                                                st.session_state['selected_report_obj'] = report
+                                        # Show response form for selected report only
+                                        selected_id = st.session_state.get('selected_report_id', None)
+                                        selected_week = st.session_state.get('selected_week', None)
+                                        selected_name = st.session_state.get('selected_name', None)
+                                        selected_status = st.session_state.get('selected_status', None)
+                                        selected_report = st.session_state.get('selected_report_obj', None)
+                                        if selected_id == report.get('id', '') and status_lower == "finalized":
+                                            form_key = f"respond_form_{selected_id}_{selected_week}_{selected_name}_{selected_status}"
+                                            st.warning(f"[DEBUG] Response form is rendering for report ID {selected_id}, week {selected_week}, name {selected_name}, status {selected_status}. If you see this, the form logic is active.")
                                             with st.form(form_key):
-                                                comment_key = f"comment_{report.get('id', '')}_{week}_{name}_{status}"
+                                                comment_key = f"comment_{selected_id}_{selected_week}_{selected_name}_{selected_status}"
                                                 comment = st.text_area("Add your comment:", key=comment_key)
                                                 submit = st.form_submit_button("Respond with Comments (Email)", help="Email this report and your comment to the author")
                                                 st.write(f"[DEBUG] Form key: {form_key}, Submit pressed: {submit}")
                                                 if submit:
-                                                    st.info(f"[DEBUG] Form submitted for report ID {report.get('id', '')}, week {week}, name {name}, status {status}. This confirms the code path is reached.")
-                                                    staff_email = report.get('email')
+                                                    st.info(f"[DEBUG] Form submitted for report ID {selected_id}, week {selected_week}, name {selected_name}, status {selected_status}. This confirms the code path is reached.")
+                                                    staff_email = selected_report.get('email')
                                                     st.write(f"[DEBUG] Staff email: {staff_email}")
                                                     if not staff_email:
                                                         st.error("Could not find staff email address.")
                                                     else:
                                                         sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
-                                                        subject = f"Weekly Report Response for {week} from {sender_name}"
-                                                        body = f"Hello {report.get('team_member', 'Staff')},\n\nYour weekly report for {week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(report.get('report_body', {}), indent=2)}"
+                                                        subject = f"Weekly Report Response for {selected_week} from {sender_name}"
+                                                        body = f"Hello {selected_report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(selected_report.get('report_body', {}), indent=2)}"
                                                         st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
                                                         try:
                                                             with st.spinner("Sending email..."):
