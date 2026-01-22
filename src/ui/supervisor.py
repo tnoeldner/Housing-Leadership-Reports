@@ -21,6 +21,8 @@ def supervisor_summaries_page():
         if not summaries:
             st.info("You have no saved team summaries yet.")
             return
+    except Exception as e:
+        st.error(f"Error fetching supervisor summaries: {e}")
 
 def duty_analysis_section():
     """Specialized section for duty report analysis"""
