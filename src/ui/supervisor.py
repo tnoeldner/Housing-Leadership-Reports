@@ -203,6 +203,7 @@ def weekly_reports_viewer():
                                                 st.session_state['selected_name'] = name
                                                 st.session_state['selected_status'] = status
                                                 st.session_state['selected_report_obj'] = report
+                                                st.experimental_rerun()
                                         # Show response form for selected report only
                                         selected_id = st.session_state.get('selected_report_id', None)
                                         selected_week = st.session_state.get('selected_week', None)
