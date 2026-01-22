@@ -22,22 +22,6 @@ def supervisor_summaries_page():
             st.info("You have no saved team summaries yet.")
             return
         # ...existing code for displaying summaries...
-                                        if isinstance(report, dict) and report.get('director_concerns'):
-                                            st.markdown("##### Director Concerns")
-                                            st.markdown(report.get('director_concerns'))
-                                        section_data = report.get('report_body', {})
-                                        if section_data.get('successes'):
-                                            st.markdown("*Successes:*")
-                                            for item in section_data['successes']:
-                                                if isinstance(item, dict):
-                                                    text = item.get('text', '')
-                                                    ascend = item.get('ascend_category', 'N/A')
-                                                    north = item.get('north_category', 'N/A')
-                                                    st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                                        if section_data.get('challenges'):
-                                            st.markdown("*Challenges:*")
-                                            for item in section_data['challenges']:
-                                                if isinstance(item, dict):
                                                     text = item.get('text', '')
                                                     ascend = item.get('ascend_category', 'N/A')
                                                     north = item.get('north_category', 'N/A')
