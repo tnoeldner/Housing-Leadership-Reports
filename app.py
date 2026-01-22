@@ -47,56 +47,56 @@ if "user" not in st.session_state:
     st.info("Please log in to access the Weekly Impact Report system.")
     # Optionally, add login form or instructions here
 else:
-    # Ensure user profile exists in Supabase
-    from src.database import get_user_client
-    user_client = get_user_client()
-    user_id = getattr(st.session_state["user"], "id", None)
-    user_email = getattr(st.session_state["user"], "email", None)
-    if user_id and user_email:
-        profile_response = user_client.table("profiles").select("id").eq("id", user_id).execute()
-        profile_exists = bool(profile_response.data and isinstance(profile_response.data, list) and len(profile_response.data) > 0)
-        if not profile_exists:
-            # Create new profile with default role 'user'
-            user_client.table("profiles").insert({
-                "id": user_id,
-                "email": user_email,
-                "role": "user",
-                "full_name": st.session_state.get("full_name", ""),
-                "title": st.session_state.get("title", "")
-            }).execute()
-    # Ensure new users have a default role
-    if "role" not in st.session_state or not st.session_state["role"]:
-        st.session_state["role"] = "staff"
-    # --- Sidebar Navigation (single instance, after login) ---
-    st.sidebar.title("Navigation")
-    st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
-    st.sidebar.write(f"Role: {st.session_state.get('role', 'staff').title()}")
-    if st.sidebar.button("Logout", key="sidebar_logout"):
-        # You may need to implement the logout() function
-        st.session_state.clear()
-        st.rerun()
+        # Ensure user profile exists in Supabase
+        from src.database import get_user_client
+        user_client = get_user_client()
+        user_id = getattr(st.session_state["user"], "id", None)
+        user_email = getattr(st.session_state["user"], "email", None)
+        if user_id and user_email:
+            profile_response = user_client.table("profiles").select("id").eq("id", user_id).execute()
+            profile_exists = bool(profile_response.data and isinstance(profile_response.data, list) and len(profile_response.data) > 0)
+            if not profile_exists:
+                # Create new profile with default role 'user'
+                user_client.table("profiles").insert({
+                    "id": user_id,
+                    "email": user_email,
+                    "role": "user",
+                    "full_name": st.session_state.get("full_name", ""),
+                    "title": st.session_state.get("title", "")
+                }).execute()
+        # Ensure new users have a default role
+        if "role" not in st.session_state or not st.session_state["role"]:
+            st.session_state["role"] = "staff"
+        # --- Sidebar Navigation (single instance, after login) ---
+        st.sidebar.title("Navigation")
+        st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
+        st.sidebar.write(f"Role: {st.session_state.get('role', 'staff').title()}")
+        if st.sidebar.button("Logout", key="sidebar_logout"):
+            # You may need to implement the logout() function
+            st.session_state.clear()
+            st.rerun()
 
-    # Build pages based on user role
-    pages = {
-        "My Profile": profile_page,
-        "Submit / Edit Report": submit_and_edit_page,
-        "User Manual": user_manual_page,
-        "Saved Reports": saved_reports_page,
-        "Staff Recognition": staff_recognition_page,
-        "Supervisor Summaries": supervisor_summaries_page,
-        "Supervisors": supervisors_section_page,
-        "Admin Settings": admin_settings_page,
-        "Dashboard": dashboard_page,
-    }
-    # Add role-specific pages
-    if st.session_state.get("role") == "admin":
-        pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
-        pages["Admin Settings"] = admin_settings_page
-    if st.session_state.get("is_supervisor"):
-        pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
-        pages["My Team Summaries"] = supervisor_summaries_page
-    selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
-    pages[selected_page]()
+        # Build pages based on user role
+        pages = {
+            "My Profile": profile_page,
+            "Submit / Edit Report": submit_and_edit_page,
+            "User Manual": user_manual_page,
+            "Saved Reports": saved_reports_page,
+            "Staff Recognition": staff_recognition_page,
+            "Supervisor Summaries": supervisor_summaries_page,
+            "Supervisors": supervisors_section_page,
+            "Admin Settings": admin_settings_page,
+            "Dashboard": dashboard_page,
+        }
+        # Add role-specific pages
+        if st.session_state.get("role") == "admin":
+            pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
+            pages["Admin Settings"] = admin_settings_page
+        if st.session_state.get("is_supervisor"):
+            pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
+            pages["My Team Summaries"] = supervisor_summaries_page
+        selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
+        pages[selected_page]()
 
 # --- Connections ---
 @st.cache_resource
