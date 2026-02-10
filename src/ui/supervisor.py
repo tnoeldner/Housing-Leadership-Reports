@@ -124,24 +124,24 @@ def weekly_reports_viewer():
                     with st.expander(f"Week Ending {week} ({len(week_reports)} reports)", expanded=False):
                         # Create grid layout (3 columns)
                         cols = st.columns(3)
-                        
+            
                         for i, report in enumerate(week_reports):
                             with cols[i % 3]:
                                 name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
                                 status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
-                                
+                    
                                 with st.container(border=True):
                                     st.markdown(f"#### {name}")
-                                    
+                        
                                     # Status Badge
                                     status_lower = status.lower()
                                     status_class = "status-submitted" if status_lower == "finalized" else ("status-approved" if status_lower == "approved" else "status-draft")
                                     st.markdown(f'<div style="margin-bottom: 1rem;"><span class="status-badge {status_class}">{status}</span></div>', unsafe_allow_html=True)
-                                    
+                        
                                     # Well-being Metric
                                     if report.get('well_being_rating'):
                                         st.metric("Well-being", f"{report.get('well_being_rating')}/5")
-                                    
+                        
                                     # AI Summary Snippet
                                     summary = report.get('individual_summary') if isinstance(report, dict) else None
                                     clean_sum = None
@@ -149,7 +149,7 @@ def weekly_reports_viewer():
                                         clean_sum = clean_summary_response(summary)
                                         snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
                                         st.info(snippet)
-                                    
+                        
                                     # View Details
                                     with st.expander("View Full Report"):
                                         # Full AI Summary
@@ -159,19 +159,19 @@ def weekly_reports_viewer():
                                         # Director Concerns
                                         if isinstance(report, dict) and report.get('director_concerns'):
                                             st.error(f"**⚠️ Director Concerns:**\n{report.get('director_concerns')}")
-                                        
+                            
                                         # General Updates
                                         st.markdown("##### 📝 General Updates")
                                         st.markdown(f"**Professional Development:**\n{report.get('professional_development', 'None') if isinstance(report, dict) else 'None'}")
                                         st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead', 'None') if isinstance(report, dict) else 'None'}")
                                         st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in', 'None') if isinstance(report, dict) else 'None'}")
-                                        
+                            
                                         st.markdown("---")
                                         st.markdown("##### 🎯 Core Activities")
-                                        
+                            
                                         # Report Body
                                         body = report.get('report_body', {}) if isinstance(report, dict) else {}
-                                        
+                            
                                         for section_key, section_name in CORE_SECTIONS.items():
                                             section_data = body.get(section_key, {}) if isinstance(body, dict) else {}
                                             if section_data and (section_data.get('successes') or section_data.get('challenges')):
@@ -193,6 +193,53 @@ def weekly_reports_viewer():
                                                             north = item.get('north_category', 'N/A')
                                                             st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
                                                 st.markdown("")
+                                        # --- Response Option ---
+                                        # Only show for finalized reports
+                                        if status_lower == "finalized":
+                                            select_key = f"select_report_{report.get('id', '')}_{week}_{name}_{status}"
+                                            if st.button(f"Respond to {name}'s report", key=select_key):
+                                                st.session_state['selected_report_id'] = report.get('id', '')
+                                                st.session_state['selected_week'] = week
+                                                st.session_state['selected_name'] = name
+                                                st.session_state['selected_status'] = status
+                                                st.session_state['selected_report_obj'] = report
+                                                st.experimental_rerun()
+                                        # Show response form for selected report only
+                                        selected_id = st.session_state.get('selected_report_id', None)
+                                        selected_week = st.session_state.get('selected_week', None)
+                                        selected_name = st.session_state.get('selected_name', None)
+                                        selected_status = st.session_state.get('selected_status', None)
+                                        selected_report = st.session_state.get('selected_report_obj', None)
+                                        if selected_id == report.get('id', '') and status_lower == "finalized":
+                                            form_key = f"respond_form_{selected_id}_{selected_week}_{selected_name}_{selected_status}"
+                                            st.warning(f"[DEBUG] Response form is rendering for report ID {selected_id}, week {selected_week}, name {selected_name}, status {selected_status}. If you see this, the form logic is active.")
+                                            with st.form(form_key):
+                                                comment_key = f"comment_{selected_id}_{selected_week}_{selected_name}_{selected_status}"
+                                                comment = st.text_area("Add your comment:", key=comment_key)
+                                                submit = st.form_submit_button("Respond with Comments (Email)", help="Email this report and your comment to the author")
+                                                st.write(f"[DEBUG] Form key: {form_key}, Submit pressed: {submit}")
+                                                if submit:
+                                                    st.info(f"[DEBUG] Form submitted for report ID {selected_id}, week {selected_week}, name {selected_name}, status {selected_status}. This confirms the code path is reached.")
+                                                    staff_email = selected_report.get('email')
+                                                    st.write(f"[DEBUG] Staff email: {staff_email}")
+                                                    if not staff_email:
+                                                        st.error("Could not find staff email address.")
+                                                    else:
+                                                        sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
+                                                        subject = f"Weekly Report Response for {selected_week} from {sender_name}"
+                                                        body = f"Hello {selected_report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(selected_report.get('report_body', {}), indent=2)}"
+                                                        st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
+                                                        try:
+                                                            with st.spinner("Sending email..."):
+                                                                from src.ui.dashboard import send_email
+                                                                success = send_email(staff_email, subject, body)
+                                                            st.write(f"[DEBUG] send_email returned: {success}")
+                                                            if success:
+                                                                st.success(f"Email sent to {staff_email}")
+                                                            else:
+                                                                st.error("Failed to send email.")
+                                                        except Exception as e:
+                                                            st.error(f"Exception during email send: {e}")
             
             except Exception as e:
                 st.error(f"Error fetching reports: {str(e)}")
