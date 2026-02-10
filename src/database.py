@@ -440,3 +440,146 @@ def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id
             
     except Exception as e:
         return {"success": False, "message": f"Error saving engagement analysis: {str(e)}"}
+
+def select_monthly_winners(month, year):
+    """
+    Selects the monthly winners for ASCEND and NORTH recognition based on the number of weekly recognitions.
+    """
+    try:
+        start_date = f"{year}-{month:02d}-01"
+        end_date = f"{year}-{month:02d}-31"
+
+        # Fetch all recognitions for the given month
+        success, data, error = safe_db_query(
+            supabase.table("saved_staff_recognition")
+            .select("ascend_recognition, north_recognition")
+            .gte("week_ending_date", start_date)
+            .lte("week_ending_date", end_date),
+            "Fetching monthly recognitions"
+        )
+
+        if not success:
+            return {"success": False, "message": error}
+
+        ascend_counts = {}
+        north_counts = {}
+
+        for record in data:
+            # Process ASCEND recognition
+            if record.get('ascend_recognition'):
+                try:
+                    ascend_rec = json.loads(record['ascend_recognition'].strip('\"'))
+                    staff_member = ascend_rec.get('staff_member')
+                    if staff_member:
+                        ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Ignore malformed JSON
+
+            # Process NORTH recognition
+            if record.get('north_recognition'):
+                try:
+                    north_rec = json.loads(record['north_recognition'].strip('\"'))
+                    staff_member = north_rec.get('staff_member')
+                    if staff_member:
+                        north_counts[staff_member] = north_counts.get(staff_member, 0) + 1
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Ignore malformed JSON
+        
+        # Determine winners
+        ascend_winner = max(ascend_counts, key=ascend_counts.get) if ascend_counts else None
+        north_winner = max(north_counts, key=north_counts.get) if north_counts else None
+
+        # Check for ties
+        if ascend_winner and list(ascend_counts.values()).count(ascend_counts[ascend_winner]) > 1:
+            tied_winners = [k for k, v in ascend_counts.items() if v == ascend_counts[ascend_winner]]
+            return {"success": True, "status": "tie", "category": "ASCEND", "winners": tied_winners}
+
+        if north_winner and list(north_counts.values()).count(north_counts[north_winner]) > 1:
+            tied_winners = [k for k, v in north_counts.items() if v == north_counts[north_winner]]
+            return {"success": True, "status": "tie", "category": "NORTH", "winners": tied_winners}
+
+        # Save winners to the database
+        recognition_month = f"{year}-{month:02d}-01"
+        
+        # Fetch the full recognition object for the winners
+        ascend_winner_obj = {}
+        if ascend_winner:
+            for record in data:
+                if record.get('ascend_recognition'):
+                    try:
+                        ascend_rec = json.loads(record['ascend_recognition'].strip('\"'))
+                        if ascend_rec.get('staff_member') == ascend_winner:
+                            ascend_winner_obj = ascend_rec
+                            break
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+        
+        north_winner_obj = {}
+        if north_winner:
+            for record in data:
+                if record.get('north_recognition'):
+                    try:
+                        north_rec = json.loads(record['north_recognition'].strip('\"'))
+                        if north_rec.get('staff_member') == north_winner:
+                            north_winner_obj = north_rec
+                            break
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+        save_data = {
+            "recognition_month": recognition_month,
+            "ascend_winner": json.dumps(ascend_winner_obj),
+            "north_winner": json.dumps(north_winner_obj)
+        }
+
+        success, _, error = safe_db_query(
+            supabase.table("monthly_staff_recognition").insert(save_data),
+            "Saving monthly winners"
+        )
+
+        if not success:
+            return {"success": False, "message": error}
+
+        return {"success": True, "status": "success", "ascend_winner": ascend_winner, "north_winner": north_winner}
+
+    except Exception as e:
+        return {"success": False, "message": f"An error occurred: {str(e)}"}
+
+def get_all_staff_names():
+    """Fetches all unique staff member names from the database."""
+    try:
+        # Fetch all staff members from the database
+        success, data, error = safe_db_query(
+            supabase.table("saved_staff_recognition").select("ascend_recognition, north_recognition"),
+            "Fetching all staff names"
+        )
+
+        if not success:
+            return {"success": False, "message": error}
+
+        staff_names = set()
+        for record in data:
+            # Process ASCEND recognition
+            if record.get('ascend_recognition'):
+                try:
+                    ascend_rec = json.loads(record['ascend_recognition'].strip('\"'))
+                    staff_member = ascend_rec.get('staff_member')
+                    if staff_member:
+                        staff_names.add(staff_member)
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Ignore malformed JSON
+
+            # Process NORTH recognition
+            if record.get('north_recognition'):
+                try:
+                    north_rec = json.loads(record['north_recognition'].strip('\"'))
+                    staff_member = north_rec.get('staff_member')
+                    if staff_member:
+                        staff_names.add(staff_member)
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Ignore malformed JSON
+
+        return {"success": True, "data": list(staff_names), "message": "All staff names fetched successfully"}
+
+    except Exception as e:
+        return {"success": False, "message": f"Error fetching all staff names: {str(e)}"}
