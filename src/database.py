@@ -441,6 +441,7 @@ def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id
     except Exception as e:
         return {"success": False, "message": f"Error saving engagement analysis: {str(e)}"}
 
+
 def select_monthly_winners(month, year):
     """
     Selects the monthly winners for ASCEND and NORTH recognition based on the number of weekly recognitions.
@@ -461,29 +462,67 @@ def select_monthly_winners(month, year):
         if not success:
             return {"success": False, "message": error}
 
+        # Debug: Check how many records were found
+        print(f"[DEBUG] Found {len(data) if data else 0} records for {start_date} to {end_date}")
+
         ascend_counts = {}
         north_counts = {}
 
-        for record in data:
+        for record in data or []:
+            # Helper function to safely parse JSON with multiple levels of escaping
+            def parse_json_value(value):
+                """Parse JSON handling multiple levels of escaping"""
+                if isinstance(value, dict):
+                    return value
+                if not isinstance(value, str):
+                    return None
+                
+                # Remove surrounding quotes if present
+                value = value.strip()
+                while value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                
+                # Handle escaped quotes
+                value = value.replace('\\"', '"')
+                value = value.replace('\\\\', '\\')
+                
+                try:
+                    return json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    return None
+            
             # Process ASCEND recognition
             if record.get('ascend_recognition'):
                 try:
-                    ascend_rec = json.loads(record['ascend_recognition'].strip('\"'))
-                    staff_member = ascend_rec.get('staff_member')
-                    if staff_member:
-                        ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
-                except (json.JSONDecodeError, TypeError):
-                    pass  # Ignore malformed JSON
+                    ascend_rec = parse_json_value(record['ascend_recognition'])
+                    if ascend_rec:
+                        staff_member = ascend_rec.get('staff_member')
+                        if staff_member:
+                            ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
+                            print(f"[DEBUG] ASCEND: {staff_member} count = {ascend_counts[staff_member]}")
+                    else:
+                        print(f"[DEBUG] Could not parse ASCEND data: {record.get('ascend_recognition')[:100]}")
+                except Exception as e:
+                    print(f"[DEBUG] Error parsing ASCEND: {str(e)}")
+                    pass
 
             # Process NORTH recognition
             if record.get('north_recognition'):
                 try:
-                    north_rec = json.loads(record['north_recognition'].strip('\"'))
-                    staff_member = north_rec.get('staff_member')
-                    if staff_member:
-                        north_counts[staff_member] = north_counts.get(staff_member, 0) + 1
-                except (json.JSONDecodeError, TypeError):
-                    pass  # Ignore malformed JSON
+                    north_rec = parse_json_value(record['north_recognition'])
+                    if north_rec:
+                        staff_member = north_rec.get('staff_member')
+                        if staff_member:
+                            north_counts[staff_member] = north_counts.get(staff_member, 0) + 1
+                            print(f"[DEBUG] NORTH: {staff_member} count = {north_counts[staff_member]}")
+                    else:
+                        print(f"[DEBUG] Could not parse NORTH data: {record.get('north_recognition')[:100]}")
+                except Exception as e:
+                    print(f"[DEBUG] Error parsing NORTH: {str(e)}")
+                    pass
+        
+        print(f"[DEBUG] ASCEND counts: {ascend_counts}")
+        print(f"[DEBUG] NORTH counts: {north_counts}")
         
         # Determine winners
         ascend_winner = max(ascend_counts, key=ascend_counts.get) if ascend_counts else None
@@ -504,26 +543,48 @@ def select_monthly_winners(month, year):
         # Fetch the full recognition object for the winners
         ascend_winner_obj = {}
         if ascend_winner:
-            for record in data:
+            for record in data or []:
                 if record.get('ascend_recognition'):
                     try:
-                        ascend_rec = json.loads(record['ascend_recognition'].strip('\"'))
+                        ascend_data = record['ascend_recognition']
+                        # Check if it's already a dict or needs JSON parsing
+                        if isinstance(ascend_data, dict):
+                            ascend_rec = ascend_data
+                        else:
+                            # Remove surrounding quotes and handle escaping
+                            cleaned = ascend_data.strip()
+                            while cleaned.startswith('"') and cleaned.endswith('"'):
+                                cleaned = cleaned[1:-1]
+                            cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
+                            ascend_rec = json.loads(cleaned)
+                        
                         if ascend_rec.get('staff_member') == ascend_winner:
                             ascend_winner_obj = ascend_rec
                             break
-                    except (json.JSONDecodeError, TypeError):
+                    except (json.JSONDecodeError, TypeError, AttributeError):
                         continue
         
         north_winner_obj = {}
         if north_winner:
-            for record in data:
+            for record in data or []:
                 if record.get('north_recognition'):
                     try:
-                        north_rec = json.loads(record['north_recognition'].strip('\"'))
+                        north_data = record['north_recognition']
+                        # Check if it's already a dict or needs JSON parsing
+                        if isinstance(north_data, dict):
+                            north_rec = north_data
+                        else:
+                            # Remove surrounding quotes and handle escaping
+                            cleaned = north_data.strip()
+                            while cleaned.startswith('"') and cleaned.endswith('"'):
+                                cleaned = cleaned[1:-1]
+                            cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
+                            north_rec = json.loads(cleaned)
+                        
                         if north_rec.get('staff_member') == north_winner:
                             north_winner_obj = north_rec
                             break
-                    except (json.JSONDecodeError, TypeError):
+                    except (json.JSONDecodeError, TypeError, AttributeError):
                         continue
 
         save_data = {
