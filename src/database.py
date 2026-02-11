@@ -60,7 +60,11 @@ def safe_db_query(query_builder, operation_name="Database query", max_retries=3)
 
 
 # Initialize the global supabase client (for public queries only)
-supabase = init_connection()
+try:
+    supabase = init_connection()
+except Exception as e:
+    print(f"[WARN] Failed to initialize Supabase connection at module load: {e}")
+    supabase = None
 
 def get_user_client():
     """
