@@ -468,32 +468,65 @@ def select_monthly_winners(month, year):
         
         if success_all and data_all:
             print(f"[DEBUG] Recent dates in database: {[r.get('week_ending_date') for r in data_all[:10]]}")
+            print(f"[DEBUG] Total records found in limit(50): {len(data_all)}")
+        else:
+            print(f"[DEBUG] Failed to fetch recent dates: {error_all}")
 
-        # Fetch all recognitions - filter in Python to be more reliable
-        success, data_all_records, error = safe_db_query(
-            supabase.table("saved_staff_recognition")
-            .select("week_ending_date, ascend_recognition, north_recognition")
-            .order("week_ending_date"),
-            "Fetching all recognitions"
-        )
+        # Try using admin client to bypass RLS
+        print(f"[DEBUG] Attempting to fetch all records with admin client...")
+        try:
+            admin = get_admin_client()
+            response = admin.table("saved_staff_recognition").select("week_ending_date, ascend_recognition, north_recognition").order("week_ending_date").execute()
+            data_all_records = response.data if response else None
+            if data_all_records:
+                print(f"[DEBUG] Admin client returned {len(data_all_records)} total records")
+                print(f"[DEBUG] Recent dates from admin: {[r.get('week_ending_date') for r in data_all_records[-10:]]}")
+            else:
+                print(f"[DEBUG] Admin client returned no data")
+        except Exception as admin_error:
+            print(f"[DEBUG] Admin client failed: {admin_error}")
+            # Fallback to regular client
+            success, data_all_records, error = safe_db_query(
+                supabase.table("saved_staff_recognition")
+                .select("week_ending_date, ascend_recognition, north_recognition")
+                .order("week_ending_date"),
+                "Fetching all recognitions"
+            )
+            print(f"[DEBUG] Regular client success: {success}, records: {len(data_all_records) if data_all_records else 0}")
+            if not success:
+                print(f"[DEBUG] Query failed: {error}")
+                return {"success": False, "message": error}
 
-        if not success:
-            print(f"[DEBUG] Query failed: {error}")
-            return {"success": False, "message": error}
+        if not data_all_records:
+            print(f"[DEBUG] No records returned at all!")
+            return {
+                "success": True,
+                "status": "success",
+                "ascend_winner": None,
+                "north_winner": None,
+                "debug": {
+                    "records_found": 0,
+                    "ascend_count": 0,
+                    "north_count": 0,
+                    "error": "No records found in database - check if saved_staff_recognition table exists and has data"
+                }
+            }
 
         # Filter to only records in the specified month
         data = []
-        if data_all_records:
-            for record in data_all_records:
-                week_date = record.get('week_ending_date', '')
-                if week_date and start_date <= week_date <= end_date:
-                    data.append(record)
+        for record in data_all_records:
+            week_date = record.get('week_ending_date', '')
+            if week_date and start_date <= week_date <= end_date:
+                data.append(record)
         
         # Debug: Check how many records were found
         print(f"[DEBUG] Found {len(data) if data else 0} records for {start_date} to {end_date}")
         if data:
             for i, record in enumerate(data):
                 print(f"[DEBUG]   Record {i+1}: week_ending_date={record.get('week_ending_date')}, has_ascend={bool(record.get('ascend_recognition'))}, has_north={bool(record.get('north_recognition'))}")
+        else:
+            print(f"[DEBUG] No records in date range {start_date} to {end_date}")
+            print(f"[DEBUG] Total records in DB: {len(data_all_records)}")
 
         ascend_counts = {}
         north_counts = {}
