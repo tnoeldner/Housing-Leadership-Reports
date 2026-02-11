@@ -73,6 +73,9 @@ def monthly_recognition_page():
     # --- Winner Selection Logic ---
     if st.button("Select Monthly Winners"):
         with st.spinner("Determining winners..."):
+            # Show what we're querying for debugging
+            st.info(f"Querying for winners in {selected_month_name} {selected_year} (dates: {selected_year}-{selected_month:02d}-01 to {selected_year}-{selected_month:02d}-31)")
+            
             result = select_monthly_winners(selected_month, selected_year)
 
             if not result.get("success"):
@@ -97,6 +100,7 @@ def monthly_recognition_page():
                 north_winner = result.get('north_winner')
                 
                 if not ascend_winner and not north_winner:
+                    debug_info = result.get('debug', {})
                     st.warning(f"""
                     ⚠️ No staff recognitions found for {selected_month_name} {selected_year}.
                     
@@ -106,6 +110,17 @@ def monthly_recognition_page():
                     
                     Once you create weekly recognitions for {selected_month_name}, come back and try again.
                     """)
+                    
+                    # Show debug info
+                    if debug_info:
+                        with st.expander("Debug Information"):
+                            st.write(f"**Records found:** {debug_info.get('records_found', 0)}")
+                            st.write(f"**ASCEND recognitions:** {debug_info.get('ascend_count', 0)}")
+                            st.write(f"**NORTH recognitions:** {debug_info.get('north_count', 0)}")
+                            if debug_info.get('records'):
+                                st.write("**Record Details:**")
+                                for rec in debug_info['records']:
+                                    st.write(f"- Week ending {rec['week_ending_date']}: ASCEND={rec['has_ascend']}, NORTH={rec['has_north']}")
                 else:
                     st.success("Monthly winners selected and saved successfully!")
                     st.balloons()

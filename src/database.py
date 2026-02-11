@@ -535,6 +535,24 @@ def select_monthly_winners(month, year):
         ascend_winner = max(ascend_counts, key=ascend_counts.get) if ascend_counts else None
         north_winner = max(north_counts, key=north_counts.get) if north_counts else None
 
+        print(f"[DEBUG] Determined winners - ASCEND: {ascend_winner}, NORTH: {north_winner}")
+
+        # If no winners found, return early with diagnostic info
+        if not ascend_winner and not north_winner:
+            print(f"[DEBUG] No winners determined - counts are empty")
+            return {
+                "success": True,
+                "status": "success",
+                "ascend_winner": None,
+                "north_winner": None,
+                "debug": {
+                    "records_found": len(data) if data else 0,
+                    "ascend_count": len(ascend_counts),
+                    "north_count": len(north_counts),
+                    "records": [{"week_ending_date": r.get('week_ending_date'), "has_ascend": bool(r.get('ascend_recognition')), "has_north": bool(r.get('north_recognition'))} for r in (data or [])]
+                }
+            }
+        
         # Check for ties
         if ascend_winner and list(ascend_counts.values()).count(ascend_counts[ascend_winner]) > 1:
             tied_winners = [k for k, v in ascend_counts.items() if v == ascend_counts[ascend_winner]]
