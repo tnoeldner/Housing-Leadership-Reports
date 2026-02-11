@@ -152,14 +152,21 @@ def monthly_recognition_page():
             save_data = {"recognition_month": recognition_month, "north_winner": json.dumps(winner_obj)}
 
         # Check if a record for this month already exists to decide on insert vs update
-        existing_record, _, _ = supabase.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
+        try:
+            existing_response = supabase.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
+            existing_record = existing_response.data if hasattr(existing_response, 'data') else existing_response
+            
+            if existing_record and len(existing_record) > 0:
+                update_query = supabase.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month)
+            else:
+                update_query = supabase.table("monthly_staff_recognition").insert(save_data)
 
-        if existing_record:
-            update_query = supabase.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month)
-        else:
-            update_query = supabase.table("monthly_staff_recognition").insert(save_data)
-
-        success, _, error = update_query.execute()
+            result = update_query.execute()
+            success = result.data is not None if hasattr(result, 'data') else True
+            error = None
+        except Exception as e:
+            success = False
+            error = str(e)
 
         if success:
             st.success(f"Winner for {category} saved successfully!")

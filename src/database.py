@@ -593,10 +593,28 @@ def select_monthly_winners(month, year):
             "north_winner": json.dumps(north_winner_obj)
         }
 
-        success, _, error = safe_db_query(
-            supabase.table("monthly_staff_recognition").insert(save_data),
-            "Saving monthly winners"
+        # Check if a record for this month already exists
+        check_success, existing_records, check_error = safe_db_query(
+            supabase.table("monthly_staff_recognition")
+            .select("id")
+            .eq("recognition_month", recognition_month),
+            "Checking for existing monthly winner record"
         )
+
+        if check_success and existing_records and len(existing_records) > 0:
+            # Record exists, update it
+            success, _, error = safe_db_query(
+                supabase.table("monthly_staff_recognition")
+                .update(save_data)
+                .eq("recognition_month", recognition_month),
+                "Updating monthly winners"
+            )
+        else:
+            # Record doesn't exist, insert it
+            success, _, error = safe_db_query(
+                supabase.table("monthly_staff_recognition").insert(save_data),
+                "Saving monthly winners"
+            )
 
         if not success:
             return {"success": False, "message": error}
