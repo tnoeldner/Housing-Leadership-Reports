@@ -12,7 +12,10 @@ def monthly_recognition_page():
     st.write(f"📊 Session state keys: {list(st.session_state.keys())}")
     
     if 'manual_winner' in st.session_state:
-        st.warning(f"⚠️ Manual winner found in session: {st.session_state.manual_winner}")
+        st.warning(f"⚠️ Manual winner found in session: {st.session_state.get('manual_winner')}")
+    
+    if 'tie_category' in st.session_state:
+        st.info(f"ℹ️ Tie category in session: {st.session_state.get('tie_category')}")
     
     # Check if the monthly_staff_recognition table exists
     try:
@@ -79,6 +82,9 @@ def monthly_recognition_page():
 
     # --- Winner Selection Logic ---
     if st.button("Select Monthly Winners"):
+        # Set session state IMMEDIATELY before any complex operations
+        st.session_state['button_clicked'] = True
+        
         with st.spinner("Determining winners..."):
             # Show what we're querying for debugging
             st.info(f"Querying for winners in {selected_month_name} {selected_year} (dates: {selected_year}-{selected_month:02d}-01 to {selected_year}-{selected_month:02d}-31)")
@@ -91,14 +97,19 @@ def monthly_recognition_page():
                 st.warning(f"A tie was found for the {result['category']} category.")
                 st.write("Please select the winner from the following staff members:")
                 
-                # Store tied winners in session state
-                st.session_state.tied_winners = result['winners']
-                st.session_state.tie_category = result['category']
-                st.session_state.recognition_month = f"{selected_year}-{selected_month:02d}-01"
+                # Store tied winners in session state EXPLICITLY
+                st.session_state['tied_winners'] = result['winners']
+                st.session_state['tie_category'] = result['category']
+                st.session_state['recognition_month'] = f"{selected_year}-{selected_month:02d}-01"
+                
+                st.write(f"Debug: Session state updated with tie info. Category: {st.session_state.get('tie_category')}")
 
                 for winner in result['winners']:
-                    if st.button(f"Select {winner} as the winner"):
-                        st.session_state.manual_winner = winner
+                    if st.button(f"Select {winner} as the winner", key=f"winner_btn_{winner}"):
+                        st.session_state['manual_winner'] = winner
+                        st.write(f"✅ Button clicked! Setting manual_winner = {winner}")
+                        st.write(f"Session state now has: {list(st.session_state.keys())}")
+                        print(f"[DEBUG] Button clicked for {winner}, rerunning...")
                         # Rerun to process manual selection
                         st.rerun()
 
@@ -143,15 +154,15 @@ def monthly_recognition_page():
     # --- Manual Tie-Breaking Logic ---
     print(f"[DEBUG] Checking for manual_winner in session_state: {list(st.session_state.keys())}")
     
-    if 'manual_winner' in st.session_state:
+    if 'manual_winner' in st.session_state and st.session_state.get('manual_winner'):
         print(f"[DEBUG] FOUND manual_winner! Processing tie-breaking save...")
         
         with st.container(border=True):
             st.write("🔍 **TIE-BREAKING LOGIC RUNNING**")
             
-            winner = st.session_state.manual_winner
-            category = st.session_state.tie_category
-            recognition_month = st.session_state.recognition_month
+            winner = st.session_state.get('manual_winner')
+            category = st.session_state.get('tie_category')
+            recognition_month = st.session_state.get('recognition_month')
             
             st.write(f"You have selected **{winner}** as the winner for the **{category}** category.")
             st.write(f"Saving to month: {recognition_month}")
