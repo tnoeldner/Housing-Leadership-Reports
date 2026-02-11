@@ -8,15 +8,6 @@ def monthly_recognition_page():
     """Render the monthly staff recognition winners selection page"""
     st.title("🏆 Monthly Staff Recognition Winners")
     
-    # Check session state at start for debugging
-    st.write(f"📊 Session state keys: {list(st.session_state.keys())}")
-    
-    if 'manual_winner' in st.session_state:
-        st.warning(f"⚠️ Manual winner found in session: {st.session_state.get('manual_winner')}")
-    
-    if 'tie_category' in st.session_state:
-        st.info(f"ℹ️ Tie category in session: {st.session_state.get('tie_category')}")
-    
     # Check if the monthly_staff_recognition table exists
     try:
         supabase.table("monthly_staff_recognition").select("id", count="exact").limit(1).execute()
