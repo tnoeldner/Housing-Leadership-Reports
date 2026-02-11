@@ -8,6 +8,12 @@ def monthly_recognition_page():
     """Render the monthly staff recognition winners selection page"""
     st.title("🏆 Monthly Staff Recognition Winners")
     
+    # Check session state at start for debugging
+    st.write(f"📊 Session state keys: {list(st.session_state.keys())}")
+    
+    if 'manual_winner' in st.session_state:
+        st.warning(f"⚠️ Manual winner found in session: {st.session_state.manual_winner}")
+    
     # Check if the monthly_staff_recognition table exists
     try:
         supabase.table("monthly_staff_recognition").select("id", count="exact").limit(1).execute()
@@ -139,139 +145,144 @@ def monthly_recognition_page():
     
     if 'manual_winner' in st.session_state:
         print(f"[DEBUG] FOUND manual_winner! Processing tie-breaking save...")
-        st.write("🔍 **DEBUG: Tie-breaking logic triggered**")
         
-        winner = st.session_state.manual_winner
-        category = st.session_state.tie_category
-        recognition_month = st.session_state.recognition_month
-        
-        st.write(f"You have selected **{winner}** as the winner for the **{category}** category.")
-        st.write(f"Debug: winner={winner}, category={category}, month={recognition_month}")
+        with st.container(border=True):
+            st.write("🔍 **TIE-BREAKING LOGIC RUNNING**")
+            
+            winner = st.session_state.manual_winner
+            category = st.session_state.tie_category
+            recognition_month = st.session_state.recognition_month
+            
+            st.write(f"You have selected **{winner}** as the winner for the **{category}** category.")
+            st.write(f"Saving to month: {recognition_month}")
 
-        # Fetch the full recognition object for the winner
-        start_date = recognition_month
-        end_date = f"{recognition_month[:7]}-31"
-        
-        query_col = "ascend_recognition" if category == "ASCEND" else "north_recognition"
+            # Fetch the full recognition object for the winner
+            start_date = recognition_month
+            end_date = f"{recognition_month[:7]}-31"
+            
+            query_col = "ascend_recognition" if category == "ASCEND" else "north_recognition"
 
-        try:
-            # Use admin client to bypass RLS
-            from src.database import get_admin_client
-            admin = get_admin_client()
-            st.write(f"Debug: Admin client created, fetching records...")
-            
-            response = admin.table("saved_staff_recognition").select(query_col, "week_ending_date").order("week_ending_date").execute()
-            data = response.data if response else []
-            
-            st.write(f"Debug: Got {len(data)} total records, filtering for {query_col}...")
-            print(f"[DEBUG] Got {len(data)} total records for {query_col}")
-            
-            winner_obj = {}
-            if data:
-                for record in data:
-                    week_date = record.get('week_ending_date', '')
-                    # Filter to records in the month
-                    if week_date and start_date <= week_date <= end_date:
-                        rec_data = record.get(query_col)
-                        if rec_data:
-                            try:
-                                # Handle multiple levels of string escaping
-                                if isinstance(rec_data, str):
-                                    cleaned = rec_data.strip()
-                                    while cleaned.startswith('"') and cleaned.endswith('"'):
-                                        cleaned = cleaned[1:-1]
-                                    cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
-                                    rec = json.loads(cleaned)
-                                else:
-                                    rec = rec_data
-                                    
-                                if rec.get('staff_member') == winner:
-                                    winner_obj = rec
-                                    st.write(f"Debug: Found winner object for {winner}")
-                                    print(f"[DEBUG] Found winner object: {winner_obj}")
-                                    break
-                            except (json.JSONDecodeError, TypeError) as e:
-                                print(f"[DEBUG] Error parsing recognition data for {winner}: {e}")
-                                continue
-            
-            if not winner_obj:
-                st.warning(f"Debug: No recognition object found for {winner} in month {start_date}")
-                print(f"[DEBUG] No winner_obj found! winner={winner}, category={category}")
+            try:
+                # Use admin client to bypass RLS
+                from src.database import get_admin_client
+                admin = get_admin_client()
+                st.write(f"Debug: Admin client created, fetching records...")
                 
-        except Exception as e:
-            st.error(f"Failed to load winner data: {e}")
-            print(f"[ERROR] Tie-breaking fetch failed: {e}")
-            import traceback
-            traceback.print_exc()
-            st.stop()
+                response = admin.table("saved_staff_recognition").select(query_col, "week_ending_date").order("week_ending_date").execute()
+                data = response.data if response else []
+                
+                st.write(f"Debug: Got {len(data)} total records, filtering for {query_col}...")
+                print(f"[DEBUG] Got {len(data)} total records for {query_col}")
+                
+                winner_obj = {}
+                if data:
+                    for record in data:
+                        week_date = record.get('week_ending_date', '')
+                        # Filter to records in the month
+                        if week_date and start_date <= week_date <= end_date:
+                            rec_data = record.get(query_col)
+                            if rec_data:
+                                try:
+                                    # Handle multiple levels of string escaping
+                                    if isinstance(rec_data, str):
+                                        cleaned = rec_data.strip()
+                                        while cleaned.startswith('"') and cleaned.endswith('"'):
+                                            cleaned = cleaned[1:-1]
+                                        cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
+                                        rec = json.loads(cleaned)
+                                    else:
+                                        rec = rec_data
+                                        
+                                    if rec.get('staff_member') == winner:
+                                        winner_obj = rec
+                                        st.write(f"✅ Found winner object for {winner}")
+                                        print(f"[DEBUG] Found winner object: {winner_obj}")
+                                        break
+                                except (json.JSONDecodeError, TypeError) as e:
+                                    print(f"[DEBUG] Error parsing recognition data for {winner}: {e}")
+                                    continue
+                
+                if not winner_obj:
+                    st.warning(f"⚠️ No recognition object found for {winner} in month {start_date} - saving empty object")
+                    print(f"[DEBUG] No winner_obj found! winner={winner}, category={category}")
+                    
+            except Exception as e:
+                st.error(f"❌ Failed to load winner data: {e}")
+                st.error(f"Full error details: {str(e)}")
+                print(f"[ERROR] Tie-breaking fetch failed: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue with empty object so save can be attempted
+                winner_obj = {}
 
-        # Save the manually selected winner
-        st.write(f"Debug: Preparing save data...")
-        if category == "ASCEND":
-            save_data = {"recognition_month": recognition_month, "ascend_winner": json.dumps(winner_obj)}
-        else: # NORTH
-            save_data = {"recognition_month": recognition_month, "north_winner": json.dumps(winner_obj)}
-        
-        print(f"[DEBUG] Save data prepared: {save_data}")
+            # Save the manually selected winner
+            st.write(f"Preparing to save...")
+            if category == "ASCEND":
+                save_data = {"recognition_month": recognition_month, "ascend_winner": json.dumps(winner_obj)}
+            else: # NORTH
+                save_data = {"recognition_month": recognition_month, "north_winner": json.dumps(winner_obj)}
+            
+            st.write(f"Save data: {save_data}")
+            print(f"[DEBUG] Save data prepared: {save_data}")
 
-        # Check if a record for this month already exists to decide on insert vs update
-        try:
-            from src.database import get_admin_client
-            admin = get_admin_client()
-            
-            # Check for existing record
-            check_response = admin.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
-            existing_record = check_response.data if check_response else []
-            
-            st.write(f"Debug: Checking for existing record for {recognition_month}...")
-            print(f"[DEBUG] Checking for existing record for {recognition_month}: found {len(existing_record) if existing_record else 0}")
-            print(f"[DEBUG] Save data: {save_data}")
-            print(f"[DEBUG] Winner object: {winner_obj}")
-            
-            if existing_record and len(existing_record) > 0:
-                print(f"[DEBUG] Updating existing record for {recognition_month}")
-                st.write(f"Debug: Updating existing record...")
-                result = admin.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month).execute()
-                operation = "UPDATE"
-            else:
-                print(f"[DEBUG] Inserting new record for {recognition_month}")
-                st.write(f"Debug: Inserting new record...")
-                result = admin.table("monthly_staff_recognition").insert(save_data).execute()
-                operation = "INSERT"
-            
-            print(f"[DEBUG] {operation} result type: {type(result)}")
-            print(f"[DEBUG] {operation} result: {result}")
-            if hasattr(result, 'data'):
-                print(f"[DEBUG] {operation} result.data: {result.data}")
-            if hasattr(result, 'error'):
-                print(f"[DEBUG] {operation} result.error: {result.error}")
-            
-            st.write(f"Debug: Save result = {result}")
-            
-            # Check success - be more lenient about what counts as success
-            success = result is not None
-            if success:
-                st.success(f"✅ Winner for {category} saved successfully!")
-                st.write(f"Debug: Saved! Category={category}, Winner={winner}")
-                # Clear session state
-                if 'manual_winner' in st.session_state:
-                    del st.session_state.manual_winner
-                if 'tied_winners' in st.session_state:
-                    del st.session_state.tied_winners
-                if 'tie_category' in st.session_state:
-                    del st.session_state.tie_category
-                if 'recognition_month' in st.session_state:
-                    del st.session_state.recognition_month
-                time.sleep(2)  # Give user time to see success message
-                st.rerun()
-            else:
-                st.error(f"Failed to save the winner. Result was None/empty.")
-                print(f"[ERROR] Save returned None/empty")
-        except Exception as e:
-            st.error(f"Failed to save the winner: {e}")
-            print(f"[ERROR] Tie-breaking save failed: {e}")
-            import traceback
-            traceback.print_exc()
+            # Check if a record for this month already exists to decide on insert vs update
+            try:
+                from src.database import get_admin_client
+                admin = get_admin_client()
+                
+                # Check for existing record
+                check_response = admin.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
+                existing_record = check_response.data if check_response else []
+                
+                st.write(f"Checking for existing record for {recognition_month}: found {len(existing_record) if existing_record else 0}")
+                print(f"[DEBUG] Checking for existing record for {recognition_month}: found {len(existing_record) if existing_record else 0}")
+                print(f"[DEBUG] Save data: {save_data}")
+                print(f"[DEBUG] Winner object: {winner_obj}")
+                
+                if existing_record and len(existing_record) > 0:
+                    print(f"[DEBUG] Updating existing record for {recognition_month}")
+                    st.write(f"Updating existing record...")
+                    result = admin.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month).execute()
+                    operation = "UPDATE"
+                else:
+                    print(f"[DEBUG] Inserting new record for {recognition_month}")
+                    st.write(f"Inserting new record...")
+                    result = admin.table("monthly_staff_recognition").insert(save_data).execute()
+                    operation = "INSERT"
+                
+                print(f"[DEBUG] {operation} result type: {type(result)}")
+                print(f"[DEBUG] {operation} result: {result}")
+                if hasattr(result, 'data'):
+                    print(f"[DEBUG] {operation} result.data: {result.data}")
+                if hasattr(result, 'error'):
+                    print(f"[DEBUG] {operation} result.error: {result.error}")
+                
+                st.write(f"Save result type: {type(result)}")
+                
+                # Check success - be more lenient about what counts as success
+                success = result is not None
+                if success:
+                    st.success(f"✅ Winner for {category} saved successfully!")
+                    st.write(f"Category={category}, Winner={winner}, Month={recognition_month}")
+                    # Clear session state
+                    if 'manual_winner' in st.session_state:
+                        del st.session_state.manual_winner
+                    if 'tied_winners' in st.session_state:
+                        del st.session_state.tied_winners
+                    if 'tie_category' in st.session_state:
+                        del st.session_state.tie_category
+                    if 'recognition_month' in st.session_state:
+                        del st.session_state.recognition_month
+                    time.sleep(1)  # Give user time to see success message
+                    st.rerun()
+                else:
+                    st.error(f"❌ Failed to save the winner. Result was None/empty.")
+                    print(f"[ERROR] Save returned None/empty")
+            except Exception as e:
+                st.error(f"❌ Failed to save the winner: {e}")
+                print(f"[ERROR] Tie-breaking save failed: {e}")
+                import traceback
+                traceback.print_exc()
 
     # --- Display Past Winners ---
     st.subheader("Past Monthly Winners")
