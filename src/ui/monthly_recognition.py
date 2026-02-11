@@ -147,19 +147,42 @@ def monthly_recognition_page():
         
         query_col = "ascend_recognition" if category == "ASCEND" else "north_recognition"
 
-        success, data, error = supabase.table("saved_staff_recognition").select(query_col).gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
-        
-        winner_obj = {}
-        if success:
-            for record in data:
-                if record.get(query_col):
-                    try:
-                        rec = json.loads(record[query_col].strip('\"'))
-                        if rec.get('staff_member') == winner:
-                            winner_obj = rec
-                            break
-                    except (json.JSONDecodeError, TypeError):
-                        continue
+        try:
+            # Use admin client to bypass RLS
+            from src.database import get_admin_client
+            admin = get_admin_client()
+            response = admin.table("saved_staff_recognition").select(query_col, "week_ending_date").order("week_ending_date").execute()
+            data = response.data if response else []
+            
+            winner_obj = {}
+            if data:
+                for record in data:
+                    week_date = record.get('week_ending_date', '')
+                    # Filter to records in the month
+                    if week_date and start_date <= week_date <= end_date:
+                        rec_data = record.get(query_col)
+                        if rec_data:
+                            try:
+                                # Handle multiple levels of string escaping
+                                if isinstance(rec_data, str):
+                                    cleaned = rec_data.strip()
+                                    while cleaned.startswith('"') and cleaned.endswith('"'):
+                                        cleaned = cleaned[1:-1]
+                                    cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
+                                    rec = json.loads(cleaned)
+                                else:
+                                    rec = rec_data
+                                    
+                                if rec.get('staff_member') == winner:
+                                    winner_obj = rec
+                                    break
+                            except (json.JSONDecodeError, TypeError) as e:
+                                print(f"[DEBUG] Error parsing recognition data for {winner}: {e}")
+                                continue
+        except Exception as e:
+            st.error(f"Failed to load winner data: {e}")
+            print(f"[ERROR] Tie-breaking fetch failed: {e}")
+            st.stop()
 
         # Save the manually selected winner
         if category == "ASCEND":
@@ -169,31 +192,38 @@ def monthly_recognition_page():
 
         # Check if a record for this month already exists to decide on insert vs update
         try:
-            existing_response = supabase.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
-            existing_record = existing_response.data if hasattr(existing_response, 'data') else existing_response
+            from src.database import get_admin_client
+            admin = get_admin_client()
+            
+            # Check for existing record
+            check_response = admin.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
+            existing_record = check_response.data if check_response else []
+            
+            print(f"[DEBUG] Checking for existing record for {recognition_month}: found {len(existing_record) if existing_record else 0}")
             
             if existing_record and len(existing_record) > 0:
-                update_query = supabase.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month)
+                print(f"[DEBUG] Updating existing record for {recognition_month}")
+                result = admin.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month).execute()
             else:
-                update_query = supabase.table("monthly_staff_recognition").insert(save_data)
-
-            result = update_query.execute()
-            success = result.data is not None if hasattr(result, 'data') else True
-            error = None
+                print(f"[DEBUG] Inserting new record for {recognition_month}")
+                result = admin.table("monthly_staff_recognition").insert(save_data).execute()
+            
+            print(f"[DEBUG] Save result: {result}")
+            
+            if result and result.data:
+                st.success(f"Winner for {category} saved successfully!")
+                # Clear session state
+                del st.session_state.manual_winner
+                del st.session_state.tied_winners
+                del st.session_state.tie_category
+                del st.session_state.recognition_month
+                st.rerun()
+            else:
+                st.error(f"Failed to save the winner. Please try again.")
+                print(f"[ERROR] Save returned no data: {result}")
         except Exception as e:
-            success = False
-            error = str(e)
-
-        if success:
-            st.success(f"Winner for {category} saved successfully!")
-            # Clear session state
-            del st.session_state.manual_winner
-            del st.session_state.tied_winners
-            del st.session_state.tie_category
-            del st.session_state.recognition_month
-            st.rerun()
-        else:
-            st.error(f"Failed to save the winner: {error}")
+            st.error(f"Failed to save the winner: {e}")
+            print(f"[ERROR] Tie-breaking save failed: {e}")
 
     # --- Display Past Winners ---
     st.subheader("Past Monthly Winners")
