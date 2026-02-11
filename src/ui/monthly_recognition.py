@@ -135,12 +135,18 @@ def monthly_recognition_page():
                         st.metric("🧭 NORTH Winner", north_winner or "Not awarded")
 
     # --- Manual Tie-Breaking Logic ---
+    print(f"[DEBUG] Checking for manual_winner in session_state: {list(st.session_state.keys())}")
+    
     if 'manual_winner' in st.session_state:
+        print(f"[DEBUG] FOUND manual_winner! Processing tie-breaking save...")
+        st.write("🔍 **DEBUG: Tie-breaking logic triggered**")
+        
         winner = st.session_state.manual_winner
         category = st.session_state.tie_category
         recognition_month = st.session_state.recognition_month
         
         st.write(f"You have selected **{winner}** as the winner for the **{category}** category.")
+        st.write(f"Debug: winner={winner}, category={category}, month={recognition_month}")
 
         # Fetch the full recognition object for the winner
         start_date = recognition_month
@@ -152,8 +158,13 @@ def monthly_recognition_page():
             # Use admin client to bypass RLS
             from src.database import get_admin_client
             admin = get_admin_client()
+            st.write(f"Debug: Admin client created, fetching records...")
+            
             response = admin.table("saved_staff_recognition").select(query_col, "week_ending_date").order("week_ending_date").execute()
             data = response.data if response else []
+            
+            st.write(f"Debug: Got {len(data)} total records, filtering for {query_col}...")
+            print(f"[DEBUG] Got {len(data)} total records for {query_col}")
             
             winner_obj = {}
             if data:
@@ -176,20 +187,32 @@ def monthly_recognition_page():
                                     
                                 if rec.get('staff_member') == winner:
                                     winner_obj = rec
+                                    st.write(f"Debug: Found winner object for {winner}")
+                                    print(f"[DEBUG] Found winner object: {winner_obj}")
                                     break
                             except (json.JSONDecodeError, TypeError) as e:
                                 print(f"[DEBUG] Error parsing recognition data for {winner}: {e}")
                                 continue
+            
+            if not winner_obj:
+                st.warning(f"Debug: No recognition object found for {winner} in month {start_date}")
+                print(f"[DEBUG] No winner_obj found! winner={winner}, category={category}")
+                
         except Exception as e:
             st.error(f"Failed to load winner data: {e}")
             print(f"[ERROR] Tie-breaking fetch failed: {e}")
+            import traceback
+            traceback.print_exc()
             st.stop()
 
         # Save the manually selected winner
+        st.write(f"Debug: Preparing save data...")
         if category == "ASCEND":
             save_data = {"recognition_month": recognition_month, "ascend_winner": json.dumps(winner_obj)}
         else: # NORTH
             save_data = {"recognition_month": recognition_month, "north_winner": json.dumps(winner_obj)}
+        
+        print(f"[DEBUG] Save data prepared: {save_data}")
 
         # Check if a record for this month already exists to decide on insert vs update
         try:
