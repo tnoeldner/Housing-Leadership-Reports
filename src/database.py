@@ -469,19 +469,26 @@ def select_monthly_winners(month, year):
         if success_all and data_all:
             print(f"[DEBUG] Recent dates in database: {[r.get('week_ending_date') for r in data_all[:10]]}")
 
-        # Fetch all recognitions for the given month
-        success, data, error = safe_db_query(
+        # Fetch all recognitions - filter in Python to be more reliable
+        success, data_all_records, error = safe_db_query(
             supabase.table("saved_staff_recognition")
             .select("week_ending_date, ascend_recognition, north_recognition")
-            .gte("week_ending_date", start_date)
-            .lte("week_ending_date", end_date),
-            "Fetching monthly recognitions"
+            .order("week_ending_date"),
+            "Fetching all recognitions"
         )
 
         if not success:
             print(f"[DEBUG] Query failed: {error}")
             return {"success": False, "message": error}
 
+        # Filter to only records in the specified month
+        data = []
+        if data_all_records:
+            for record in data_all_records:
+                week_date = record.get('week_ending_date', '')
+                if week_date and start_date <= week_date <= end_date:
+                    data.append(record)
+        
         # Debug: Check how many records were found
         print(f"[DEBUG] Found {len(data) if data else 0} records for {start_date} to {end_date}")
         if data:
