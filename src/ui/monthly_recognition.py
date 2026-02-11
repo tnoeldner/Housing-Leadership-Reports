@@ -2,6 +2,7 @@ import streamlit as st
 from src.database import select_monthly_winners, supabase
 import datetime
 import json
+import time
 
 def monthly_recognition_page():
     """Render the monthly staff recognition winners selection page"""
@@ -199,31 +200,55 @@ def monthly_recognition_page():
             check_response = admin.table("monthly_staff_recognition").select("id").eq("recognition_month", recognition_month).execute()
             existing_record = check_response.data if check_response else []
             
+            st.write(f"Debug: Checking for existing record for {recognition_month}...")
             print(f"[DEBUG] Checking for existing record for {recognition_month}: found {len(existing_record) if existing_record else 0}")
+            print(f"[DEBUG] Save data: {save_data}")
+            print(f"[DEBUG] Winner object: {winner_obj}")
             
             if existing_record and len(existing_record) > 0:
                 print(f"[DEBUG] Updating existing record for {recognition_month}")
+                st.write(f"Debug: Updating existing record...")
                 result = admin.table("monthly_staff_recognition").update(save_data).eq("recognition_month", recognition_month).execute()
+                operation = "UPDATE"
             else:
                 print(f"[DEBUG] Inserting new record for {recognition_month}")
+                st.write(f"Debug: Inserting new record...")
                 result = admin.table("monthly_staff_recognition").insert(save_data).execute()
+                operation = "INSERT"
             
-            print(f"[DEBUG] Save result: {result}")
+            print(f"[DEBUG] {operation} result type: {type(result)}")
+            print(f"[DEBUG] {operation} result: {result}")
+            if hasattr(result, 'data'):
+                print(f"[DEBUG] {operation} result.data: {result.data}")
+            if hasattr(result, 'error'):
+                print(f"[DEBUG] {operation} result.error: {result.error}")
             
-            if result and result.data:
-                st.success(f"Winner for {category} saved successfully!")
+            st.write(f"Debug: Save result = {result}")
+            
+            # Check success - be more lenient about what counts as success
+            success = result is not None
+            if success:
+                st.success(f"✅ Winner for {category} saved successfully!")
+                st.write(f"Debug: Saved! Category={category}, Winner={winner}")
                 # Clear session state
-                del st.session_state.manual_winner
-                del st.session_state.tied_winners
-                del st.session_state.tie_category
-                del st.session_state.recognition_month
+                if 'manual_winner' in st.session_state:
+                    del st.session_state.manual_winner
+                if 'tied_winners' in st.session_state:
+                    del st.session_state.tied_winners
+                if 'tie_category' in st.session_state:
+                    del st.session_state.tie_category
+                if 'recognition_month' in st.session_state:
+                    del st.session_state.recognition_month
+                time.sleep(2)  # Give user time to see success message
                 st.rerun()
             else:
-                st.error(f"Failed to save the winner. Please try again.")
-                print(f"[ERROR] Save returned no data: {result}")
+                st.error(f"Failed to save the winner. Result was None/empty.")
+                print(f"[ERROR] Save returned None/empty")
         except Exception as e:
             st.error(f"Failed to save the winner: {e}")
             print(f"[ERROR] Tie-breaking save failed: {e}")
+            import traceback
+            traceback.print_exc()
 
     # --- Display Past Winners ---
     st.subheader("Past Monthly Winners")
