@@ -446,9 +446,123 @@ def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id
         return {"success": False, "message": f"Error saving engagement analysis: {str(e)}"}
 
 
+def analyze_candidates_for_monthly_winner(category, candidates_details):
+    """
+    Use AI to analyze and summarize why each candidate should win for the month.
+    
+    Args:
+        category: str, "ASCEND" or "NORTH"
+        candidates_details: dict mapping staff_member -> list of recognition objects
+                           Each recognition object has: staff_member, category, score, reasoning, week_ending_date
+    
+    Returns:
+        dict mapping staff_member -> AI-generated summary
+    """
+    try:
+        from src.ai import call_gemini_ai
+        
+        if not candidates_details or not any(candidates_details.values()):
+            return {}
+        
+        # Prepare detailed candidate profiles for AI analysis
+        candidate_summaries = {}
+        candidates_text = ""
+        
+        for staff_member, recognitions in candidates_details.items():
+            if not recognitions:
+                continue
+            
+            # Build profile for this candidate
+            recognition_count = len(recognitions)
+            scores = [r.get('score', 0) for r in recognitions if r.get('score')]
+            avg_score = sum(scores) / len(scores) if scores else 0
+            
+            # Compile their recognitions
+            candidate_text = f"### {staff_member}\n"
+            candidate_text += f"**Recognition Count:** {recognition_count}\n"
+            candidate_text += f"**Average Performance Score:** {avg_score:.1f}/4\n\n"
+            candidate_text += "**Individual Recognitions:**\n"
+            
+            for rec in recognitions:
+                week = rec.get('week_ending_date', 'Unknown date')
+                score = rec.get('score', 'N/A')
+                reasoning = rec.get('reasoning', 'No reasoning provided')
+                candidate_text += f"- **Week of {week}** (Score: {score}/4): {reasoning}\n"
+            
+            candidate_text += "\n"
+            candidates_text += candidate_text
+            candidate_summaries[staff_member] = None  # Will be filled with AI summary
+        
+        # Use AI to generate compelling case for each candidate
+        prompt = f"""You are evaluating candidates for {category} Monthly Winner recognition at UND Housing & Residence Life.
+
+Your task is to create a concise, compelling one-paragraph summary for each candidate that explains why they deserve to win. The winner should be based on:
+1. Consistent high-quality performance (score 3-4 out of 4)
+2. Breadth of impact across different ASCEND/NORTH categories
+3. Demonstrated alignment with organizational values
+4. Positive impact on team and students
+
+CANDIDATE PROFILES:
+{candidates_text}
+
+For EACH candidate above, provide a one-paragraph summary (3-4 sentences) that:
+- Highlights their key strengths based on recognition data
+- Explains why they made exceptional contributions this month
+- References specific achievements or areas of impact
+
+Format your response as follows - use this EXACT format:
+**Candidate: [Staff Member Name]**
+[One paragraph summary]
+
+**Candidate: [Next Staff Member Name]**
+[One paragraph summary]
+
+Be specific, action-oriented, and compelling. Focus on what makes each person stand out."""
+        
+        response = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash")
+        
+        if not response:
+            return candidate_summaries
+        
+        # Parse AI response to extract summaries for each candidate
+        lines = response.split('\n')
+        current_candidate = None
+        current_summary = []
+        
+        for line in lines:
+            if line.startswith('**Candidate:'):
+                # Save previous candidate's summary
+                if current_candidate and current_summary:
+                    summary_text = '\n'.join(current_summary).strip()
+                    if current_candidate in candidate_summaries:
+                        candidate_summaries[current_candidate] = summary_text
+                
+                # Extract candidate name
+                name_match = line.replace('**Candidate:', '').replace('**', '').strip()
+                current_candidate = name_match
+                current_summary = []
+            elif current_candidate and line.strip():
+                current_summary.append(line)
+        
+        # Save last candidate
+        if current_candidate and current_summary:
+            summary_text = '\n'.join(current_summary).strip()
+            if current_candidate in candidate_summaries:
+                candidate_summaries[current_candidate] = summary_text
+        
+        return candidate_summaries
+        
+    except Exception as e:
+        print(f"[DEBUG] Error analyzing candidates with AI: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
 def select_monthly_winners(month, year):
     """
     Selects the monthly winners for ASCEND and NORTH recognition based on the number of weekly recognitions.
+    Includes AI-generated summaries for each candidate explaining why they should win.
     """
     try:
         start_date = f"{year}-{month:02d}-01"
@@ -530,6 +644,8 @@ def select_monthly_winners(month, year):
 
         ascend_counts = {}
         north_counts = {}
+        ascend_details = {}  # Maps staff_member -> list of recognition objects
+        north_details = {}   # Maps staff_member -> list of recognition objects
 
         for record in data or []:
             # Helper function to safely parse JSON with multiple levels of escaping
@@ -562,6 +678,10 @@ def select_monthly_winners(month, year):
                         staff_member = ascend_rec.get('staff_member')
                         if staff_member:
                             ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
+                            # Collect full recognition details for AI analysis
+                            if staff_member not in ascend_details:
+                                ascend_details[staff_member] = []
+                            ascend_details[staff_member].append(ascend_rec)
                             print(f"[DEBUG] ASCEND: {staff_member} count = {ascend_counts[staff_member]}")
                     else:
                         print(f"[DEBUG] Could not parse ASCEND data: {record.get('ascend_recognition')[:100]}")
@@ -577,6 +697,10 @@ def select_monthly_winners(month, year):
                         staff_member = north_rec.get('staff_member')
                         if staff_member:
                             north_counts[staff_member] = north_counts.get(staff_member, 0) + 1
+                            # Collect full recognition details for AI analysis
+                            if staff_member not in north_details:
+                                north_details[staff_member] = []
+                            north_details[staff_member].append(north_rec)
                             print(f"[DEBUG] NORTH: {staff_member} count = {north_counts[staff_member]}")
                     else:
                         print(f"[DEBUG] Could not parse NORTH data: {record.get('north_recognition')[:100]}")
@@ -609,14 +733,46 @@ def select_monthly_winners(month, year):
                 }
             }
         
-        # Check for ties
+        # Check for ties - with AI analysis
         if ascend_winner and list(ascend_counts.values()).count(ascend_counts[ascend_winner]) > 1:
             tied_winners = [k for k, v in ascend_counts.items() if v == ascend_counts[ascend_winner]]
-            return {"success": True, "status": "tie", "category": "ASCEND", "winners": tied_winners}
+            # Generate AI summaries for tied candidates
+            ai_summaries = analyze_candidates_for_monthly_winner("ASCEND", 
+                                                                  {w: ascend_details.get(w, []) for w in tied_winners})
+            print(f"[DEBUG] ASCEND tie detected. AI summaries: {ai_summaries}")
+            return {
+                "success": True, 
+                "status": "tie", 
+                "category": "ASCEND", 
+                "winners": tied_winners,
+                "ai_summaries": ai_summaries
+            }
 
         if north_winner and list(north_counts.values()).count(north_counts[north_winner]) > 1:
             tied_winners = [k for k, v in north_counts.items() if v == north_counts[north_winner]]
-            return {"success": True, "status": "tie", "category": "NORTH", "winners": tied_winners}
+            # Generate AI summaries for tied candidates  
+            ai_summaries = analyze_candidates_for_monthly_winner("NORTH",
+                                                                  {w: north_details.get(w, []) for w in tied_winners})
+            print(f"[DEBUG] NORTH tie detected. AI summaries: {ai_summaries}")
+            return {
+                "success": True,
+                "status": "tie",
+                "category": "NORTH",
+                "winners": tied_winners,
+                "ai_summaries": ai_summaries
+            }
+
+        # No tie - generate AI summary explaining why the winner was chosen
+        ascend_summary = None
+        north_summary = None
+        
+        if ascend_winner:
+            summaries = analyze_candidates_for_monthly_winner("ASCEND", {ascend_winner: ascend_details.get(ascend_winner, [])})
+            ascend_summary = summaries.get(ascend_winner)
+        
+        if north_winner:
+            summaries = analyze_candidates_for_monthly_winner("NORTH", {north_winner: north_details.get(north_winner, [])})
+            north_summary = summaries.get(north_winner)
 
         # Save winners to the database
         recognition_month = f"{year}-{month:02d}-01"
@@ -700,7 +856,14 @@ def select_monthly_winners(month, year):
         if not success:
             return {"success": False, "message": error}
 
-        return {"success": True, "status": "success", "ascend_winner": ascend_winner, "north_winner": north_winner}
+        return {
+            "success": True, 
+            "status": "success", 
+            "ascend_winner": ascend_winner, 
+            "north_winner": north_winner,
+            "ascend_summary": ascend_summary,
+            "north_summary": north_summary
+        }
 
     except Exception as e:
         return {"success": False, "message": f"An error occurred: {str(e)}"}

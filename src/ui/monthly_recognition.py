@@ -73,15 +73,24 @@ def monthly_recognition_page():
 
     # --- Check if we need to display tie-breaking options ---
     if 'tied_winners' in st.session_state and st.session_state.get('tied_winners'):
-        st.warning(f"A tie was found for the {st.session_state.get('tie_category')} category.")
-        st.write("Please select the winner from the following staff members:")
+        st.warning(f"🤝 A tie was found for the {st.session_state.get('tie_category')} category.")
+        st.write("Please review the AI-generated summaries below and select the winner:")
         
-        for i, winner in enumerate(st.session_state.get('tied_winners', [])):
-            st.write(f"Debug: Loop iteration {i}, winner={winner}")
-            print(f"[DEBUG] Creating tie-break button for winner {i}: {winner}")
-            if st.button(f"Select {winner} as the winner", key=f"tie_winner_{winner}"):
-                st.session_state['manual_winner'] = winner
-                st.rerun()
+        # Display AI summaries for each tied candidate
+        ai_summaries = st.session_state.get('ai_summaries', {})
+        for winner in st.session_state.get('tied_winners', []):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                with st.expander(f"📊 {winner} - AI Analysis"):
+                    summary = ai_summaries.get(winner, "No summary available")
+                    st.write(summary)
+            with col2:
+                st.write("")  # Spacing
+                st.write("")  # Spacing
+                if st.button(f"Select {winner}", key=f"tie_winner_{winner}"):
+                    st.session_state['manual_winner'] = winner
+                    st.rerun()
+
 
     # --- Winner Selection Logic ---
     if st.button("Select Monthly Winners") and 'tied_winners' not in st.session_state:
@@ -97,20 +106,19 @@ def monthly_recognition_page():
             if not result.get("success"):
                 st.error(f"An error occurred: {result.get('message')}")
             elif result.get("status") == "tie":
-                st.warning(f"A tie was found for the {result['category']} category.")
-                st.write("Please select the winner from the following staff members:")
+                st.warning(f"🤝 A tie was found for the {result['category']} category.")
+                st.write("AI is analyzing each candidate's performance...")
                 
-                # Store tied winners in session state EXPLICITLY
+                # Store tied winners AND AI summaries in session state
                 st.session_state['tied_winners'] = result['winners']
                 st.session_state['tie_category'] = result['category']
                 st.session_state['recognition_month'] = f"{selected_year}-{selected_month:02d}-01"
+                st.session_state['ai_summaries'] = result.get('ai_summaries', {})
                 
-                st.write(f"Debug: Session state updated with tie info. Category: {st.session_state.get('tie_category')}")
-                st.write(f"Debug: Winners found: {result['winners']}")
-                st.write(f"Debug: About to display {len(result['winners'])} buttons...")
                 print(f"[DEBUG] Winners list: {result['winners']}")
+                print(f"[DEBUG] AI Summaries: {result.get('ai_summaries', {})}")
                 
-                # Rerun to show tie-breaking buttons
+                # Rerun to show tie-breaking buttons with AI summaries
                 st.rerun()
 
             else:
@@ -141,15 +149,28 @@ def monthly_recognition_page():
                                     st.write(f"- Week ending {rec['week_ending_date']}: ASCEND={rec['has_ascend']}, NORTH={rec['has_north']}")
                             st.write("**Note:** Check the terminal/console for complete debug output including recent dates in database")
                 else:
-                    st.success("Monthly winners selected and saved successfully!")
+                    st.success("✅ Monthly winners selected and saved successfully!")
                     st.balloons()
                     st.subheader("This Month's Winners")
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.metric("🌟 ASCEND Winner", ascend_winner or "Not awarded")
+                        if ascend_winner:
+                            st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner}")
+                            if result.get('ascend_summary'):
+                                with st.expander("📊 Why this winner?"):
+                                    st.write(result.get('ascend_summary'))
+                        else:
+                            st.metric("🌟 ASCEND Winner", "Not awarded")
+                    
                     with col2:
-                        st.metric("🧭 NORTH Winner", north_winner or "Not awarded")
+                        if north_winner:
+                            st.markdown(f"### 🧭 NORTH Winner: {north_winner}")
+                            if result.get('north_summary'):
+                                with st.expander("📊 Why this winner?"):
+                                    st.write(result.get('north_summary'))
+                        else:
+                            st.metric("🧭 NORTH Winner", "Not awarded")
 
     # --- Manual Tie-Breaking Logic ---
     print(f"[DEBUG] Checking for manual_winner in session_state: {list(st.session_state.keys())}")
