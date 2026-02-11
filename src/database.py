@@ -450,20 +450,27 @@ def select_monthly_winners(month, year):
         start_date = f"{year}-{month:02d}-01"
         end_date = f"{year}-{month:02d}-31"
 
+        print(f"\n[DEBUG] select_monthly_winners called for {year}-{month:02d}")
+        print(f"[DEBUG] Date range: {start_date} to {end_date}")
+
         # Fetch all recognitions for the given month
         success, data, error = safe_db_query(
             supabase.table("saved_staff_recognition")
-            .select("ascend_recognition, north_recognition")
+            .select("week_ending_date, ascend_recognition, north_recognition")
             .gte("week_ending_date", start_date)
             .lte("week_ending_date", end_date),
             "Fetching monthly recognitions"
         )
 
         if not success:
+            print(f"[DEBUG] Query failed: {error}")
             return {"success": False, "message": error}
 
         # Debug: Check how many records were found
         print(f"[DEBUG] Found {len(data) if data else 0} records for {start_date} to {end_date}")
+        if data:
+            for i, record in enumerate(data):
+                print(f"[DEBUG]   Record {i+1}: week_ending_date={record.get('week_ending_date')}, has_ascend={bool(record.get('ascend_recognition'))}, has_north={bool(record.get('north_recognition'))}")
 
         ascend_counts = {}
         north_counts = {}
