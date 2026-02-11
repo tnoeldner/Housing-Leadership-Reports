@@ -80,8 +80,20 @@ def monthly_recognition_page():
 
     selected_month = month_names.index(selected_month_name) + 1
 
+    # --- Check if we need to display tie-breaking options ---
+    if 'tied_winners' in st.session_state and st.session_state.get('tied_winners'):
+        st.warning(f"A tie was found for the {st.session_state.get('tie_category')} category.")
+        st.write("Please select the winner from the following staff members:")
+        
+        for i, winner in enumerate(st.session_state.get('tied_winners', [])):
+            st.write(f"Debug: Loop iteration {i}, winner={winner}")
+            print(f"[DEBUG] Creating tie-break button for winner {i}: {winner}")
+            if st.button(f"Select {winner} as the winner", key=f"tie_winner_{winner}"):
+                st.session_state['manual_winner'] = winner
+                st.rerun()
+
     # --- Winner Selection Logic ---
-    if st.button("Select Monthly Winners"):
+    if st.button("Select Monthly Winners") and 'tied_winners' not in st.session_state:
         # Set session state IMMEDIATELY before any complex operations
         st.session_state['button_clicked'] = True
         
@@ -103,15 +115,12 @@ def monthly_recognition_page():
                 st.session_state['recognition_month'] = f"{selected_year}-{selected_month:02d}-01"
                 
                 st.write(f"Debug: Session state updated with tie info. Category: {st.session_state.get('tie_category')}")
-
-                for winner in result['winners']:
-                    if st.button(f"Select {winner} as the winner", key=f"winner_btn_{winner}"):
-                        st.session_state['manual_winner'] = winner
-                        st.write(f"✅ Button clicked! Setting manual_winner = {winner}")
-                        st.write(f"Session state now has: {list(st.session_state.keys())}")
-                        print(f"[DEBUG] Button clicked for {winner}, rerunning...")
-                        # Rerun to process manual selection
-                        st.rerun()
+                st.write(f"Debug: Winners found: {result['winners']}")
+                st.write(f"Debug: About to display {len(result['winners'])} buttons...")
+                print(f"[DEBUG] Winners list: {result['winners']}")
+                
+                # Rerun to show tie-breaking buttons
+                st.rerun()
 
             else:
                 ascend_winner = result.get('ascend_winner')
