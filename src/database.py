@@ -453,6 +453,18 @@ def select_monthly_winners(month, year):
         print(f"\n[DEBUG] select_monthly_winners called for {year}-{month:02d}")
         print(f"[DEBUG] Date range: {start_date} to {end_date}")
 
+        # First, let's see what dates actually exist in the database
+        success_all, data_all, error_all = safe_db_query(
+            supabase.table("saved_staff_recognition")
+            .select("week_ending_date")
+            .order("week_ending_date", desc=True)
+            .limit(50),
+            "Fetching recent dates to check what exists"
+        )
+        
+        if success_all and data_all:
+            print(f"[DEBUG] Recent dates in database: {[r.get('week_ending_date') for r in data_all[:10]]}")
+
         # Fetch all recognitions for the given month
         success, data, error = safe_db_query(
             supabase.table("saved_staff_recognition")

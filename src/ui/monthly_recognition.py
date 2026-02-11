@@ -121,6 +121,7 @@ def monthly_recognition_page():
                                 st.write("**Record Details:**")
                                 for rec in debug_info['records']:
                                     st.write(f"- Week ending {rec['week_ending_date']}: ASCEND={rec['has_ascend']}, NORTH={rec['has_north']}")
+                            st.write("**Note:** Check the terminal/console for complete debug output including recent dates in database")
                 else:
                     st.success("Monthly winners selected and saved successfully!")
                     st.balloons()
