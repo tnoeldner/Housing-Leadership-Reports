@@ -14,7 +14,7 @@ def admin_settings_page():
         st.stop()
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates", "📋 Weekly Reports Summary"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates", "📋 Weekly Reports Summary", "📊 Weekly Summary Generator"])
     
     with tab4:
         st.subheader("User Management")
@@ -374,6 +374,17 @@ You are writing a weekly staff recognition summary. From the following staff rep
         from src.ui.supervisor import weekly_reports_viewer
         # Show all reports for admin (no supervisor filtering)
         weekly_reports_viewer(supervisor_id=None)
+
+    with tab7:
+        st.subheader("Generate Weekly Summary for All Staff")
+        st.markdown("""
+        Generate comprehensive AI-powered weekly summaries for all staff across the organization.
+        This summary includes insights from all finalized and draft reports, duty analyses, and engagement data.
+        """)
+        
+        from src.ui.dashboard import dashboard_page
+        # Show the admin dashboard summary generation
+        dashboard_page(supervisor_mode=False)
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
