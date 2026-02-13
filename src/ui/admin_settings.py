@@ -107,8 +107,7 @@ def admin_settings_page():
                                     update_data = {
                                         "role": new_role,
                                         "title": new_title,
-                                        "supervisor_id": new_supervisor_id,
-                                        "updated_at": datetime.now().isoformat()
+                                        "supervisor_id": new_supervisor_id
                                     }
                                     supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
                                 st.success(f"✅ User {selected_name} updated successfully!")
