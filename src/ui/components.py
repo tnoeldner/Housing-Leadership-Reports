@@ -44,7 +44,7 @@ def signup_form():
                 res = supabase.auth.sign_up({"email": email, "password": password})
                 if getattr(res, "user", None):
                     new_user_id = res.user.id
-                    supabase.table("profiles").update({"full_name": full_name, "title": title}).eq("id", new_user_id).execute()
+                    supabase.table("profiles").update({"full_name": full_name, "title": title, "email": email}).eq("id", new_user_id).execute()
                     st.success("Signup successful! Please check your email to confirm your account.")
                 else:
                     st.error("Signup failed. A user may already exist with this email.")

@@ -22,26 +22,25 @@ def admin_settings_page():
         
         # Load all users
         try:
+            # Fetch profiles including email (now saves during signup)
             users_response = supabase.table("profiles").select("id,full_name,title,role,supervisor_id,email").order("full_name").execute()
             users = users_response.data if users_response else []
             
-            with st.expander("🔍 Debug: Auth Email Status", expanded=False):
-                # Try to fetch emails from profiles.email column (should have them from signup)
-                st.write(f"Found {len(users)} profiles")
+            with st.expander("🔍 Debug: Email Status", expanded=False):
+                st.write(f"Loaded {len(users)} profiles")
                 
-                # Check if emails exist in profiles
-                profiles_with_email = [u for u in users if u.get("email")]
-                st.write(f"Profiles with email field: {len(profiles_with_email)}")
+                # Count profiles with email
+                users_with_email = [u for u in users if u.get("email")]
+                st.write(f"Profiles with email: {len(users_with_email)}")
                 
-                if profiles_with_email:
-                    st.write("Sample emails from profiles:")
-                    for u in profiles_with_email[:3]:
-                        st.code(f"{u.get('full_name')}: {u.get('email')}")
+                if users_with_email:
+                    st.success("✅ Email sync working - emails are stored in profiles")
+                else:
+                    st.warning("⚠️ No emails found in profiles - only new signups will have emails")
                     
         except Exception as e:
             st.error(f"Error loading users: {e}")
             users = []
-            auth_emails = {}
         
         if users:
             st.subheader("Staff Directory")
