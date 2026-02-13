@@ -24,9 +24,29 @@ def admin_settings_page():
         try:
             users_response = supabase.table("profiles").select("*").order("full_name").execute()
             users = users_response.data if users_response else []
+            
+            # Try to get emails from auth.users
+            try:
+                from src.database import get_admin_client
+                admin = get_admin_client()
+                auth_users = admin.auth.admin.list_users()
+                auth_emails = {user.id: user.email for user in auth_users.users} if hasattr(auth_users, 'users') else {}
+            except Exception as auth_error:
+                print(f"[DEBUG] Could not fetch auth users: {auth_error}")
+                auth_emails = {}
+            
+            # Add emails to user data
+            for user in users:
+                user_id = user.get("id")
+                if user_id and user_id in auth_emails:
+                    user["email"] = auth_emails[user_id]
+                elif not user.get("email"):
+                    user["email"] = "Email not synced"
+                    
         except Exception as e:
             st.error(f"Error loading users: {e}")
             users = []
+            auth_emails = {}
         
         if users:
             st.subheader("Staff Directory")
@@ -65,6 +85,23 @@ def admin_settings_page():
                 try:
                     users_response = supabase.table("profiles").select("*").order("full_name").execute()
                     fresh_users = users_response.data if users_response else []
+                    
+                    # Try to get emails from auth.users
+                    try:
+                        from src.database import get_admin_client
+                        admin = get_admin_client()
+                        auth_users = admin.auth.admin.list_users()
+                        auth_emails = {user.id: user.email for user in auth_users.users} if hasattr(auth_users, 'users') else {}
+                    except Exception as auth_error:
+                        auth_emails = {}
+                    
+                    # Add emails to user data
+                    for user in fresh_users:
+                        user_id = user.get("id")
+                        if user_id and user_id in auth_emails:
+                            user["email"] = auth_emails[user_id]
+                        elif not user.get("email"):
+                            user["email"] = "Email not synced"
                 except Exception:
                     fresh_users = users
                 
@@ -75,16 +112,21 @@ def admin_settings_page():
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            st.write("**Current Email:**")
-                            st.code(selected_user.get('email', 'No email'))
+                            st.write("**Email (Login):**")
+                            email_display = selected_user.get('email', 'Email not synced')
+                            st.code(email_display)
                         
                         with col2:
                             if st.form_submit_button("🔐 Send Password Reset Email", type="secondary"):
-                                try:
-                                    supabase.auth.admin.send_recovery_email(email=selected_user.get('email'))
-                                    st.success(f"✅ Password reset email sent to {selected_user.get('email')}")
-                                except Exception as e:
-                                    st.error(f"Failed to send password reset: {e}")
+                                email_to_reset = selected_user.get('email')
+                                if email_to_reset and email_to_reset != "Email not synced":
+                                    try:
+                                        supabase.auth.admin.send_recovery_email(email=email_to_reset)
+                                        st.success(f"✅ Password reset email sent to {email_to_reset}")
+                                    except Exception as e:
+                                        st.error(f"Failed to send password reset: {e}")
+                                else:
+                                    st.error("Cannot send reset - email not available")
                         
                         st.divider()
                         
