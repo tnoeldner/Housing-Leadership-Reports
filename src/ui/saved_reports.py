@@ -1,5 +1,6 @@
 import streamlit as st
 from src.database import get_admin_client
+from src.ui.supervisor import weekly_reports_viewer
 
 def saved_reports_page():
     if "user" not in st.session_state:
@@ -7,8 +8,8 @@ def saved_reports_page():
         st.stop()
     """View saved duty analyses, staff recognition reports, and weekly summaries"""
     st.title("Saved Reports Archive")
-    st.write("View all saved reports: duty analyses, staff recognition, and weekly summaries.")
-    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries"])
+    st.write("View all saved reports: duty analyses, staff recognition, weekly summaries, and submitted reports.")
+    tab1, tab2, tab3, tab4 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries", "📝 Weekly Reports"])
     admin_supabase = get_admin_client()
 
     with tab1:
@@ -49,3 +50,8 @@ def saved_reports_page():
                 with st.expander(f"Week Ending: {week}"):
                     st.markdown(f"**Created By:** {summary.get('created_by', 'N/A')}")
                     st.markdown(f"**Summary:** {summary.get('summary_text', 'No summary available')}")
+
+    with tab4:
+        st.subheader("All Weekly Reports Submitted")
+        # Show all reports without supervisor filtering
+        weekly_reports_viewer(supervisor_id=None)

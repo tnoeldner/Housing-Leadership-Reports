@@ -20,24 +20,30 @@ def supervisor_summaries_page():
         summaries = resp.data if isinstance(resp.data, list) else []
         if not summaries:
             st.info("You have no saved team summaries yet.")
-            return
-        for s in summaries:
-            if isinstance(s, dict):
-                with st.expander(f"Week Ending {s.get('week_ending_date', 'Unknown')} — Saved {s.get('created_at', 'Unknown')}"):
-                    st.markdown(clean_summary_response(s.get('summary_text', '')))
+        else:
+            for s in summaries:
+                if isinstance(s, dict):
+                    with st.expander(f"Week Ending {s.get('week_ending_date', 'Unknown')} — Saved {s.get('created_at', 'Unknown')}"):
+                        st.markdown(clean_summary_response(s.get('summary_text', '')))
     except Exception as e:
         st.error(f"Failed to fetch supervisor summaries: {e}")
+    
+    st.divider()
+    st.subheader("View Your Team's Weekly Reports")
+    
+    # Show weekly reports for this supervisor's team only
+    weekly_reports_viewer(supervisor_id=st.session_state['user'].id)
 
 def supervisors_section_page():
     """Page for supervisors to view and analyze Roompact form submissions"""
-    st.title("📋 Supervisors Section - Form Analysis")
+    st.title("📋 Form Analysis")
     st.markdown("""
     This section provides specialized analysis tools for reviewing form submissions 
     and generating AI-powered summaries with actionable insights.
     """)
     
     # Create tabs for the analysis sections
-    tab1, tab2, tab3, tab4 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis", "📋 Individual Reports", "📝 Weekly Reports"])
+    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis", "📋 Individual Reports"])
     
     with tab1:
         duty_analysis_section()
@@ -47,13 +53,15 @@ def supervisors_section_page():
     
     with tab3:
         individual_reports_viewer()
-        
-    with tab4:
-        weekly_reports_viewer()
 
-def weekly_reports_viewer():
-    """View and filter weekly reports submitted via the app"""
-    st.subheader("📝 Weekly Reports Viewer")
+def weekly_reports_viewer(supervisor_id=None):
+    """View and filter weekly reports submitted via the app
+    
+    Args:
+        supervisor_id: If provided, only show reports from users with this supervisor_id.
+                      If None, show all reports (admin only).
+    """
+    st.subheader("📝 Weekly Reports")
     st.markdown("""
     View weekly reports submitted by staff members through the application.
     """)
@@ -103,6 +111,14 @@ def weekly_reports_viewer():
                     .execute()
                 
                 reports = response.data or []
+                
+                # Filter by supervisor if needed
+                if supervisor_id:
+                    # Get all users who report to this supervisor
+                    users_response = supabase.table("profiles").select("id").eq("supervisor_id", supervisor_id).execute()
+                    supervised_user_ids = {u.get("id") for u in users_response.data if isinstance(u, dict)}
+                    # Filter reports to only those from supervised users
+                    reports = [r for r in reports if isinstance(r, dict) and r.get("user_id") in supervised_user_ids]
                 
                 if not reports:
                     st.warning("No reports found in the selected date range.")
