@@ -22,38 +22,21 @@ def admin_settings_page():
         
         # Load all users
         try:
-            users_response = supabase.table("profiles").select("*").order("full_name").execute()
+            users_response = supabase.table("profiles").select("id,full_name,title,role,supervisor_id,email").order("full_name").execute()
             users = users_response.data if users_response else []
             
-            # Try to get emails from auth.users
-            auth_emails = {}
-            try:
-                from src.database import get_admin_client
-                admin = get_admin_client()
-                auth_response = admin.auth.admin.list_users()
+            with st.expander("🔍 Debug: Auth Email Status", expanded=False):
+                # Try to fetch emails from profiles.email column (should have them from signup)
+                st.write(f"Found {len(users)} profiles")
                 
-                # Debug: check what we got back
-                print(f"[DEBUG] Auth response type: {type(auth_response)}")
-                print(f"[DEBUG] Auth response: {auth_response}")
+                # Check if emails exist in profiles
+                profiles_with_email = [u for u in users if u.get("email")]
+                st.write(f"Profiles with email field: {len(profiles_with_email)}")
                 
-                if hasattr(auth_response, 'users'):
-                    auth_emails = {user.id: user.email for user in auth_response.users}
-                    print(f"[DEBUG] Found {len(auth_emails)} emails from auth users")
-                else:
-                    print(f"[DEBUG] No 'users' attribute found in auth_response")
-                    
-            except Exception as auth_error:
-                print(f"[DEBUG] Could not fetch auth users: {auth_error}")
-                import traceback
-                traceback.print_exc()
-            
-            # Add emails to user data
-            for user in users:
-                user_id = user.get("id")
-                if user_id and user_id in auth_emails:
-                    user["email"] = auth_emails[user_id]
-                else:
-                    user["email"] = "Email not synced"
+                if profiles_with_email:
+                    st.write("Sample emails from profiles:")
+                    for u in profiles_with_email[:3]:
+                        st.code(f"{u.get('full_name')}: {u.get('email')}")
                     
         except Exception as e:
             st.error(f"Error loading users: {e}")
@@ -93,94 +76,56 @@ def admin_settings_page():
             selected_name = st.selectbox("Select Staff Member", options=staff_names, key="user_select")
             
             if selected_name:
-                # Find the selected user - reload fresh data
-                try:
-                    users_response = supabase.table("profiles").select("*").order("full_name").execute()
-                    fresh_users = users_response.data if users_response else []
-                    
-                    # Try to get emails from auth.users
-                    auth_emails = {}
-                    try:
-                        from src.database import get_admin_client
-                        admin = get_admin_client()
-                        auth_response = admin.auth.admin.list_users()
-                        
-                        if hasattr(auth_response, 'users'):
-                            auth_emails = {user.id: user.email for user in auth_response.users}
-                        
-                    except Exception as auth_error:
-                        print(f"[DEBUG] Could not fetch auth users on edit: {auth_error}")
-                    
-                    # Add emails to user data
-                    for user in fresh_users:
-                        user_id = user.get("id")
-                        if user_id and user_id in auth_emails:
-                            user["email"] = auth_emails[user_id]
-                        else:
-                            user["email"] = "Email not synced"
-                except Exception:
-                    fresh_users = users
-                
-                selected_user = next((u for u in fresh_users if u.get("full_name") == selected_name), None)
+                # Find the selected user from already-loaded users
+                selected_user = next((u for u in users if u.get("full_name") == selected_name), None)
                 
                 if selected_user:
-                    with st.form("edit_user_form"):
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.write("**Email (Login):**")
-                            email_display = selected_user.get('email', 'Email not synced')
-                            st.code(email_display)
-                        
-                        with col2:
-                            if st.form_submit_button("🔐 Send Password Reset Email", type="secondary"):
-                                email_to_reset = selected_user.get('email')
-                                if email_to_reset and email_to_reset != "Email not synced":
-                                    try:
-                                        supabase.auth.admin.send_recovery_email(email=email_to_reset)
-                                        st.success(f"✅ Password reset email sent to {email_to_reset}")
-                                    except Exception as e:
-                                        st.error(f"Failed to send password reset: {e}")
-                                else:
-                                    st.error("Cannot send reset - email not available")
-                        
-                        st.divider()
-                        
-                        current_role = selected_user.get("role", "staff")
+                    st.subheader(f"Editing: {selected_name}")
+                    st.write(f"**Email:** {selected_user.get('email', 'Not set')}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
                         new_role = st.selectbox(
                             "Role",
                             options=["staff", "admin"],
-                            index=0 if current_role == "staff" else 1
+                            index=0 if selected_user.get("role", "staff") == "staff" else 1,
+                            key=f"role_{selected_name}"
                         )
-                        
-                        current_title = selected_user.get("title", "")
-                        new_title = st.text_input("Title/Position", value=current_title)
-                        
-                        # Supervisor assignment dropdown
-                        st.subheader("Assign Supervisor")
-                        supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in fresh_users if u.get("id") != selected_user.get("id")]
-                        
-                        current_supervisor_id = selected_user.get("supervisor_id")
-                        current_supervisor_name = "Not Assigned"
-                        if current_supervisor_id:
-                            supervisor = next((u for u in fresh_users if u.get("id") == current_supervisor_id), None)
-                            if supervisor:
-                                current_supervisor_name = supervisor.get("full_name", "Not Assigned")
-                        
-                        selected_supervisor_name = st.selectbox(
-                            "Select Supervisor for this staff member",
-                            options=supervisor_options,
-                            index=supervisor_options.index(current_supervisor_name) if current_supervisor_name in supervisor_options else 0,
-                            help="Choose a supervisor to assign this staff member to"
+                    
+                    with col2:
+                        new_title = st.text_input(
+                            "Title/Position",
+                            value=selected_user.get("title", ""),
+                            key=f"title_{selected_name}"
                         )
-                        
-                        new_supervisor_id = None
-                        if selected_supervisor_name != "Not Assigned":
-                            supervisor = next((u for u in fresh_users if u.get("full_name") == selected_supervisor_name), None)
-                            if supervisor:
-                                new_supervisor_id = supervisor.get("id")
-                        
-                        if st.form_submit_button("Save User Changes", type="primary"):
+                    
+                    st.divider()
+                    st.subheader("Assign Supervisor")
+                    supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in users if u.get("id") != selected_user.get("id")]
+                    
+                    current_supervisor_id = selected_user.get("supervisor_id")
+                    current_supervisor_name = "Not Assigned"
+                    if current_supervisor_id:
+                        supervisor = next((u for u in users if u.get("id") == current_supervisor_id), None)
+                        if supervisor:
+                            current_supervisor_name = supervisor.get("full_name", "Not Assigned")
+                    
+                    selected_supervisor_name = st.selectbox(
+                        "Select Supervisor",
+                        options=supervisor_options,
+                        index=supervisor_options.index(current_supervisor_name) if current_supervisor_name in supervisor_options else 0,
+                        key=f"supervisor_{selected_name}"
+                    )
+                    
+                    new_supervisor_id = None
+                    if selected_supervisor_name != "Not Assigned":
+                        supervisor = next((u for u in users if u.get("full_name") == selected_supervisor_name), None)
+                        if supervisor:
+                            new_supervisor_id = supervisor.get("id")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        if st.button("💾 Save Changes", key=f"save_{selected_name}"):
                             try:
                                 with st.spinner("Updating user..."):
                                     update_data = {
@@ -188,13 +133,27 @@ def admin_settings_page():
                                         "title": new_title,
                                         "supervisor_id": new_supervisor_id
                                     }
-                                    supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
-                                st.success(f"✅ User {selected_name} updated successfully!")
-                                st.balloons()
-                                time.sleep(1)
-                                st.rerun()
+                                    result = supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
+                                    if result:
+                                        st.success(f"✅ User {selected_name} updated!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("Update returned no response")
                             except Exception as e:
-                                st.error(f"Failed to update user: {e}")
+                                st.error(f"Failed to update user: {str(e)}")
+                    
+                    with col2:
+                        email_to_reset = selected_user.get('email', '')
+                        if email_to_reset and email_to_reset != "Email not set":
+                            if st.button("🔐 Send Password Reset", key=f"reset_{selected_name}"):
+                                try:
+                                    supabase.auth.admin.send_recovery_email(email=email_to_reset)
+                                    st.success(f"✅ Reset email sent to {email_to_reset}")
+                                except Exception as e:
+                                    st.error(f"Failed to send reset: {e}")
+                        else:
+                            st.button("🔐 Email Not Available", disabled=True)
         else:
             st.info("No users found in the system.")
 
