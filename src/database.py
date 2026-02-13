@@ -906,3 +906,331 @@ def get_all_staff_names():
 
     except Exception as e:
         return {"success": False, "message": f"Error fetching all staff names: {str(e)}"}
+
+def select_quarterly_winners(quarter, fiscal_year):
+    """
+    Selects the quarterly winners for ASCEND and NORTH recognition based on the number of weekly recognitions.
+    Includes AI-generated summaries for each candidate explaining why they should win.
+    
+    Fiscal Year runs July 1 through June 30.
+    Q1: July, August, September
+    Q2: October, November, December
+    Q3: January, February, March
+    Q4: April, May, June
+    """
+    try:
+        # Determine the calendar year and month range for the quarter
+        quarter_months = {
+            1: [(fiscal_year - 1, 7), (fiscal_year - 1, 8), (fiscal_year - 1, 9)],  # Jul-Sep of fiscal year start year
+            2: [(fiscal_year - 1, 10), (fiscal_year - 1, 11), (fiscal_year - 1, 12)],  # Oct-Dec of fiscal year start year
+            3: [(fiscal_year, 1), (fiscal_year, 2), (fiscal_year, 3)],  # Jan-Mar of fiscal year end year
+            4: [(fiscal_year, 4), (fiscal_year, 5), (fiscal_year, 6)]  # Apr-Jun of fiscal year end year
+        }
+        
+        months = quarter_months[quarter]
+        start_month = months[0]
+        end_month = months[-1]
+        
+        start_date = f"{start_month[0]}-{start_month[1]:02d}-01"
+        end_date = f"{end_month[0]}-{end_month[1]:02d}-31"
+
+        print(f"\n[DEBUG] select_quarterly_winners called for FY{fiscal_year} Q{quarter}")
+        print(f"[DEBUG] Date range: {start_date} to {end_date}")
+        print(f"[DEBUG] Months included: {[f'{y}-{m:02d}' for y, m in months]}")
+
+        # First, let's see what dates actually exist in the database
+        success_all, data_all, error_all = safe_db_query(
+            supabase.table("saved_staff_recognition")
+            .select("week_ending_date")
+            .order("week_ending_date", desc=True)
+            .limit(50),
+            "Fetching recent dates to check what exists"
+        )
+        
+        if success_all and data_all:
+            print(f"[DEBUG] Recent dates in database: {[r.get('week_ending_date') for r in data_all[:10]]}")
+            print(f"[DEBUG] Total records found in limit(50): {len(data_all)}")
+        else:
+            print(f"[DEBUG] Failed to fetch recent dates: {error_all}")
+
+        # Try using admin client to bypass RLS
+        print(f"[DEBUG] Attempting to fetch all records with admin client...")
+        try:
+            admin = get_admin_client()
+            response = admin.table("saved_staff_recognition").select("week_ending_date, ascend_recognition, north_recognition").order("week_ending_date").execute()
+            data_all_records = response.data if response else None
+            if data_all_records:
+                print(f"[DEBUG] Admin client returned {len(data_all_records)} total records")
+                print(f"[DEBUG] Recent dates from admin: {[r.get('week_ending_date') for r in data_all_records[-10:]]}")
+            else:
+                print(f"[DEBUG] Admin client returned no data")
+        except Exception as admin_error:
+            print(f"[DEBUG] Admin client failed: {admin_error}")
+            # Fallback to regular client
+            success, data_all_records, error = safe_db_query(
+                supabase.table("saved_staff_recognition")
+                .select("week_ending_date, ascend_recognition, north_recognition")
+                .order("week_ending_date"),
+                "Fetching all recognitions"
+            )
+            print(f"[DEBUG] Regular client success: {success}, records: {len(data_all_records) if data_all_records else 0}")
+            if not success:
+                print(f"[DEBUG] Query failed: {error}")
+                return {"success": False, "message": error}
+
+        if not data_all_records:
+            print(f"[DEBUG] No records returned at all!")
+            return {
+                "success": True,
+                "status": "success",
+                "ascend_winner": None,
+                "north_winner": None,
+                "debug": {
+                    "records_found": 0,
+                    "ascend_count": 0,
+                    "north_count": 0,
+                    "error": "No records found in database - check if saved_staff_recognition table exists and has data"
+                }
+            }
+
+        # Filter to only records in the specified quarter
+        data = []
+        for record in data_all_records:
+            week_date = record.get('week_ending_date', '')
+            if week_date and start_date <= week_date <= end_date:
+                data.append(record)
+        
+        # Debug: Check how many records were found
+        print(f"[DEBUG] Found {len(data) if data else 0} records for {start_date} to {end_date}")
+        if data:
+            for i, record in enumerate(data):
+                print(f"[DEBUG]   Record {i+1}: week_ending_date={record.get('week_ending_date')}, has_ascend={bool(record.get('ascend_recognition'))}, has_north={bool(record.get('north_recognition'))}")
+        else:
+            print(f"[DEBUG] No records in date range {start_date} to {end_date}")
+            print(f"[DEBUG] Total records in DB: {len(data_all_records)}")
+
+        ascend_counts = {}
+        north_counts = {}
+        ascend_details = {}  # Maps staff_member -> list of recognition objects
+        north_details = {}   # Maps staff_member -> list of recognition objects
+
+        for record in data or []:
+            # Helper function to safely parse JSON with multiple levels of escaping
+            def parse_json_value(value):
+                """Parse JSON handling multiple levels of escaping"""
+                if isinstance(value, dict):
+                    return value
+                if not isinstance(value, str):
+                    return None
+                
+                # Remove surrounding quotes if present
+                value = value.strip()
+                while value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                
+                # Handle escaped quotes
+                value = value.replace('\\"', '"')
+                value = value.replace('\\\\', '\\')
+                
+                try:
+                    return json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    return None
+            
+            # Process ASCEND recognition
+            if record.get('ascend_recognition'):
+                try:
+                    ascend_rec = parse_json_value(record['ascend_recognition'])
+                    if ascend_rec:
+                        staff_member = ascend_rec.get('staff_member')
+                        if staff_member:
+                            ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
+                            # Collect full recognition details for AI analysis
+                            if staff_member not in ascend_details:
+                                ascend_details[staff_member] = []
+                            ascend_details[staff_member].append(ascend_rec)
+                            print(f"[DEBUG] ASCEND: {staff_member} count = {ascend_counts[staff_member]}")
+                    else:
+                        print(f"[DEBUG] Could not parse ASCEND data: {record.get('ascend_recognition')[:100]}")
+                except Exception as e:
+                    print(f"[DEBUG] Error parsing ASCEND: {str(e)}")
+                    pass
+
+            # Process NORTH recognition
+            if record.get('north_recognition'):
+                try:
+                    north_rec = parse_json_value(record['north_recognition'])
+                    if north_rec:
+                        staff_member = north_rec.get('staff_member')
+                        if staff_member:
+                            north_counts[staff_member] = north_counts.get(staff_member, 0) + 1
+                            # Collect full recognition details for AI analysis
+                            if staff_member not in north_details:
+                                north_details[staff_member] = []
+                            north_details[staff_member].append(north_rec)
+                            print(f"[DEBUG] NORTH: {staff_member} count = {north_counts[staff_member]}")
+                    else:
+                        print(f"[DEBUG] Could not parse NORTH data: {record.get('north_recognition')[:100]}")
+                except Exception as e:
+                    print(f"[DEBUG] Error parsing NORTH: {str(e)}")
+                    pass
+        
+        print(f"[DEBUG] ASCEND counts: {ascend_counts}")
+        print(f"[DEBUG] NORTH counts: {north_counts}")
+        
+        # Determine winners
+        ascend_winner = max(ascend_counts, key=ascend_counts.get) if ascend_counts else None
+        north_winner = max(north_counts, key=north_counts.get) if north_counts else None
+
+        print(f"[DEBUG] Determined winners - ASCEND: {ascend_winner}, NORTH: {north_winner}")
+
+        # If no winners found, return early with diagnostic info
+        if not ascend_winner and not north_winner:
+            print(f"[DEBUG] No winners determined - counts are empty")
+            return {
+                "success": True,
+                "status": "success",
+                "ascend_winner": None,
+                "north_winner": None,
+                "debug": {
+                    "records_found": len(data) if data else 0,
+                    "ascend_count": len(ascend_counts),
+                    "north_count": len(north_counts),
+                    "records": [{"week_ending_date": r.get('week_ending_date'), "has_ascend": bool(r.get('ascend_recognition')), "has_north": bool(r.get('north_recognition'))} for r in (data or [])]
+                }
+            }
+        
+        # Check for ties - with AI analysis
+        if ascend_winner and list(ascend_counts.values()).count(ascend_counts[ascend_winner]) > 1:
+            tied_winners = [k for k, v in ascend_counts.items() if v == ascend_counts[ascend_winner]]
+            # Generate AI summaries for tied candidates
+            ai_summaries = analyze_candidates_for_monthly_winner("ASCEND", 
+                                                                  {w: ascend_details.get(w, []) for w in tied_winners})
+            print(f"[DEBUG] ASCEND tie detected. AI summaries: {ai_summaries}")
+            return {
+                "success": True, 
+                "status": "tie", 
+                "category": "ASCEND", 
+                "winners": tied_winners,
+                "ai_summaries": ai_summaries
+            }
+
+        if north_winner and list(north_counts.values()).count(north_counts[north_winner]) > 1:
+            tied_winners = [k for k, v in north_counts.items() if v == north_counts[north_winner]]
+            # Generate AI summaries for tied candidates  
+            ai_summaries = analyze_candidates_for_monthly_winner("NORTH",
+                                                                  {w: north_details.get(w, []) for w in tied_winners})
+            print(f"[DEBUG] NORTH tie detected. AI summaries: {ai_summaries}")
+            return {
+                "success": True,
+                "status": "tie",
+                "category": "NORTH",
+                "winners": tied_winners,
+                "ai_summaries": ai_summaries
+            }
+
+        # No tie - generate AI summary explaining why the winner was chosen
+        ascend_summary = None
+        north_summary = None
+        
+        if ascend_winner:
+            summaries = analyze_candidates_for_monthly_winner("ASCEND", {ascend_winner: ascend_details.get(ascend_winner, [])})
+            ascend_summary = summaries.get(ascend_winner)
+        
+        if north_winner:
+            summaries = analyze_candidates_for_monthly_winner("NORTH", {north_winner: north_details.get(north_winner, [])})
+            north_summary = summaries.get(north_winner)
+
+        # Save winners to the database
+        ascend_winner_obj = {}
+        if ascend_winner:
+            for record in data or []:
+                if record.get('ascend_recognition'):
+                    try:
+                        ascend_data = record['ascend_recognition']
+                        # Check if it's already a dict or needs JSON parsing
+                        if isinstance(ascend_data, dict):
+                            ascend_rec = ascend_data
+                        else:
+                            # Remove surrounding quotes and handle escaping
+                            cleaned = ascend_data.strip()
+                            while cleaned.startswith('"') and cleaned.endswith('"'):
+                                cleaned = cleaned[1:-1]
+                            cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
+                            ascend_rec = json.loads(cleaned)
+                        
+                        if ascend_rec.get('staff_member') == ascend_winner:
+                            ascend_winner_obj = ascend_rec
+                            break
+                    except (json.JSONDecodeError, TypeError, AttributeError):
+                        continue
+        
+        north_winner_obj = {}
+        if north_winner:
+            for record in data or []:
+                if record.get('north_recognition'):
+                    try:
+                        north_data = record['north_recognition']
+                        # Check if it's already a dict or needs JSON parsing
+                        if isinstance(north_data, dict):
+                            north_rec = north_data
+                        else:
+                            # Remove surrounding quotes and handle escaping
+                            cleaned = north_data.strip()
+                            while cleaned.startswith('"') and cleaned.endswith('"'):
+                                cleaned = cleaned[1:-1]
+                            cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
+                            north_rec = json.loads(cleaned)
+                        
+                        if north_rec.get('staff_member') == north_winner:
+                            north_winner_obj = north_rec
+                            break
+                    except (json.JSONDecodeError, TypeError, AttributeError):
+                        continue
+
+        save_data = {
+            "fiscal_year": fiscal_year,
+            "quarter": quarter,
+            "ascend_winner": json.dumps(ascend_winner_obj),
+            "north_winner": json.dumps(north_winner_obj)
+        }
+
+        # Check if a record for this quarter already exists
+        check_success, existing_records, check_error = safe_db_query(
+            supabase.table("quarterly_staff_recognition")
+            .select("id")
+            .eq("fiscal_year", fiscal_year)
+            .eq("quarter", quarter),
+            "Checking for existing quarterly winner record"
+        )
+
+        if check_success and existing_records and len(existing_records) > 0:
+            # Record exists, update it
+            success, _, error = safe_db_query(
+                supabase.table("quarterly_staff_recognition")
+                .update(save_data)
+                .eq("fiscal_year", fiscal_year)
+                .eq("quarter", quarter),
+                "Updating quarterly winners"
+            )
+        else:
+            # Record doesn't exist, insert it
+            success, _, error = safe_db_query(
+                supabase.table("quarterly_staff_recognition").insert(save_data),
+                "Saving quarterly winners"
+            )
+
+        if not success:
+            return {"success": False, "message": error}
+
+        return {
+            "success": True, 
+            "status": "success", 
+            "ascend_winner": ascend_winner, 
+            "north_winner": north_winner,
+            "ascend_summary": ascend_summary,
+            "north_summary": north_summary
+        }
+
+    except Exception as e:
+        return {"success": False, "message": f"An error occurred: {str(e)}"}
