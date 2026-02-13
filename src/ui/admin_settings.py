@@ -14,7 +14,7 @@ def admin_settings_page():
         st.stop()
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates", "📋 Weekly Reports Summary"])
     
     with tab4:
         st.subheader("User Management")
@@ -364,6 +364,16 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     st.rerun()
                 except Exception as e:
                     st.error(f"Failed to save AI prompts or rubrics: {e}")
+
+    with tab6:
+        st.subheader("Weekly Reports Summary")
+        st.markdown("""
+        View all weekly reports submitted by staff across the organization. Filter by date range and staff member.
+        """)
+        
+        from src.ui.supervisor import weekly_reports_viewer
+        # Show all reports for admin (no supervisor filtering)
+        weekly_reports_viewer(supervisor_id=None)
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
