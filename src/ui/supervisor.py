@@ -287,9 +287,12 @@ def weekly_reports_viewer(supervisor_id=None):
                                             st.error("❌ Please add a comment before sending.")
                                         else:
                                             staff_email = report.get('email')
+                                            supervisor_email = st.session_state.get('user').email if st.session_state.get('user') else None
                                             
                                             if not staff_email:
                                                 st.error("❌ No email found for this staff member.")
+                                            elif not supervisor_email:
+                                                st.error("❌ No email found for supervisor.")
                                             else:
                                                 try:
                                                     with st.spinner("📧 Sending email..."):
@@ -298,13 +301,20 @@ def weekly_reports_viewer(supervisor_id=None):
                                                         subject = f"Response to Your Weekly Report for {week}"
                                                         body = f"Hello {name},\n\nI've reviewed your weekly report for {week}.\n\nMy feedback:\n{comment}\n\nBest regards,\n{sender_name}"
                                                         
-                                                        success = send_email(staff_email, subject, body)
+                                                        # Send to staff member
+                                                        success_staff = send_email(staff_email, subject, body)
                                                         
-                                                        if success:
-                                                            st.success(f"✅ Email sent to {staff_email}!")
+                                                        # Send copy to supervisor
+                                                        supervisor_body = f"Sent response to {name}'s weekly report for {week}.\n\nFeedback sent:\n{comment}"
+                                                        success_supervisor = send_email(supervisor_email, f"[Copy] {subject}", supervisor_body)
+                                                        
+                                                        if success_staff and success_supervisor:
+                                                            st.success(f"✅ Email sent to {name} and copy sent to you!")
                                                             # Clear form
                                                             st.session_state[f"comment_{report_id}"] = ""
                                                             st.session_state[f"toggle_respond_{report_id}"] = False
+                                                        elif success_staff:
+                                                            st.warning(f"⚠️ Email sent to {name} but copy to supervisor failed.")
                                                         else:
                                                             st.error("❌ Failed to send email.")
                                                 except Exception as e:
