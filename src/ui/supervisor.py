@@ -82,7 +82,7 @@ def weekly_reports_viewer():
         with st.spinner("Fetching reports from database..."):
             try:
                 # Check if user is admin - if so, use admin client to bypass RLS
-                role = st.session_state.get('role', 'staff')
+                role = st.session_state.get('role', 'user')
                 
                 if role == 'admin':
                     try:
@@ -496,7 +496,7 @@ def duty_analysis_section():
                     if 'end_date' in filter_info and hasattr(filter_info['end_date'], 'isoformat'):
                         analysis_data['filter_info']['end_date'] = filter_info['end_date'].isoformat()
                     # Use admin client for admins
-                    role = st.session_state.get('role', 'staff')
+                    role = st.session_state.get('role', 'user')
                     if role == 'admin':
                         admin_client = get_admin_client()
                         db_client = admin_client
@@ -522,7 +522,7 @@ def duty_analysis_section():
                     }
                     week_ending = filter_info.get('end_date')
                     # Use admin client for admins
-                    role = st.session_state.get('role', 'staff')
+                    role = st.session_state.get('role', 'user')
                     if role == 'admin':
                         admin_client = get_admin_client()
                         db_client = admin_client

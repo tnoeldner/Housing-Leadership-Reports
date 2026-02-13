@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from src.database import supabase
+from src.database import supabase, get_admin_client
 from src.utils import get_deadline_settings
 from src.email_service import send_email
 import streamlit as st
@@ -18,12 +18,26 @@ def admin_settings_page():
     
     with tab4:
         st.subheader("User Management")
+        
+        # Admin-only access
+        user_role = st.session_state.get('role', 'user')
+        if user_role != 'admin':
+            st.error("❌ Access Denied: Only admins can manage users.")
+            st.stop()
+        
         st.write("Manage user roles and permissions.")
         
         # Load all users
         try:
             # Fetch profiles including email (now saves during signup)
-            users_response = supabase.table("profiles").select("id,full_name,title,role,supervisor_id,email").order("full_name").execute()
+            # Use admin client to bypass RLS and get all profiles
+            try:
+                admin_client = get_admin_client()
+                users_response = admin_client.table("profiles").select("id,full_name,title,role,supervisor_id,email").order("full_name").execute()
+            except Exception as admin_error:
+                st.warning(f"Admin client unavailable, using regular client: {admin_error}")
+                users_response = supabase.table("profiles").select("id,full_name,title,role,supervisor_id,email").order("full_name").execute()
+            
             users = users_response.data if users_response else []
             
             with st.expander("🔍 Debug: Email Status", expanded=False):
@@ -135,27 +149,49 @@ def admin_settings_page():
                         if st.button("💾 Save Changes", key=f"save_{selected_name}"):
                             try:
                                 with st.spinner("Updating user..."):
+                                    # Only include fields that should be updated
                                     update_data = {
                                         "role": new_role,
                                         "title": new_title,
-                                        "email": new_email if new_email else None,
                                         "supervisor_id": new_supervisor_id
                                     }
                                     
+                                    # Only add email if it was actually entered
+                                    if new_email and new_email.strip():
+                                        update_data["email"] = new_email
+                                    
+                                    user_id = selected_user.get("id")
+                                    
                                     # Debug output
                                     with st.expander("Debug Info"):
-                                        st.write(f"User ID: {selected_user.get('id')}")
+                                        st.write(f"User ID: {user_id}")
                                         st.write(f"Update Data: {update_data}")
                                         st.write(f"Supervisor Name Selected: {selected_supervisor_name}")
                                         st.write(f"Supervisor ID to Save: {new_supervisor_id}")
+                                        st.write(f"Email Input Value: '{new_email}'")
                                     
-                                    result = supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
-                                    if result and result.data:
+                                    # Use admin client to bypass RLS (admins have this authority)
+                                    try:
+                                        admin_client = get_admin_client()
+                                        result = admin_client.table("profiles").update(update_data).eq("id", user_id).execute()
+                                    except Exception as admin_error:
+                                        st.warning(f"Admin client failed, trying regular client: {admin_error}")
+                                        result = supabase.table("profiles").update(update_data).eq("id", user_id).execute()
+                                    
+                                    st.write(f"Raw result: {result}")
+                                    st.write(f"Result data: {result.data if result else 'None'}")
+                                    st.write(f"Result count: {result.count if result else 'None'}")
+                                    
+                                    if result and result.data and len(result.data) > 0:
                                         st.success(f"✅ User {selected_name} updated! Changes saved to database.")
                                         time.sleep(1)
                                         st.rerun()
+                                    elif result:
+                                        st.warning(f"Update may have succeeded but returned no data. Result: {result}")
+                                        time.sleep(1)
+                                        st.rerun()
                                     else:
-                                        st.error(f"Update result: {result}")
+                                        st.error(f"Update failed - no result returned")
                             except Exception as e:
                                 st.error(f"Failed to update user: {str(e)}")
                                 import traceback

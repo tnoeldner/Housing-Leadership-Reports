@@ -210,7 +210,7 @@ def staff_recognition_page():
     try:
         current_user_id = st.session_state['user'].id
         is_supervisor = st.session_state.get('is_supervisor', False)
-        user_role = st.session_state.get('role', 'staff')
+        user_role = st.session_state.get('role', 'user')
         
         all_reports = []
 
