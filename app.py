@@ -36,7 +36,6 @@ from src.ui.saved_reports import saved_reports_page
 from src.ui.admin_settings import admin_settings_page
 from src.ui.submission import submit_and_edit_page
 from src.ui.staff_recognition import staff_recognition_page
-from src.ui.monthly_recognition import monthly_recognition_page
 from src.ui.quarterly_recognition import quarterly_recognition_page
 
 
@@ -85,7 +84,6 @@ else:
             "User Manual": user_manual_page,
             "Saved Reports": saved_reports_page,
             "Staff Recognition": staff_recognition_page,
-            "Monthly Recognition": monthly_recognition_page,
             "Quarterly Recognition": quarterly_recognition_page,
             "Supervisor Summaries": supervisor_summaries_page,
             "Supervisors": supervisors_section_page,
