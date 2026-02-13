@@ -1329,6 +1329,13 @@ def select_quarterly_winners(quarter, fiscal_year):
                     except (json.JSONDecodeError, TypeError, AttributeError):
                         continue
 
+        # Update winner objects with AI-generated quarterly summaries as reasoning
+        if ascend_winner_obj and ascend_summary:
+            ascend_winner_obj['reasoning'] = ascend_summary
+        
+        if north_winner_obj and north_summary:
+            north_winner_obj['reasoning'] = north_summary
+
         save_data = {
             "fiscal_year": fiscal_year,
             "quarter": quarter,
