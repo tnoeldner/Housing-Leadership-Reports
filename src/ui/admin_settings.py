@@ -53,19 +53,40 @@ def admin_settings_page():
             df = pd.DataFrame(user_data)
             st.dataframe(df, use_container_width=True, hide_index=True)
             
+            st.divider()
             st.subheader("Edit User")
             
             # Get list of staff names for selection
             staff_names = [user.get("full_name", "") for user in users if user.get("full_name")]
-            selected_name = st.selectbox("Select Staff Member", options=staff_names)
+            selected_name = st.selectbox("Select Staff Member", options=staff_names, key="user_select")
             
             if selected_name:
-                # Find the selected user
-                selected_user = next((u for u in users if u.get("full_name") == selected_name), None)
+                # Find the selected user - reload fresh data
+                try:
+                    users_response = supabase.table("profiles").select("*").order("full_name").execute()
+                    fresh_users = users_response.data if users_response else []
+                except Exception:
+                    fresh_users = users
+                
+                selected_user = next((u for u in fresh_users if u.get("full_name") == selected_name), None)
                 
                 if selected_user:
                     with st.form("edit_user_form"):
-                        st.write(f"**Email:** {selected_user.get('email')}")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write("**Current Email:**")
+                            st.code(selected_user.get('email', 'No email'))
+                        
+                        with col2:
+                            if st.form_submit_button("🔐 Send Password Reset Email", type="secondary"):
+                                try:
+                                    supabase.auth.admin.send_recovery_email(email=selected_user.get('email'))
+                                    st.success(f"✅ Password reset email sent to {selected_user.get('email')}")
+                                except Exception as e:
+                                    st.error(f"Failed to send password reset: {e}")
+                        
+                        st.divider()
                         
                         current_role = selected_user.get("role", "staff")
                         new_role = st.selectbox(
@@ -79,12 +100,12 @@ def admin_settings_page():
                         
                         # Supervisor assignment dropdown
                         st.subheader("Assign Supervisor")
-                        supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in users if u.get("id") != selected_user.get("id")]
+                        supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in fresh_users if u.get("id") != selected_user.get("id")]
                         
                         current_supervisor_id = selected_user.get("supervisor_id")
                         current_supervisor_name = "Not Assigned"
                         if current_supervisor_id:
-                            supervisor = next((u for u in users if u.get("id") == current_supervisor_id), None)
+                            supervisor = next((u for u in fresh_users if u.get("id") == current_supervisor_id), None)
                             if supervisor:
                                 current_supervisor_name = supervisor.get("full_name", "Not Assigned")
                         
@@ -97,7 +118,7 @@ def admin_settings_page():
                         
                         new_supervisor_id = None
                         if selected_supervisor_name != "Not Assigned":
-                            supervisor = next((u for u in users if u.get("full_name") == selected_supervisor_name), None)
+                            supervisor = next((u for u in fresh_users if u.get("full_name") == selected_supervisor_name), None)
                             if supervisor:
                                 new_supervisor_id = supervisor.get("id")
                         
@@ -111,7 +132,8 @@ def admin_settings_page():
                                     }
                                     supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
                                 st.success(f"✅ User {selected_name} updated successfully!")
-                                time.sleep(2)
+                                st.balloons()
+                                time.sleep(1)
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Failed to update user: {e}")
