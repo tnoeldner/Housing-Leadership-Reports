@@ -558,6 +558,145 @@ Be specific, action-oriented, and compelling. Focus on what makes each person st
         traceback.print_exc()
         return {}
 
+def analyze_candidates_for_quarterly_winner(category, candidates_details, quarter, fiscal_year):
+    """
+    Use AI to analyze and summarize why each candidate should win for the quarter.
+    Generates a comprehensive summary of all achievements across the 3-month period.
+    
+    Args:
+        category: str, "ASCEND" or "NORTH"
+        candidates_details: dict mapping staff_member -> list of recognition objects
+                           Each recognition object has: staff_member, category, score, reasoning, week_ending_date
+        quarter: int, 1-4 indicating which quarter
+        fiscal_year: int, the fiscal year
+    
+    Returns:
+        dict mapping staff_member -> AI-generated summary
+    """
+    try:
+        from src.ai import call_gemini_ai
+        
+        if not candidates_details or not any(candidates_details.values()):
+            return {}
+        
+        # Determine quarter display
+        quarter_display = {
+            1: "Q1 (July, August, September)",
+            2: "Q2 (October, November, December)",
+            3: "Q3 (January, February, March)",
+            4: "Q4 (April, May, June)"
+        }
+        quarter_label = quarter_display.get(quarter, f"Q{quarter}")
+        
+        # Prepare detailed candidate profiles for AI analysis
+        candidate_summaries = {}
+        candidates_text = ""
+        
+        for staff_member, recognitions in candidates_details.items():
+            if not recognitions:
+                continue
+            
+            # Build profile for this candidate
+            recognition_count = len(recognitions)
+            scores = [r.get('score', 0) for r in recognitions if r.get('score')]
+            avg_score = sum(scores) / len(scores) if scores else 0
+            
+            # Organize recognitions by month for better context
+            recognitions_by_month = {}
+            for rec in recognitions:
+                week_date = rec.get('week_ending_date', 'Unknown')
+                if week_date and len(week_date) >= 7:
+                    month = week_date[:7]  # YYYY-MM
+                    if month not in recognitions_by_month:
+                        recognitions_by_month[month] = []
+                    recognitions_by_month[month].append(rec)
+            
+            # Compile their recognitions with monthly grouping
+            candidate_text = f"### {staff_member}\n"
+            candidate_text += f"**Total Recognition Count (Across 3 Months):** {recognition_count}\n"
+            candidate_text += f"**Average Performance Score:** {avg_score:.1f}/4\n\n"
+            candidate_text += "**Recognitions by Month:**\n"
+            
+            for month in sorted(recognitions_by_month.keys()):
+                month_recs = recognitions_by_month[month]
+                candidate_text += f"\n**{month}** ({len(month_recs)} recognition{'s' if len(month_recs) != 1 else ''}):\n"
+                for rec in month_recs:
+                    week = rec.get('week_ending_date', 'Unknown date')
+                    score = rec.get('score', 'N/A')
+                    reasoning = rec.get('reasoning', 'No reasoning provided')
+                    candidate_text += f"  - Week of {week} (Score: {score}/4): {reasoning}\n"
+            
+            candidate_text += "\n"
+            candidates_text += candidate_text
+            candidate_summaries[staff_member] = None  # Will be filled with AI summary
+        
+        # Use AI to generate comprehensive quarterly summary for each candidate
+        prompt = f"""You are evaluating candidates for {category} Quarterly Winner recognition at UND Housing & Residence Life for FY{fiscal_year} {quarter_label}.
+
+Your task is to create a concise, compelling summary for each candidate that explains why they deserve to win based on their performance across the ENTIRE 3-month quarter. Focus on:
+
+1. **Sustained Performance:** Consistent achievements across all 3 months (not just one month)
+2. **Breadth of Impact:** Performance across different ASCEND/NORTH categories over the quarter
+3. **Demonstrated Growth:** How they've contributed to organizational goals over the full quarter
+4. **Positive Impact:** Their influence on team culture and student success over 12 weeks
+
+CANDIDATE PROFILES:
+{candidates_text}
+
+For EACH candidate above, provide a compelling summary (4-5 sentences) that:
+- Highlights their sustained contributions throughout the quarter
+- Explains key themes or patterns in their achievements across the 3-month period
+- References specific accomplishments and their impact on the organization
+- Shows why they stand out as the top performer for this category over the quarter
+
+Format your response as follows - use this EXACT format:
+**Candidate: [Staff Member Name]**
+[Quarterly summary paragraph]
+
+**Candidate: [Next Staff Member Name]**
+[Quarterly summary paragraph]
+
+Be specific, data-driven based on the recognitions provided, and compelling. Focus on sustained excellence over the 3-month period."""
+        
+        response = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash")
+        
+        if not response:
+            return candidate_summaries
+        
+        # Parse AI response to extract summaries for each candidate
+        lines = response.split('\n')
+        current_candidate = None
+        current_summary = []
+        
+        for line in lines:
+            if line.startswith('**Candidate:'):
+                # Save previous candidate's summary
+                if current_candidate and current_summary:
+                    summary_text = '\n'.join(current_summary).strip()
+                    if current_candidate in candidate_summaries:
+                        candidate_summaries[current_candidate] = summary_text
+                
+                # Extract candidate name
+                name_match = line.replace('**Candidate:', '').replace('**', '').strip()
+                current_candidate = name_match
+                current_summary = []
+            elif current_candidate and line.strip():
+                current_summary.append(line)
+        
+        # Save last candidate
+        if current_candidate and current_summary:
+            summary_text = '\n'.join(current_summary).strip()
+            if current_candidate in candidate_summaries:
+                candidate_summaries[current_candidate] = summary_text
+        
+        return candidate_summaries
+        
+    except Exception as e:
+        print(f"[DEBUG] Error analyzing quarterly candidates with AI: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
 
 def select_monthly_winners(month, year):
     """
@@ -1104,8 +1243,9 @@ def select_quarterly_winners(quarter, fiscal_year):
         if ascend_winner and list(ascend_counts.values()).count(ascend_counts[ascend_winner]) > 1:
             tied_winners = [k for k, v in ascend_counts.items() if v == ascend_counts[ascend_winner]]
             # Generate AI summaries for tied candidates
-            ai_summaries = analyze_candidates_for_monthly_winner("ASCEND", 
-                                                                  {w: ascend_details.get(w, []) for w in tied_winners})
+            ai_summaries = analyze_candidates_for_quarterly_winner("ASCEND", 
+                                                                    {w: ascend_details.get(w, []) for w in tied_winners},
+                                                                    quarter, fiscal_year)
             print(f"[DEBUG] ASCEND tie detected. AI summaries: {ai_summaries}")
             return {
                 "success": True, 
@@ -1118,8 +1258,9 @@ def select_quarterly_winners(quarter, fiscal_year):
         if north_winner and list(north_counts.values()).count(north_counts[north_winner]) > 1:
             tied_winners = [k for k, v in north_counts.items() if v == north_counts[north_winner]]
             # Generate AI summaries for tied candidates  
-            ai_summaries = analyze_candidates_for_monthly_winner("NORTH",
-                                                                  {w: north_details.get(w, []) for w in tied_winners})
+            ai_summaries = analyze_candidates_for_quarterly_winner("NORTH",
+                                                                    {w: north_details.get(w, []) for w in tied_winners},
+                                                                    quarter, fiscal_year)
             print(f"[DEBUG] NORTH tie detected. AI summaries: {ai_summaries}")
             return {
                 "success": True,
@@ -1134,11 +1275,11 @@ def select_quarterly_winners(quarter, fiscal_year):
         north_summary = None
         
         if ascend_winner:
-            summaries = analyze_candidates_for_monthly_winner("ASCEND", {ascend_winner: ascend_details.get(ascend_winner, [])})
+            summaries = analyze_candidates_for_quarterly_winner("ASCEND", {ascend_winner: ascend_details.get(ascend_winner, [])}, quarter, fiscal_year)
             ascend_summary = summaries.get(ascend_winner)
         
         if north_winner:
-            summaries = analyze_candidates_for_monthly_winner("NORTH", {north_winner: north_details.get(north_winner, [])})
+            summaries = analyze_candidates_for_quarterly_winner("NORTH", {north_winner: north_details.get(north_winner, [])}, quarter, fiscal_year)
             north_summary = summaries.get(north_winner)
 
         # Save winners to the database
