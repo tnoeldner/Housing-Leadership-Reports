@@ -26,21 +26,33 @@ def admin_settings_page():
             users = users_response.data if users_response else []
             
             # Try to get emails from auth.users
+            auth_emails = {}
             try:
                 from src.database import get_admin_client
                 admin = get_admin_client()
-                auth_users = admin.auth.admin.list_users()
-                auth_emails = {user.id: user.email for user in auth_users.users} if hasattr(auth_users, 'users') else {}
+                auth_response = admin.auth.admin.list_users()
+                
+                # Debug: check what we got back
+                print(f"[DEBUG] Auth response type: {type(auth_response)}")
+                print(f"[DEBUG] Auth response: {auth_response}")
+                
+                if hasattr(auth_response, 'users'):
+                    auth_emails = {user.id: user.email for user in auth_response.users}
+                    print(f"[DEBUG] Found {len(auth_emails)} emails from auth users")
+                else:
+                    print(f"[DEBUG] No 'users' attribute found in auth_response")
+                    
             except Exception as auth_error:
                 print(f"[DEBUG] Could not fetch auth users: {auth_error}")
-                auth_emails = {}
+                import traceback
+                traceback.print_exc()
             
             # Add emails to user data
             for user in users:
                 user_id = user.get("id")
                 if user_id and user_id in auth_emails:
                     user["email"] = auth_emails[user_id]
-                elif not user.get("email"):
+                else:
                     user["email"] = "Email not synced"
                     
         except Exception as e:
@@ -87,20 +99,24 @@ def admin_settings_page():
                     fresh_users = users_response.data if users_response else []
                     
                     # Try to get emails from auth.users
+                    auth_emails = {}
                     try:
                         from src.database import get_admin_client
                         admin = get_admin_client()
-                        auth_users = admin.auth.admin.list_users()
-                        auth_emails = {user.id: user.email for user in auth_users.users} if hasattr(auth_users, 'users') else {}
+                        auth_response = admin.auth.admin.list_users()
+                        
+                        if hasattr(auth_response, 'users'):
+                            auth_emails = {user.id: user.email for user in auth_response.users}
+                        
                     except Exception as auth_error:
-                        auth_emails = {}
+                        print(f"[DEBUG] Could not fetch auth users on edit: {auth_error}")
                     
                     # Add emails to user data
                     for user in fresh_users:
                         user_id = user.get("id")
                         if user_id and user_id in auth_emails:
                             user["email"] = auth_emails[user_id]
-                        elif not user.get("email"):
+                        else:
                             user["email"] = "Email not synced"
                 except Exception:
                     fresh_users = users
