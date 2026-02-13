@@ -148,6 +148,7 @@ def weekly_reports_viewer(supervisor_id=None):
                             with cols[i % 3]:
                                 name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
                                 status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
+                                report_id = report.get('id', '')
                     
                                 with st.container(border=True):
                                     st.markdown(f"#### {name}")
@@ -169,115 +170,111 @@ def weekly_reports_viewer(supervisor_id=None):
                                         snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
                                         st.info(snippet)
                         
-                                    # View Details & Respond Button
-                                    col_full, col_respond = st.columns([1, 1])
-                                    with col_full:
-                                        if st.button("📖 View Full Report", key=f"view_{report.get('id', '')}", use_container_width=True):
-                                            with st.expander("📄 Full Report Details", expanded=True):
-                                                # Full AI Summary
-                                                if clean_sum:
-                                                    st.markdown("##### 🤖 AI Summary")
-                                                    st.markdown(clean_sum)
-                                                # Director Concerns
-                                                if isinstance(report, dict) and report.get('director_concerns'):
-                                                    st.error(f"**⚠️ Director Concerns:**\n{report.get('director_concerns')}")
-                                
-                                                # General Updates
-                                                st.markdown("##### 📝 General Updates")
-                                                st.markdown(f"**Professional Development:**\n{report.get('professional_development', 'None') if isinstance(report, dict) else 'None'}")
-                                                st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead', 'None') if isinstance(report, dict) else 'None'}")
-                                                st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in', 'None') if isinstance(report, dict) else 'None'}")
-                                
-                                                st.markdown("---")
-                                                st.markdown("##### 🎯 Core Activities")
-                                
-                                                # Report Body
-                                                body = report.get('report_body', {}) if isinstance(report, dict) else {}
-                                
-                                                for section_key, section_name in CORE_SECTIONS.items():
-                                                    section_data = body.get(section_key, {}) if isinstance(body, dict) else {}
-                                                    if section_data and (section_data.get('successes') or section_data.get('challenges')):
-                                                        st.markdown(f"**{section_name}**")
-                                                        if section_data.get('successes'):
-                                                            st.markdown("*Successes:*")
-                                                            for item in section_data['successes']:
-                                                                if isinstance(item, dict):
-                                                                    text = item.get('text', '')
-                                                                    ascend = item.get('ascend_category', 'N/A')
-                                                                    north = item.get('north_category', 'N/A')
-                                                                    st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                                                        if section_data.get('challenges'):
-                                                            st.markdown("*Challenges:*")
-                                                            for item in section_data['challenges']:
-                                                                if isinstance(item, dict):
-                                                                    text = item.get('text', '')
-                                                                    ascend = item.get('ascend_category', 'N/A')
-                                                                    north = item.get('north_category', 'N/A')
-                                                                    st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                                                        st.markdown("")
+                                    # Buttons - View Details and Respond
+                                    col_b1, col_b2 = st.columns([1, 1])
+                                    with col_b1:
+                                        toggle_details_key = f"toggle_details_{report_id}"
+                                        show_details = st.session_state.get(toggle_details_key, False)
+                                        if st.button("📖 Show Details" if not show_details else "📖 Hide Details", key=f"btn_view_{report_id}", use_container_width=True):
+                                            st.session_state[toggle_details_key] = not show_details
                                     
-                                    with col_respond:
+                                    with col_b2:
                                         # Only show respond button for finalized reports
                                         if status_lower == "finalized":
-                                            if st.button(f"💬 Respond", key=f"btn_respond_{report.get('id', '')}", use_container_width=True):
-                                                st.session_state['selected_report_id'] = report.get('id', '')
-                                                st.session_state['selected_week'] = week
-                                                st.session_state['selected_name'] = name
-                                                st.session_state['selected_report_obj'] = report
-                                                st.rerun()
-                        
-                        # Show response form AFTER grid - at full width
-                        st.divider()
-                        selected_id = st.session_state.get('selected_report_id', None)
-                        
-                        # Check if selected report belongs to this week
-                        if selected_id:
-                            selected_report = next((r for r in week_reports if isinstance(r, dict) and r.get('id') == selected_id), None)
-                            if selected_report:
-                                st.subheader(f"📧 Respond to {st.session_state.get('selected_name', 'Team Member')}")
-                                
-                                comment = st.text_area(
-                                    "📝 Add your feedback/comments:",
-                                    key=f"comment_{selected_id}",
-                                    height=150,
-                                    placeholder="Type your response to this staff member..."
-                                )
-                                
-                                col1, col2 = st.columns([1, 1])
-                                with col1:
-                                    if st.button("✉️ Send Response Email", key=f"btn_send_{selected_id}", type="primary", use_container_width=True):
-                                        if not comment.strip():
-                                            st.error("❌ Please add a comment before sending.")
+                                            toggle_respond_key = f"toggle_respond_{report_id}"
+                                            show_respond = st.session_state.get(toggle_respond_key, False)
+                                            if st.button("💬 Respond" if not show_respond else "💬 Hide Form", key=f"btn_respond_{report_id}", use_container_width=True):
+                                                st.session_state[toggle_respond_key] = not show_respond
+                                    
+                                    # Show full report details if toggled
+                                    if st.session_state.get(f"toggle_details_{report_id}", False):
+                                        st.divider()
+                                        st.markdown("##### 🤖 AI Summary")
+                                        if clean_sum:
+                                            st.markdown(clean_sum)
                                         else:
-                                            staff_email = selected_report.get('email')
-                                            
-                                            if not staff_email:
-                                                st.error("❌ Could not find staff email address in report.")
-                                            else:
-                                                try:
-                                                    with st.spinner("📧 Sending email response..."):
-                                                        from src.ui.dashboard import send_email
-                                                        sender_name = st.session_state.get('full_name', 'Supervisor/Admin')
-                                                        subject = f"Response to Your Weekly Report for {st.session_state.get('selected_week', 'Unknown Week')}"
-                                                        body = f"Hello {selected_report.get('team_member', 'Team Member')},\n\nI've reviewed your weekly report for {st.session_state.get('selected_week')}.\n\nMy feedback:\n{comment}\n\nBest regards,\n{sender_name}"
-                                                        
-                                                        success = send_email(staff_email, subject, body)
-                                                        
-                                                        if success:
-                                                            st.success(f"✅ Response email sent to {staff_email}!")
-                                                            # Clear the form
-                                                            st.session_state['selected_report_id'] = None
-                                                            time.sleep(2)
-                                                            st.rerun()
-                                                        else:
-                                                            st.error("❌ Failed to send email. Please try again.")
-                                                except Exception as e:
-                                                    st.error(f"❌ Error sending email: {str(e)}")
-                                
-                                with col2:
-                                    if st.button("❌ Cancel Response", key=f"btn_cancel_{selected_id}", use_container_width=True):
-                                        st.session_state['selected_report_id'] = None
-                                        st.rerun()
+                                            st.info("No AI summary available")
+                                        
+                                        # Director Concerns
+                                        if isinstance(report, dict) and report.get('director_concerns'):
+                                            st.error(f"**⚠️ Director Concerns:**\n{report.get('director_concerns')}")
+                        
+                                        # General Updates
+                                        st.markdown("##### 📝 General Updates")
+                                        st.markdown(f"**Professional Development:**\n{report.get('professional_development', 'None') if isinstance(report, dict) else 'None'}")
+                                        st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead', 'None') if isinstance(report, dict) else 'None'}")
+                                        st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in', 'None') if isinstance(report, dict) else 'None'}")
+                        
+                                        # Core Activities
+                                        st.markdown("##### 🎯 Core Activities")
+                                        body = report.get('report_body', {}) if isinstance(report, dict) else {}
+                        
+                                        for section_key, section_name in CORE_SECTIONS.items():
+                                            section_data = body.get(section_key, {}) if isinstance(body, dict) else {}
+                                            if section_data and (section_data.get('successes') or section_data.get('challenges')):
+                                                st.markdown(f"**{section_name}**")
+                                                if section_data.get('successes'):
+                                                    st.markdown("*Successes:*")
+                                                    for item in section_data['successes']:
+                                                        if isinstance(item, dict):
+                                                            text = item.get('text', '')
+                                                            ascend = item.get('ascend_category', 'N/A')
+                                                            north = item.get('north_category', 'N/A')
+                                                            st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
+                                                if section_data.get('challenges'):
+                                                    st.markdown("*Challenges:*")
+                                                    for item in section_data['challenges']:
+                                                        if isinstance(item, dict):
+                                                            text = item.get('text', '')
+                                                            ascend = item.get('ascend_category', 'N/A')
+                                                            north = item.get('north_category', 'N/A')
+                                                            st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
+                                    
+                                    # Show response form if toggled
+                                    if st.session_state.get(f"toggle_respond_{report_id}", False) and status_lower == "finalized":
+                                        st.divider()
+                                        st.markdown("##### 📧 Send Response")
+                                        
+                                        comment = st.text_area(
+                                            "Your feedback:",
+                                            key=f"comment_{report_id}",
+                                            height=120,
+                                            placeholder="Type your response..."
+                                        )
+                                        
+                                        col_send, col_cancel = st.columns([1, 1])
+                                        with col_send:
+                                            if st.button("✉️ Send Email", key=f"btn_send_{report_id}", type="primary", use_container_width=True):
+                                                if not comment.strip():
+                                                    st.error("❌ Please add a comment before sending.")
+                                                else:
+                                                    staff_email = report.get('email')
+                                                    
+                                                    if not staff_email:
+                                                        st.error("❌ No email found for this staff member.")
+                                                    else:
+                                                        try:
+                                                            with st.spinner("📧 Sending email..."):
+                                                                from src.ui.dashboard import send_email
+                                                                sender_name = st.session_state.get('full_name', 'Supervisor/Admin')
+                                                                subject = f"Response to Your Weekly Report for {week}"
+                                                                body = f"Hello {name},\n\nI've reviewed your weekly report for {week}.\n\nMy feedback:\n{comment}\n\nBest regards,\n{sender_name}"
+                                                                
+                                                                success = send_email(staff_email, subject, body)
+                                                                
+                                                                if success:
+                                                                    st.success(f"✅ Email sent to {staff_email}!")
+                                                                    # Clear form
+                                                                    st.session_state[f"comment_{report_id}"] = ""
+                                                                    st.session_state[f"toggle_respond_{report_id}"] = False
+                                                                else:
+                                                                    st.error("❌ Failed to send email.")
+                                                        except Exception as e:
+                                                            st.error(f"❌ Error: {str(e)}")
+                                        
+                                        with col_cancel:
+                                            if st.button("Cancel", key=f"btn_cancel_{report_id}", use_container_width=True):
+                                                st.session_state[f"toggle_respond_{report_id}"] = False
             
             except Exception as e:
                 st.error(f"Error fetching reports: {str(e)}")
