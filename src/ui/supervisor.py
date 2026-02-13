@@ -1,4 +1,6 @@
 import streamlit as st
+import time
+import json
 from datetime import datetime, timedelta
 from src.database import supabase, get_admin_client
 from src.ai import summarize_form_submissions, create_duty_report_summary, clean_summary_response
@@ -212,50 +214,56 @@ def weekly_reports_viewer(supervisor_id=None):
                                         # --- Response Option ---
                                         # Only show for finalized reports
                                         if status_lower == "finalized":
-                                            select_key = f"select_report_{report.get('id', '')}_{week}_{name}_{status}"
-                                            if st.button(f"Respond to {name}'s report", key=select_key):
+                                            select_key = f"select_report_{report.get('id', '')}"
+                                            if st.button(f"💬 Respond to {name}'s report", key=select_key):
                                                 st.session_state['selected_report_id'] = report.get('id', '')
                                                 st.session_state['selected_week'] = week
                                                 st.session_state['selected_name'] = name
                                                 st.session_state['selected_status'] = status
                                                 st.session_state['selected_report_obj'] = report
-                                                st.experimental_rerun()
+                                                st.rerun()
+                                        
                                         # Show response form for selected report only
                                         selected_id = st.session_state.get('selected_report_id', None)
-                                        selected_week = st.session_state.get('selected_week', None)
-                                        selected_name = st.session_state.get('selected_name', None)
-                                        selected_status = st.session_state.get('selected_status', None)
-                                        selected_report = st.session_state.get('selected_report_obj', None)
                                         if selected_id == report.get('id', '') and status_lower == "finalized":
-                                            form_key = f"respond_form_{selected_id}_{selected_week}_{selected_name}_{selected_status}"
-                                            st.warning(f"[DEBUG] Response form is rendering for report ID {selected_id}, week {selected_week}, name {selected_name}, status {selected_status}. If you see this, the form logic is active.")
-                                            with st.form(form_key):
-                                                comment_key = f"comment_{selected_id}_{selected_week}_{selected_name}_{selected_status}"
-                                                comment = st.text_area("Add your comment:", key=comment_key)
-                                                submit = st.form_submit_button("Respond with Comments (Email)", help="Email this report and your comment to the author")
-                                                st.write(f"[DEBUG] Form key: {form_key}, Submit pressed: {submit}")
-                                                if submit:
-                                                    st.info(f"[DEBUG] Form submitted for report ID {selected_id}, week {selected_week}, name {selected_name}, status {selected_status}. This confirms the code path is reached.")
-                                                    staff_email = selected_report.get('email')
-                                                    st.write(f"[DEBUG] Staff email: {staff_email}")
-                                                    if not staff_email:
-                                                        st.error("Could not find staff email address.")
-                                                    else:
-                                                        sender_name = st.session_state['user'].get('full_name', 'Supervisor/Admin')
-                                                        subject = f"Weekly Report Response for {selected_week} from {sender_name}"
-                                                        body = f"Hello {selected_report.get('team_member', 'Staff')},\n\nYour weekly report for {selected_week} is below.\n\nResponse Comments:\n{comment}\n\nReport Content:\n{json.dumps(selected_report.get('report_body', {}), indent=2)}"
-                                                        st.write(f"[DEBUG] Sending email to: {staff_email}, subject: {subject}")
-                                                        try:
-                                                            with st.spinner("Sending email..."):
-                                                                from src.ui.dashboard import send_email
-                                                                success = send_email(staff_email, subject, body)
-                                                            st.write(f"[DEBUG] send_email returned: {success}")
+                                            st.divider()
+                                            st.subheader(f"📧 Respond to {name}")
+                                            
+                                            comment = st.text_area(
+                                                "Add your comment:",
+                                                key=f"comment_{selected_id}",
+                                                help="Your comment will be sent to the staff member via email"
+                                            )
+                                            
+                                            if st.button("📧 Send Response Email", key=f"send_{selected_id}", type="primary"):
+                                                staff_email = st.session_state['selected_report_obj'].get('email')
+                                                
+                                                if not staff_email:
+                                                    st.error("❌ Could not find staff email address.")
+                                                else:
+                                                    try:
+                                                        with st.spinner("Sending email..."):
+                                                            from src.ui.dashboard import send_email
+                                                            sender_name = st.session_state.get('full_name', 'Supervisor/Admin')
+                                                            subject = f"Response to Your Weekly Report for {st.session_state['selected_week']}"
+                                                            body = f"Hello {st.session_state['selected_report_obj'].get('team_member', 'Staff')},\n\nI've reviewed your weekly report for {st.session_state['selected_week']}.\n\nMy feedback:\n{comment}"
+                                                            
+                                                            success = send_email(staff_email, subject, body)
+                                                            
                                                             if success:
-                                                                st.success(f"Email sent to {staff_email}")
+                                                                st.success(f"✅ Response email sent to {staff_email}!")
+                                                                # Clear the form
+                                                                st.session_state['selected_report_id'] = None
+                                                                time.sleep(2)
+                                                                st.rerun()
                                                             else:
-                                                                st.error("Failed to send email.")
-                                                        except Exception as e:
-                                                            st.error(f"Exception during email send: {e}")
+                                                                st.error("Failed to send email. Please try again.")
+                                                    except Exception as e:
+                                                        st.error(f"❌ Error sending email: {str(e)}")
+                                            
+                                            if st.button("Cancel", key=f"cancel_{selected_id}"):
+                                                st.session_state['selected_report_id'] = None
+                                                st.rerun()
             
             except Exception as e:
                 st.error(f"Error fetching reports: {str(e)}")
