@@ -68,35 +68,50 @@ else:
         # Ensure new users have a default role
         if "role" not in st.session_state or not st.session_state["role"]:
             st.session_state["role"] = "user"
+        
+        # Check if user is a supervisor (has people assigned to them)
+        if "is_supervisor" not in st.session_state:
+            try:
+                from src.database import supabase as db
+                current_user_id = st.session_state["user"].id
+                supervised_response = db.table("profiles").select("id").eq("supervisor_id", current_user_id).execute()
+                st.session_state["is_supervisor"] = bool(supervised_response.data and len(supervised_response.data) > 0)
+            except Exception as e:
+                print(f"Error checking supervisor status: {e}")
+                st.session_state["is_supervisor"] = False
+        
         # --- Sidebar Navigation (single instance, after login) ---
         st.sidebar.title("Navigation")
         st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
         st.sidebar.write(f"Role: {st.session_state.get('role', 'user').title()}")
+        if st.session_state.get("is_supervisor"):
+            st.sidebar.write("✓ Supervisor")
         if st.sidebar.button("Logout", key="sidebar_logout"):
             # You may need to implement the logout() function
             st.session_state.clear()
             st.rerun()
 
         # Build pages based on user role
+        # Pages available to ALL users
         pages = {
             "My Profile": profile_page,
             "Submit / Edit Report": submit_and_edit_page,
             "User Manual": user_manual_page,
-            "Saved Reports": saved_reports_page,
-            "Staff Recognition": staff_recognition_page,
-            "Quarterly Recognition": quarterly_recognition_page,
-            "Supervisor Summaries": supervisor_summaries_page,
-            "Supervisors": supervisors_section_page,
-            "Admin Settings": admin_settings_page,
-            "Dashboard": dashboard_page,
         }
-        # Add role-specific pages
-        if st.session_state.get("role") == "admin":
-            pages["Admin Dashboard"] = lambda: dashboard_page(supervisor_mode=False)
-            pages["Admin Settings"] = admin_settings_page
+        
+        # Pages available to supervisors
         if st.session_state.get("is_supervisor"):
-            pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
-            pages["My Team Summaries"] = supervisor_summaries_page
+            pages["Supervisor Summaries"] = supervisor_summaries_page
+            pages["Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
+        
+        # Pages available to admins
+        if st.session_state.get("role") == "admin":
+            pages["Saved Reports"] = saved_reports_page
+            pages["Staff Recognition"] = staff_recognition_page
+            pages["Quarterly Recognition"] = quarterly_recognition_page
+            pages["Admin Dashboard"] = admin_settings_page
+            pages["Supervisors"] = supervisors_section_page
+        
         selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
         pages[selected_page]()
 
