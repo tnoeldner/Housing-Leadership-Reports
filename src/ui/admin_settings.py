@@ -47,7 +47,6 @@ def admin_settings_page():
                     "Name": user.get("full_name", ""),
                     "Title": user.get("title", ""),
                     "Role": user.get("role", "staff").capitalize(),
-                    "Supervisor": "✅ Yes" if user.get("is_supervisor", False) else "❌ No",
                     "Assigned To": supervisor_name,
                 })
             
@@ -75,19 +74,12 @@ def admin_settings_page():
                             index=0 if current_role == "staff" else 1
                         )
                         
-                        current_supervisor = selected_user.get("is_supervisor", False)
-                        new_supervisor = st.checkbox(
-                            "Is Supervisor",
-                            value=current_supervisor,
-                            help="Check this box to mark this person as a supervisor"
-                        )
-                        
                         current_title = selected_user.get("title", "")
                         new_title = st.text_input("Title/Position", value=current_title)
                         
                         # Supervisor assignment dropdown
                         st.subheader("Assign Supervisor")
-                        supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in users if u.get("is_supervisor", False) and u.get("id") != selected_user.get("id")]
+                        supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in users if u.get("id") != selected_user.get("id")]
                         
                         current_supervisor_id = selected_user.get("supervisor_id")
                         current_supervisor_name = "Not Assigned"
@@ -114,7 +106,6 @@ def admin_settings_page():
                                 with st.spinner("Updating user..."):
                                     update_data = {
                                         "role": new_role,
-                                        "is_supervisor": new_supervisor,
                                         "title": new_title,
                                         "supervisor_id": new_supervisor_id,
                                         "updated_at": datetime.now().isoformat()
