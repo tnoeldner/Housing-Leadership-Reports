@@ -128,6 +128,19 @@ def weekly_reports_viewer(supervisor_id=None):
                     # Filter reports to only those from supervised users
                     reports = [r for r in reports if isinstance(r, dict) and r.get("user_id") in supervised_user_ids]
                 
+                # Fetch emails from profiles for all reports
+                if reports:
+                    user_ids = {r.get("user_id") for r in reports if isinstance(r, dict) and r.get("user_id")}
+                    if user_ids:
+                        profiles_response = supabase.table("profiles").select("id, email").in_("id", list(user_ids)).execute()
+                        email_map = {p.get("id"): p.get("email") for p in profiles_response.data if isinstance(p, dict)}
+                        
+                        # Add email to each report
+                        for report in reports:
+                            if isinstance(report, dict):
+                                user_id = report.get("user_id")
+                                report['email'] = email_map.get(user_id, None)
+                
                 if not reports:
                     st.warning("No reports found in the selected date range.")
                     st.session_state['weekly_reports_by_week'] = {}
@@ -166,6 +179,7 @@ def weekly_reports_viewer(supervisor_id=None):
                         name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
                         status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
                         report_id = report.get('id', '')
+                        user_id = report.get('user_id', '')
                 
                         with st.container(border=True):
                             st.markdown(f"#### {name}")
@@ -186,6 +200,13 @@ def weekly_reports_viewer(supervisor_id=None):
                                 clean_sum = clean_summary_response(summary)
                                 snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
                                 st.info(snippet)
+                    
+                            # Debug info
+                            with st.expander("🔧 Debug", expanded=False):
+                                st.write(f"Report ID: {report_id}")
+                                st.write(f"User ID: {user_id}")
+                                st.write(f"Email: {report.get('email', 'NOT FOUND')}")
+                                st.write(f"Status: {status_lower}")
                     
                             # Buttons - View Details and Respond
                             col_b1, col_b2 = st.columns([1, 1])
