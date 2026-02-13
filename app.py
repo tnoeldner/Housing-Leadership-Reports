@@ -67,11 +67,11 @@ else:
                 }).execute()
         # Ensure new users have a default role
         if "role" not in st.session_state or not st.session_state["role"]:
-            st.session_state["role"] = "staff"
+            st.session_state["role"] = "user"
         # --- Sidebar Navigation (single instance, after login) ---
         st.sidebar.title("Navigation")
         st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
-        st.sidebar.write(f"Role: {st.session_state.get('role', 'staff').title()}")
+        st.sidebar.write(f"Role: {st.session_state.get('role', 'user').title()}")
         if st.sidebar.button("Logout", key="sidebar_logout"):
             # You may need to implement the logout() function
             st.session_state.clear()

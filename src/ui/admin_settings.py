@@ -60,7 +60,7 @@ def admin_settings_page():
                     "Email": user.get("email", ""),
                     "Name": user.get("full_name", ""),
                     "Title": user.get("title", ""),
-                    "Role": user.get("role", "staff").capitalize(),
+                    "Role": user.get("role", "user").capitalize(),
                     "Assigned To": supervisor_name,
                 })
             
@@ -80,14 +80,22 @@ def admin_settings_page():
                 
                 if selected_user:
                     st.subheader(f"Editing: {selected_name}")
-                    st.write(f"**Email:** {selected_user.get('email', 'Not set')}")
+                    
+                    # Email field - allow editing
+                    current_email = selected_user.get('email', '')
+                    new_email = st.text_input(
+                        "Email (Login)",
+                        value=current_email,
+                        key=f"email_{selected_name}",
+                        help="Email address for this staff member"
+                    )
                     
                     col1, col2 = st.columns(2)
                     with col1:
                         new_role = st.selectbox(
                             "Role",
-                            options=["staff", "admin"],
-                            index=0 if selected_user.get("role", "staff") == "staff" else 1,
+                            options=["user", "admin"],
+                            index=0 if selected_user.get("role", "user") == "user" else 1,
                             key=f"role_{selected_name}"
                         )
                     
@@ -130,17 +138,28 @@ def admin_settings_page():
                                     update_data = {
                                         "role": new_role,
                                         "title": new_title,
+                                        "email": new_email if new_email else None,
                                         "supervisor_id": new_supervisor_id
                                     }
+                                    
+                                    # Debug output
+                                    with st.expander("Debug Info"):
+                                        st.write(f"User ID: {selected_user.get('id')}")
+                                        st.write(f"Update Data: {update_data}")
+                                        st.write(f"Supervisor Name Selected: {selected_supervisor_name}")
+                                        st.write(f"Supervisor ID to Save: {new_supervisor_id}")
+                                    
                                     result = supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
-                                    if result:
-                                        st.success(f"✅ User {selected_name} updated!")
+                                    if result and result.data:
+                                        st.success(f"✅ User {selected_name} updated! Changes saved to database.")
                                         time.sleep(1)
                                         st.rerun()
                                     else:
-                                        st.error("Update returned no response")
+                                        st.error(f"Update result: {result}")
                             except Exception as e:
                                 st.error(f"Failed to update user: {str(e)}")
+                                import traceback
+                                st.error(traceback.format_exc())
                     
                     with col2:
                         email_to_reset = selected_user.get('email', '')
