@@ -14,8 +14,121 @@ def admin_settings_page():
         st.stop()
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
-    tab1, tab2, tab3, tab4 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "📝 AI Prompt Templates"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates"])
+    
     with tab4:
+        st.subheader("User Management")
+        st.write("Manage user roles and permissions.")
+        
+        # Load all users
+        try:
+            users_response = supabase.table("profiles").select("*").order("full_name").execute()
+            users = users_response.data if users_response else []
+        except Exception as e:
+            st.error(f"Error loading users: {e}")
+            users = []
+        
+        if users:
+            st.subheader("Staff Directory")
+            
+            # Create a dataframe for display
+            user_data = []
+            for user in users:
+                supervisor_id = user.get("supervisor_id")
+                supervisor_name = "Not Assigned"
+                if supervisor_id:
+                    # Find the supervisor's name
+                    supervisor = next((u for u in users if u.get("id") == supervisor_id), None)
+                    if supervisor:
+                        supervisor_name = supervisor.get("full_name", "Unknown")
+                
+                user_data.append({
+                    "Email": user.get("email", ""),
+                    "Name": user.get("full_name", ""),
+                    "Title": user.get("title", ""),
+                    "Role": user.get("role", "staff").capitalize(),
+                    "Supervisor": "✅ Yes" if user.get("is_supervisor", False) else "❌ No",
+                    "Assigned To": supervisor_name,
+                })
+            
+            df = pd.DataFrame(user_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            st.subheader("Edit User")
+            
+            # Get list of staff names for selection
+            staff_names = [user.get("full_name", "") for user in users if user.get("full_name")]
+            selected_name = st.selectbox("Select Staff Member", options=staff_names)
+            
+            if selected_name:
+                # Find the selected user
+                selected_user = next((u for u in users if u.get("full_name") == selected_name), None)
+                
+                if selected_user:
+                    with st.form("edit_user_form"):
+                        st.write(f"**Email:** {selected_user.get('email')}")
+                        
+                        current_role = selected_user.get("role", "staff")
+                        new_role = st.selectbox(
+                            "Role",
+                            options=["staff", "admin"],
+                            index=0 if current_role == "staff" else 1
+                        )
+                        
+                        current_supervisor = selected_user.get("is_supervisor", False)
+                        new_supervisor = st.checkbox(
+                            "Is Supervisor",
+                            value=current_supervisor,
+                            help="Check this box to mark this person as a supervisor"
+                        )
+                        
+                        current_title = selected_user.get("title", "")
+                        new_title = st.text_input("Title/Position", value=current_title)
+                        
+                        # Supervisor assignment dropdown
+                        st.subheader("Assign Supervisor")
+                        supervisor_options = ["Not Assigned"] + [u.get("full_name", "") for u in users if u.get("is_supervisor", False) and u.get("id") != selected_user.get("id")]
+                        
+                        current_supervisor_id = selected_user.get("supervisor_id")
+                        current_supervisor_name = "Not Assigned"
+                        if current_supervisor_id:
+                            supervisor = next((u for u in users if u.get("id") == current_supervisor_id), None)
+                            if supervisor:
+                                current_supervisor_name = supervisor.get("full_name", "Not Assigned")
+                        
+                        selected_supervisor_name = st.selectbox(
+                            "Select Supervisor for this staff member",
+                            options=supervisor_options,
+                            index=supervisor_options.index(current_supervisor_name) if current_supervisor_name in supervisor_options else 0,
+                            help="Choose a supervisor to assign this staff member to"
+                        )
+                        
+                        new_supervisor_id = None
+                        if selected_supervisor_name != "Not Assigned":
+                            supervisor = next((u for u in users if u.get("full_name") == selected_supervisor_name), None)
+                            if supervisor:
+                                new_supervisor_id = supervisor.get("id")
+                        
+                        if st.form_submit_button("Save User Changes", type="primary"):
+                            try:
+                                with st.spinner("Updating user..."):
+                                    update_data = {
+                                        "role": new_role,
+                                        "is_supervisor": new_supervisor,
+                                        "title": new_title,
+                                        "supervisor_id": new_supervisor_id,
+                                        "updated_at": datetime.now().isoformat()
+                                    }
+                                    supabase.table("profiles").update(update_data).eq("id", selected_user.get("id")).execute()
+                                st.success(f"✅ User {selected_name} updated successfully!")
+                                time.sleep(2)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Failed to update user: {e}")
+        else:
+            st.info("No users found in the system.")
+
+    with tab5:
         st.subheader("AI Prompt Templates")
         st.write("Edit the prompt templates used for AI-generated summaries. Changes take effect immediately for all users.")
         # Load current prompts from admin_settings table
