@@ -461,43 +461,10 @@ def dashboard_page(supervisor_mode=False):
                 weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
                 st.session_state['debug_after_weekly_reports'] = True
                 st.session_state['debug_after_draft_reports'] = True
-                if draft_reports:
-                    st.write(f"Found {len(draft_reports)} draft report(s) for week ending {draft_unlock_week}:")
-                    if deadline_passed:
-                        st.warning("⏰ The deadline for this week has passed. These reports are currently blocked from submission.")
-                    else:
-                        st.info("✅ The deadline for this week has not passed yet. These reports can already be submitted normally.")
-                    # Display reports with enable submission buttons
-                    for report in draft_reports:
-                        col1, col2, col3 = st.columns([3, 2, 1])
-                        with col1:
-                            name = report.get('team_member', 'Unknown')
-                            if report.get('created_by_admin'):
-                                name += " (Admin Created)"
-                            st.write(f"**{name}**")
-                        with col2:
-                            created_date = report.get('created_at', '')[:10] if report.get('created_at') else 'Unknown'
-                            st.write(f"Started: {created_date}")
-                        with col3:
-                            if deadline_passed:
-                                if st.button("⏰ Enable Submission", key=f"enable_{report.get('id')}", help="Allow this draft report to be submitted despite missed deadline"):
-                                    try:
-                                        # Change status to "unlocked" which bypasses deadline check
-                                        supabase.table("reports").update({
-                                            "status": "unlocked",
-                                            "admin_note": f"Submission enabled by administrator after deadline. Enabled on {datetime.now().astimezone(get_central_tz()).strftime('%Y-%m-%d %H:%M:%S')}"
-                                        }).eq("id", report.get('id')).execute()
-                                        st.success(f"Submission enabled for {report.get('team_member')}! They can now finalize their report.")
-                                        time.sleep(1)
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Failed to enable submission: {e}")
-                            else:
-                                st.write("✅ Can submit")
 
-                    director_section = ""
-                    if not supervisor_mode:
-                        director_section = """
+                director_section = ""
+                if not supervisor_mode:
+                    director_section = """
 - **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
 """
 

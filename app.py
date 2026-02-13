@@ -102,7 +102,7 @@ else:
         # Pages available to supervisors
         if st.session_state.get("is_supervisor"):
             pages["Supervisor Summaries"] = supervisor_summaries_page
-            pages["Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
+            pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
         
         # Pages available to admins
         if st.session_state.get("role") == "admin":
@@ -110,7 +110,7 @@ else:
             pages["Staff Recognition"] = staff_recognition_page
             pages["Quarterly Recognition"] = quarterly_recognition_page
             pages["Admin Dashboard"] = admin_settings_page
-            pages["Supervisors"] = supervisors_section_page
+            pages["Form Analysis"] = supervisors_section_page
         
         selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
         pages[selected_page]()
