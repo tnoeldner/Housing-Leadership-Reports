@@ -272,7 +272,7 @@ def init_ai():
         st.stop()
     try:
         genai.configure(api_key=api_key)
-        # No client object needed for google-generativeai SDK
+        # Return True to indicate initialization was successful
         return True
     except Exception as e:
         st.error(f"❌ Google AI API key configuration failed: {e}")
@@ -282,25 +282,21 @@ def init_ai():
 
 # Return a list of available Gemini models
 def get_gemini_models():
-    global client
-    if client is None:
-        init_ai()
+    import google.generativeai as genai
     try:
-        models = list(client.list_models())
+        init_ai()
+        models = list(genai.list_models())
         return models
     except Exception as e:
         return f"Error listing models: {e}"
 
 # Send a test prompt to Gemini and return the response or error
 def gemini_test_prompt(prompt="Hello Gemini, are you working?", model_name="gemini-2.5-pro"):
-    global client
-    if client is None:
-        init_ai()
+    import google.generativeai as genai
     try:
-        response = client.generate_content(
-            model=model_name,
-            contents=prompt
-        )
+        init_ai()
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
         return getattr(response, "text", str(response))
     except Exception as e:
         return f"Gemini model error: {e}"
@@ -534,14 +530,11 @@ def create_duty_report_summary(selected_forms, start_date, end_date):
         prompt_template = get_weekly_duty_prompt(supabase)
         prompt = prompt_template.format(reports_text=reports_text)
         # Use Gemini 2.5 Flash for better quota efficiency
-        global client
-        if client is None:
-            init_ai()
+        import google.generativeai as genai
+        init_ai()
         with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
-            result = client.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            result = model.generate_content(prompt)
             response_text = getattr(result, "text", None)
             if not response_text or not response_text.strip():
                 return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
@@ -584,14 +577,11 @@ def summarize_form_submissions(selected_forms, max_forms=10):
         prompt_template = get_staff_recognition_prompt(supabase)
         prompt = prompt_template.format(reports_text=forms_text)
         # Use the same AI configuration as the rest of the app
-        global client
-        if client is None:
-            init_ai()
+        import google.generativeai as genai
+        init_ai()
         with st.spinner("AI is analyzing form submissions..."):
-            result = client.generate_content(
-                model="gemini-2.5-pro",
-                contents=prompt
-            )
+            model = genai.GenerativeModel("gemini-2.5-pro")
+            result = model.generate_content(prompt)
             response_text = getattr(result, "text", None)
             if not response_text or not response_text.strip():
                 st.info("Prompt sent to AI:")
