@@ -551,7 +551,7 @@ def summarize_form_submissions(selected_forms, max_forms=10):
         return "No forms selected for summarization."
     
     try:
-        from src.ai_prompts import get_staff_recognition_prompt
+        from src.ai_prompts import get_general_form_analysis_prompt
         # Limit to prevent token overflow
         forms_to_process = selected_forms[:max_forms]
         # Prepare form data for AI analysis
@@ -574,7 +574,7 @@ def summarize_form_submissions(selected_forms, max_forms=10):
         # Use admin-edited prompt template for staff recognition
         import streamlit as st
         from src.database import supabase
-        prompt_template = get_staff_recognition_prompt(supabase)
+        prompt_template = get_general_form_analysis_prompt(supabase)
         prompt = prompt_template.format(reports_text=forms_text)
         # Use the same AI configuration as the rest of the app
         import google.generativeai as genai

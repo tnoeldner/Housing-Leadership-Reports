@@ -45,3 +45,22 @@ def get_staff_recognition_prompt(supabase_client) -> str:
 {reports_text}
 """
     return get_prompt_template(supabase_client, "staff_recognition_prompt", default)
+
+def get_general_form_analysis_prompt(supabase_client) -> str:
+    """Get the general form analysis prompt template - analyzes reported data and content"""
+    default = """You are a housing and residence life data analyst. Your task is to analyze the following form submissions and provide a comprehensive summary of the data and information reported. 
+
+Focus on:
+1. Key themes and patterns across all submissions
+2. Specific data points, statistics, or numbers reported by staff
+3. Issues, challenges, or concerns raised
+4. Activities, events, or initiatives described
+5. Notable achievements or successes mentioned
+6. Trends or observations across multiple forms
+
+Provide a well-organized summary that helps leadership understand what was reported across the forms. Use clear sections and bullet points to make the information easy to scan. Include specific examples and quotes from the forms where relevant. Do not focus on recognizing individual staff members, but rather on summarizing the actual content and data they reported.
+
+Form Submissions:
+{reports_text}
+"""
+    return get_prompt_template(supabase_client, "general_form_analysis_prompt", default)
