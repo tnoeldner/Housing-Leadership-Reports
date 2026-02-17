@@ -530,8 +530,7 @@ def create_duty_report_summary(selected_forms, start_date, end_date):
             reports_text += "\n" + "="*50 + "\n"
         # Use admin-edited prompt template
         import streamlit as st
-        from src.database import get_supabase_client
-        supabase = get_supabase_client()
+        from src.database import supabase
         prompt_template = get_weekly_duty_prompt(supabase)
         prompt = prompt_template.format(reports_text=reports_text)
         # Use Gemini 2.5 Flash for better quota efficiency
@@ -581,8 +580,7 @@ def summarize_form_submissions(selected_forms, max_forms=10):
                     forms_text += f"**{field_label}:** {field_response}\n"
         # Use admin-edited prompt template for staff recognition
         import streamlit as st
-        from src.database import get_supabase_client
-        supabase = get_supabase_client()
+        from src.database import supabase
         prompt_template = get_staff_recognition_prompt(supabase)
         prompt = prompt_template.format(reports_text=forms_text)
         # Use the same AI configuration as the rest of the app
