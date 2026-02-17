@@ -73,177 +73,186 @@ def fetch_roompact_forms(cursor=None, max_pages=600, target_start_date=None, pro
         max_pages: Maximum number of pages to fetch (safety limit)
         target_start_date: datetime object. If provided, stop fetching when we reach forms older than this date.
         progress_callback: function(page_num, total_forms, oldest_date, reached_target) to report progress
+    
+    Returns:
+        tuple: (forms_list, error_message) where error_message is None if successful
     """
-    all_forms = []
-    page = 0
-    has_more = True
-    reached_target_date = False
-    
-    while has_more and page < max_pages and not reached_target_date:
-        # CRITICAL: Roompact API /forms endpoint has severe limitations:
-        # 1. Does NOT return pagination data (no cursor, no page support)
-        # 2. Only returns ~10 most recent forms
-        # 3. Does NOT support date filtering
-        # This makes historical data retrieval impossible via this endpoint
+    try:
+        all_forms = []
+        page = 0
+        has_more = True
+        reached_target_date = False
         
-        params = {
-            "limit": 100,      # Requested but likely ignored by API
-            "per_page": 100,   # Alternative param
-            "pageSize": 100,   # Alternative param
-        }
-        
-        if cursor:
-            params["cursor"] = cursor
+        while has_more and page < max_pages and not reached_target_date:
+            # CRITICAL: Roompact API /forms endpoint has severe limitations:
+            # 1. Does NOT return pagination data (no cursor, no page support)
+            # 2. Only returns ~10 most recent forms
+            # 3. Does NOT support date filtering
+            # This makes historical data retrieval impossible via this endpoint
             
-        data, error = make_roompact_request("forms", params)
-        
-        if error:
-            print(f"Error fetching page {page}: {error}")
-            break
+            params = {
+                "limit": 100,      # Requested but likely ignored by API
+                "per_page": 100,   # Alternative param
+                "pageSize": 100,   # Alternative param
+            }
             
-        if not data or "data" not in data:
-            break
-            
-        forms = data["data"]
-        
-        if not forms:
-            break
-            
-        all_forms.extend(forms)
-        
-        # DEBUG: Print structure of first form to check for ID fields
-        if len(all_forms) <= len(forms):  # Only for the first batch
-            print(f"DEBUG: First form structure: {forms[0]}")
-        
-        # Check dates to see if we've gone far enough back
-        oldest_date_in_batch = None
-        forms_older_than_target = 0
-        
-        if target_start_date and forms:
-            # Convert target_start_date to datetime if it's a date object
-            if isinstance(target_start_date, date) and not isinstance(target_start_date, datetime):
-                target_start_date = datetime.combine(target_start_date, datetime.min.time())
-            
-            # Parse dates to check against target - use current_revision.date for consistency
-            for form in forms:
-                current_revision = form.get('current_revision', {})
-                date_str = current_revision.get('date', '')
-                if date_str:
-                    try:
-                        # Roompact dates are usually ISO format
-                        form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                        # Make offset-naive for comparison if needed
-                        if form_date.tzinfo and not target_start_date.tzinfo:
-                            form_date = form_date.replace(tzinfo=None)
-                        
-                        if not oldest_date_in_batch or form_date < oldest_date_in_batch:
-                            oldest_date_in_batch = form_date
-                            
-                        if form_date < target_start_date:
-                            forms_older_than_target += 1
-                            
-                    except (ValueError, TypeError):
-                        continue
-            
-            # Stop if most forms in the batch are older than the target date
-            # Use 80% threshold to handle out-of-order records while still stopping efficiently
-            if len(forms) > 0 and forms_older_than_target >= (len(forms) * 0.8):
-                reached_target_date = True
-                print(f"DEBUG: Reached target date - {forms_older_than_target}/{len(forms)} forms older than {target_start_date}")
-        
-        # Setup for next page
-        # CRITICAL FIX: Roompact API returns pagination in 'links' array, not 'pagination' object
-        links = data.get('links', [])
-        cursor = None
-        
-        for link in links:
-            if link.get('rel') == 'next':
-                # Extract cursor from URI
-                next_uri = link.get('uri', '')
-                if 'cursor=' in next_uri:
-                    cursor = next_uri.split('cursor=')[1].split('&')[0]
-                break
-        
-
-        
-        # Report progress
-        if progress_callback:
-            # Handle both signature types for backward compatibility
-            try:
-                progress_callback(page + 1, len(all_forms), oldest_date_in_batch, reached_target_date)
-            except TypeError:
-                # If callback expects debug_info (from our recent change), pass None
-                progress_callback(page + 1, len(all_forms), oldest_date_in_batch, reached_target_date, None)
-        
-        # Determine if we should continue
-        if cursor:
-            has_more = True
-        elif len(forms) > 0 and not reached_target_date:
-            # If we got data but no cursor, we've reached the end
-            has_more = False
-        else:
-            has_more = False
-            
-        page += 1
-        
-        # Rate limiting - be nice to the API
-        time.sleep(0.1)  # Reduced slightly since we're doing many small requests
-        
-    # Deduplicate forms - keep only the latest revision
-    # Roompact may return multiple revisions of the same form
-    unique_forms = {}
-    
-    for form in all_forms:
-        # Try to find a unique identifier
-        form_id = None
-        
-        # PRIORITIZE form_submission_id as it represents the parent form
-        # This stays constant across revisions
-        if form.get('form_submission_id'):
-            form_id = str(form.get('form_submission_id'))
-        elif form.get('id'):
-            form_id = str(form.get('id'))
-        elif form.get('form_id'):
-            form_id = str(form.get('form_id'))
-        elif form.get('current_revision', {}).get('id'):
-            form_id = str(form.get('current_revision', {}).get('id'))
-            
-        # If no ID, we can't reliably deduplicate, so keep it (or generate a hash)
-        if not form_id:
-            # Fallback: use a hash of the content if no ID exists
-            import hashlib
-            content_str = str(form.get('current_revision', {}))
-            form_id = hashlib.md5(content_str.encode()).hexdigest()
-            
-        # Get the date of this revision
-        date_str = form.get('current_revision', {}).get('date', '')
-        this_date = datetime.min
-        if date_str:
-            try:
-                this_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                if this_date.tzinfo:
-                    this_date = this_date.replace(tzinfo=None)
-            except (ValueError, TypeError):
-                pass
+            if cursor:
+                params["cursor"] = cursor
                 
-        # Update if this is the first time seeing this ID or if this revision is newer
-        if form_id not in unique_forms:
-            unique_forms[form_id] = (this_date, form)
-        else:
-            existing_date, _ = unique_forms[form_id]
-            if this_date > existing_date:
+            data, error = make_roompact_request("forms", params)
+            
+            if error:
+                print(f"Error fetching page {page}: {error}")
+                return [], error
+                
+            if not data or "data" not in data:
+                break
+                
+            forms = data["data"]
+            
+            if not forms:
+                break
+                
+            all_forms.extend(forms)
+            
+            # DEBUG: Print structure of first form to check for ID fields
+            if len(all_forms) <= len(forms):  # Only for the first batch
+                print(f"DEBUG: First form structure: {forms[0]}")
+            
+            # Check dates to see if we've gone far enough back
+            oldest_date_in_batch = None
+            forms_older_than_target = 0
+            
+            if target_start_date and forms:
+                # Convert target_start_date to datetime if it's a date object
+                if isinstance(target_start_date, date) and not isinstance(target_start_date, datetime):
+                    target_start_date = datetime.combine(target_start_date, datetime.min.time())
+                
+                # Parse dates to check against target - use current_revision.date for consistency
+                for form in forms:
+                    current_revision = form.get('current_revision', {})
+                    date_str = current_revision.get('date', '')
+                    if date_str:
+                        try:
+                            # Roompact dates are usually ISO format
+                            form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            # Make offset-naive for comparison if needed
+                            if form_date.tzinfo and not target_start_date.tzinfo:
+                                form_date = form_date.replace(tzinfo=None)
+                            
+                            if not oldest_date_in_batch or form_date < oldest_date_in_batch:
+                                oldest_date_in_batch = form_date
+                                
+                            if form_date < target_start_date:
+                                forms_older_than_target += 1
+                                
+                        except (ValueError, TypeError):
+                            continue
+                
+                # Stop if most forms in the batch are older than the target date
+                # Use 80% threshold to handle out-of-order records while still stopping efficiently
+                if len(forms) > 0 and forms_older_than_target >= (len(forms) * 0.8):
+                    reached_target_date = True
+                    print(f"DEBUG: Reached target date - {forms_older_than_target}/{len(forms)} forms older than {target_start_date}")
+            
+            # Setup for next page
+            # CRITICAL FIX: Roompact API returns pagination in 'links' array, not 'pagination' object
+            links = data.get('links', [])
+            cursor = None
+            
+            for link in links:
+                if link.get('rel') == 'next':
+                    # Extract cursor from URI
+                    next_uri = link.get('uri', '')
+                    if 'cursor=' in next_uri:
+                        cursor = next_uri.split('cursor=')[1].split('&')[0]
+                    break
+            
+
+            
+            # Report progress
+            if progress_callback:
+                # Handle both signature types for backward compatibility
+                try:
+                    progress_callback(page + 1, len(all_forms), oldest_date_in_batch, reached_target_date)
+                except TypeError:
+                    # If callback expects debug_info (from our recent change), pass None
+                    progress_callback(page + 1, len(all_forms), oldest_date_in_batch, reached_target_date, None)
+            
+            # Determine if we should continue
+            if cursor:
+                has_more = True
+            elif len(forms) > 0 and not reached_target_date:
+                # If we got data but no cursor, we've reached the end
+                has_more = False
+            else:
+                has_more = False
+                
+            page += 1
+            
+            # Rate limiting - be nice to the API
+            time.sleep(0.1)  # Reduced slightly since we're doing many small requests
+            
+        # Deduplicate forms - keep only the latest revision
+        # Roompact may return multiple revisions of the same form
+        unique_forms = {}
+        
+        for form in all_forms:
+            # Try to find a unique identifier
+            form_id = None
+            
+            # PRIORITIZE form_submission_id as it represents the parent form
+            # This stays constant across revisions
+            if form.get('form_submission_id'):
+                form_id = str(form.get('form_submission_id'))
+            elif form.get('id'):
+                form_id = str(form.get('id'))
+            elif form.get('form_id'):
+                form_id = str(form.get('form_id'))
+            elif form.get('current_revision', {}).get('id'):
+                form_id = str(form.get('current_revision', {}).get('id'))
+                
+            # If no ID, we can't reliably deduplicate, so keep it (or generate a hash)
+            if not form_id:
+                # Fallback: use a hash of the content if no ID exists
+                import hashlib
+                content_str = str(form.get('current_revision', {}))
+                form_id = hashlib.md5(content_str.encode()).hexdigest()
+                
+            # Get the date of this revision
+            date_str = form.get('current_revision', {}).get('date', '')
+            this_date = datetime.min
+            if date_str:
+                try:
+                    this_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    if this_date.tzinfo:
+                        this_date = this_date.replace(tzinfo=None)
+                except (ValueError, TypeError):
+                    pass
+                    
+            # Update if this is the first time seeing this ID or if this revision is newer
+            if form_id not in unique_forms:
                 unique_forms[form_id] = (this_date, form)
+            else:
+                existing_date, _ = unique_forms[form_id]
+                if this_date > existing_date:
+                    unique_forms[form_id] = (this_date, form)
+        
+        # Extract just the form objects
+        deduplicated_forms = [form for _, form in unique_forms.values()]
+        
+        # Sort by date descending (newest first)
+        deduplicated_forms.sort(
+            key=lambda x: x.get('current_revision', {}).get('date', ''),
+            reverse=True
+        )
+        
+        return deduplicated_forms, None
     
-    # Extract just the form objects
-    deduplicated_forms = [form for _, form in unique_forms.values()]
-    
-    # Sort by date descending (newest first)
-    deduplicated_forms.sort(
-        key=lambda x: x.get('current_revision', {}).get('date', ''),
-        reverse=True
-    )
-    
-    return deduplicated_forms
+    except Exception as e:
+        error_msg = f"Error fetching Roompact forms: {str(e)}"
+        print(f"Exception in fetch_roompact_forms: {error_msg}")
+        return [], error_msg
 
 def discover_form_types(max_pages=600, target_start_date=None, progress_callback=None):
     """Fetch forms and discover all available form types"""
@@ -262,11 +271,14 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
             progress_placeholder.info(progress_update(page_num, total_forms, oldest_date, reached_target))
         
         with st.spinner("Discovering available form types..."):
-            forms = fetch_roompact_forms(
+            forms, error = fetch_roompact_forms(
                 max_pages=max_pages, 
                 target_start_date=target_start_date,
                 progress_callback=show_progress
             )
+            
+            if error:
+                return [], error
             
             if not forms:
                 return [], "No forms found"
