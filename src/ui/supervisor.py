@@ -402,11 +402,15 @@ def duty_analysis_section():
                     status += f" | ✅ Reached {duty_start_date}"
                 progress_placeholder.info(status)
             
-            all_forms = fetch_roompact_forms(
+            all_forms, error = fetch_roompact_forms(
                 max_pages=max_pages,
                 target_start_date=duty_start_date,
                 progress_callback=show_duty_progress
             )
+            
+            if error:
+                st.error(f"Error fetching duty forms: {error}")
+                return
             
             if not all_forms:
                 st.warning("No forms found.")
@@ -659,13 +663,15 @@ def engagement_analysis_section():
                 progress_placeholder.info(status)
             
             # Fetch forms with August 1, 2025 as target start date
-            all_forms = fetch_roompact_forms(
+            all_forms, error = fetch_roompact_forms(
                 max_pages=max_pages,
                 target_start_date=target_start_date,  # Stop at August 1, 2025
                 progress_callback=show_engagement_progress
             )
             
-            # Removed undefined error variable handling
+            if error:
+                st.error(f"Error fetching engagement forms: {error}")
+                return
             
             if not all_forms:
                 st.warning("No forms found.")
