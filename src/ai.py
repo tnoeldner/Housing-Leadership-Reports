@@ -253,7 +253,13 @@ Well-being Rating: {well_being_rating}
         personal_check_in=personal_check_in,
         director_concerns=director_concerns
     )
-    # ...existing code...
+    try:
+        response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash")
+        st.session_state["raw_ai_response"] = response_text
+        return clean_summary_response(response_text)
+    except Exception as e:
+        st.session_state["raw_ai_response"] = f"AI error: {e}"
+        return f"Error generating individual summary: {e}"
 from google import genai
 import streamlit as st
 import re
