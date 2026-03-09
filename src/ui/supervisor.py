@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from src.database import supabase, get_admin_client
 from src.ai import summarize_form_submissions, create_duty_report_summary, clean_summary_response
 from src.config import CORE_SECTIONS
+from src.email_service import send_email
 from src.roompact import (
     fetch_roompact_forms, 
     filter_forms_by_date_and_type, 
@@ -296,7 +297,6 @@ def weekly_reports_viewer(supervisor_id=None):
                                             else:
                                                 try:
                                                     with st.spinner("📧 Sending email..."):
-                                                        from src.ui.dashboard import send_email
                                                         sender_name = st.session_state.get('full_name', 'Supervisor/Admin')
                                                         subject = f"Response to Your Weekly Report for {week}"
                                                         body = f"Hello {name},\n\nI've reviewed your weekly report for {week}.\n\nMy feedback:\n{comment}\n\nBest regards,\n{sender_name}"
