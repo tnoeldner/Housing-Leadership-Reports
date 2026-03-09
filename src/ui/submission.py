@@ -22,7 +22,7 @@ from google import genai
 from src.database import supabase
 from src.config import CORE_SECTIONS, ASCEND_VALUES, NORTH_VALUES
 from src.utils import calculate_deadline_info, clear_form_state
-from src.ai import clean_summary_response
+from src.ai import clean_summary_response, call_gemini_ai
 
 def submit_and_edit_page():
     def dynamic_entry_section(section_key, section_label, report_data):
@@ -235,14 +235,42 @@ def submit_and_edit_page():
 
         from src.ai import generate_individual_report_summary
         individual_summary = generate_individual_report_summary(items_to_categorize)
-        # Fallback for categories (can be improved to use AI in future)
-        categorized_items = [
-            {
-                "id": item["id"],
-                "ascend_category": "Development",
-                "north_category": "Nurturing Student Success & Development"
-            } for item in items_to_categorize
-        ]
+        # Ask AI to categorize each item into ASCEND and NORTH; fallback to safe defaults on failure
+        categorized_items = []
+        try:
+            prompt = (
+                "Classify each weekly report entry into ASCEND and Guiding NORTH categories. "
+                "Return ONLY JSON as a list of objects with keys id, ascend_category, north_category. "
+                f"Allowed ASCEND values: {ASCEND_VALUES}. "
+                f"Allowed NORTH values: {NORTH_VALUES}. "
+                "Items: " + json.dumps(items_to_categorize)
+            )
+            ai_response = call_gemini_ai(prompt)
+            parsed = json.loads(ai_response)
+            if isinstance(parsed, list):
+                for entry in parsed:
+                    if not isinstance(entry, dict):
+                        continue
+                    item_id = entry.get("id")
+                    ascend = entry.get("ascend_category") if entry.get("ascend_category") in ASCEND_VALUES else "Development"
+                    north = entry.get("north_category") if entry.get("north_category") in NORTH_VALUES else "Nurturing Student Success & Development"
+                    categorized_items.append({
+                        "id": item_id,
+                        "ascend_category": ascend,
+                        "north_category": north
+                    })
+        except Exception:
+            categorized_items = []
+
+        # Fallback to defaults if AI classification failed or returned nothing usable
+        if not categorized_items:
+            categorized_items = [
+                {
+                    "id": item["id"],
+                    "ascend_category": "Development",
+                    "north_category": "Nurturing Student Success & Development"
+                } for item in items_to_categorize
+            ]
         return {
             "categorized_items": categorized_items,
             "individual_summary": individual_summary
