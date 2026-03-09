@@ -273,10 +273,16 @@ def weekly_reports_viewer(supervisor_id=None):
                             if st.session_state.get(f"toggle_respond_{report_id}", False) and status_lower == "finalized":
                                 st.divider()
                                 st.markdown("##### 📧 Send Response")
-                                
+                                comment_key = f"comment_{report_id}"
+                                clear_key = f"clear_comment_{report_id}"
+                                # Clear the textarea on rerun after a successful send to avoid session_state mutation errors
+                                if st.session_state.get(clear_key):
+                                    st.session_state[comment_key] = ""
+                                    st.session_state.pop(clear_key, None)
+
                                 comment = st.text_area(
                                     "Your feedback:",
-                                    key=f"comment_{report_id}",
+                                    key=comment_key,
                                     height=120,
                                     placeholder="Type your response..."
                                 )
@@ -310,9 +316,10 @@ def weekly_reports_viewer(supervisor_id=None):
                                                         
                                                         if success_staff and success_supervisor:
                                                             st.success(f"✅ Email sent to {name} and copy sent to you!")
-                                                            # Clear form
-                                                            st.session_state[f"comment_{report_id}"] = ""
+                                                            # Clear form on next render
+                                                            st.session_state[clear_key] = True
                                                             st.session_state[f"toggle_respond_{report_id}"] = False
+                                                            st.rerun()
                                                         elif success_staff:
                                                             st.warning(f"⚠️ Email sent to {name} but copy to supervisor failed.")
                                                         else:
