@@ -396,9 +396,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
         col_a, col_b = st.columns(2)
         with col_a:
-            start_date = st.date_input("Start date", value=datetime.now().date() - timedelta(days=30))
+            start_date = st.date_input("Start date", value=datetime.now().date() - timedelta(days=30), key="reprocess_start")
         with col_b:
-            end_date = st.date_input("End date", value=datetime.now().date())
+            end_date = st.date_input("End date", value=datetime.now().date(), key="reprocess_end")
 
         update_summaries = st.checkbox("Regenerate AI individual summaries", value=True, help="If checked, each report's summary is rebuilt after recategorizing.")
 
@@ -567,9 +567,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
         default_start = today - timedelta(days=14)
         col1, col2 = st.columns(2)
         with col1:
-            start_date = st.date_input("Start date", value=default_start)
+            start_date = st.date_input("Start date", value=default_start, key="ai_usage_start")
         with col2:
-            end_date = st.date_input("End date", value=today)
+            end_date = st.date_input("End date", value=today, key="ai_usage_end")
 
         if start_date > end_date:
             st.error("Start date cannot be after end date.")
