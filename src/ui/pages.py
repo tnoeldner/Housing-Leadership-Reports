@@ -46,74 +46,65 @@ def user_manual_page():
     st.markdown("""
 ## Welcome to the UND Housing Leadership Reporting Tool
 
-This guide will help you get started and make the most of the app, whether you are a staff member, supervisor, or admin.
+Practical steps for signing in, submitting weekly impact reports, and using supervisor/admin tools.
 
 ---
 
-### 1. Getting Started: Account & Access
-- **Sign Up:** Use the sidebar to create an account. Enter your UND email, full name, position title, and a password.
-- **Email Confirmation:** After signing up, check your email for a Supabase confirmation link. You must confirm before logging in.
-- **Login:** Use the sidebar to log in. Once logged in, the sidebar will show pages available for your role.
+### 1) Sign In and Roles
+- **Sign up or log in in the sidebar.** Use your UND email; confirm the email link before logging in the first time.
+- **Profile basics:** Set your name and title in **My Profile** so supervisors and admins see accurate info.
 - **Roles:**
-    - **Staff:** Submit and view your own reports, view your own recognition.
-    - **Supervisor:** Submit/view own reports, view team reports, generate and save team summaries, view team recognition.
-    - **Admin/Director:** Full access to all finalized reports, archived weekly summaries, and all recognition.
+    - **Staff:** Create, edit, and finalize your own weekly reports; view your own recognition.
+    - **Supervisors:** Everything staff can do, plus view direct-report submissions, respond with email, and save team summaries.
+    - **Admins/Directors:** Full access to all reports, summaries, recognition, form analysis, and system settings.
 
 ---
 
-### 2. Submitting a Weekly Report
-1. Go to **Submit / Edit Report** in the sidebar.
-2. Select the active week (the app calculates the current week and grace period).
-3. Complete the following sections:
-    - **Core Activities:** Add entries for Students/Stakeholders, Projects, Collaborations, General Job Responsibilities, Staffing, KPIs. For each, add Successes and Challenges.
-    - **General Updates:** Personal check-in, Professional development, Lookahead, and (optionally) Director concerns.
-4. **Save Draft:** You can save your progress and return later.
-5. **Proceed to Review:** The app uses AI to categorize your entries (ASCEND/NORTH) and generate a summary.
-6. **Review & Edit:** Edit categories, adjust the AI summary, confirm well-being score and general updates.
-7. **Lock and Submit:** Finalizes the report. Finalized reports cannot be edited without supervisor/admin help.
+### 2) Weekly Report Workflow (Staff)
+1. Open **Submit / Edit Report**.
+2. Choose the active week. Deadlines and grace periods are shown; admins can unlock late reports if needed.
+3. Add entries for each section (Students/Stakeholders, Projects, Collaborations, General Job Responsibilities, Staffing/Personnel, KPIs, Events/Committees) with successes and challenges.
+4. Add **General Updates** (professional development, lookahead, personal check-in, optional director concerns) and your well-being rating.
+5. **Save Draft** anytime. Use **Proceed to Review** to let the AI categorize items (ASCEND/NORTH) and draft a summary.
+6. Review and adjust categories and text. When ready, **Lock and Submit** to finalize.
+7. Finalized reports are read-only; ask a supervisor/admin to unlock if a correction is required after the deadline.
 
 ---
 
-### 3. Staff Recognition
-1. Go to **Staff Recognition** tab in the Saved Reports Archive.
-2. View weekly recognition reports for ASCEND and NORTH categories.
-3. Download recognition reports as markdown files.
-4. Supervisors and admins can view all staff recognition; staff see their own.
+### 3) Supervisor Tools
+- **Supervisor Dashboard:** Track who has submitted for the selected week and view status at a glance.
+- **Team Reports Viewer:** Filter by date range, inspect report details, and send email responses to direct reports from within the app.
+- **Saved Team Summaries:** View AI summaries you generated for prior weeks.
+- **Form Analysis:** Duty analysis, general Roompact form analysis, and individual report review with AI-assisted summaries.
 
 ---
 
-### 4. Viewing Weekly Summaries
-1. Go to **Weekly Summaries** tab in the Saved Reports Archive.
-2. View all finalized weekly summaries grouped by year.
-3. Download summaries as markdown files.
-4. Supervisors and admins can view all summaries; staff see their own.
+### 4) Admin/Director Tools
+- **Saved Reports:** Browse duty analyses, staff recognition, weekly summaries, and all submitted weekly reports.
+- **Staff Recognition & Quarterly Recognition:** Review weekly recognition outputs and manage quarterly winners.
+- **Admin Dashboard:**
+    - Deadline settings and submission tracking
+    - Email configuration and outbound reply helpers
+    - User management (roles, supervisor assignments, password reset emails)
+    - AI prompt templates for summaries
+    - Weekly reports summary and weekly summary generator
+- **Form Analysis:** Same tooling as supervisors, but with full data access.
 
 ---
 
-### 5. Navigation & Pages
-- **My Profile:** View and update your profile information.
-- **Submit / Edit Report:** Create or edit your weekly report.
-- **Saved Reports Archive:** Access all duty analyses, staff recognition, and weekly summaries.
-- **User Manual:** Access this guide anytime.
-- **Supervisor/Admin Pages:** Supervisors and admins have additional dashboard and team summary pages.
+### 5) Data Visibility & Security
+- Row-level security limits visibility to what your role permits. Supervisors see direct reports; admins can bypass RLS via the service role.
+- Director concerns fields are visible only to the report owner and admins/directors.
 
 ---
 
-### 6. Privacy & Security
-- **Row-Level Security:** You only see reports and recognition you are permitted to view.
-- **Director Concerns:** Only visible to the report owner and admins/directors.
-- **Supervisors:** Can view finalized reports for their direct reports only.
-- **Admins/Directors:** Have access to all reports and summaries.
+### 6) Troubleshooting
+- Cannot submit? Check the deadline banner; if the grace period passed, request an admin unlock.
+- Missing reports? Ensure your supervisor assignment is set; admins can adjust it in User Management.
+- AI summary issues? Simplify the text or retry the review step.
+- For account or access problems, contact an admin/director.
 
 ---
 
-### 7. Troubleshooting & Tips
-- If the app shows unexpected behavior, restart and check Streamlit logs for errors.
-- If you can't see a report, confirm it is finalized and your supervisor_id is set correctly in your profile.
-- If AI summary fails, simplify your entries and retry.
-- For help, contact your supervisor or admin.
-
----
-
-**Thank you for using the UND Housing Leadership Reporting Tool!**
+Thank you for using the UND Housing Leadership Reporting Tool!
 """, unsafe_allow_html=False)
