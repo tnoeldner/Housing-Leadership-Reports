@@ -18,7 +18,7 @@ def admin_settings_page():
         st.stop()
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates", "📋 Weekly Reports Summary", "📊 Weekly Summary Generator"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates", "📋 Weekly Reports Summary", "📊 Weekly Summary Generator", "💰 AI Usage"])
     
     with tab4:
         st.subheader("User Management")
@@ -555,6 +555,111 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     with st.expander("View errors"):
                         for err in errors:
                             st.error(err)
+
+    with tab8:
+        st.subheader("AI Usage & Cost Tracking")
+        user_role = st.session_state.get('role', 'user')
+        if user_role != 'admin':
+            st.error("❌ Access Denied: Only admins can view AI usage.")
+            st.stop()
+
+        today = datetime.now().date()
+        default_start = today - timedelta(days=14)
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Start date", value=default_start)
+        with col2:
+            end_date = st.date_input("End date", value=today)
+
+        if start_date > end_date:
+            st.error("Start date cannot be after end date.")
+            st.stop()
+
+        try:
+            admin_client = get_admin_client()
+            end_exclusive = end_date + timedelta(days=1)
+            resp = admin_client.table("ai_usage_logs") \
+                .select("*") \
+                .gte("created_at", start_date.isoformat()) \
+                .lt("created_at", end_exclusive.isoformat()) \
+                .execute()
+            logs = resp.data or []
+        except Exception as e:
+            st.error(f"Failed to load AI usage logs: {e}")
+            logs = []
+
+        if not logs:
+            st.info("No AI usage records found for the selected range.")
+        else:
+            df = pd.DataFrame(logs)
+            df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+            df["date"] = df["created_at"].dt.date
+            for col in ["prompt_tokens", "response_tokens", "total_tokens", "cost_usd"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+            models = sorted([m for m in df.get("model", pd.Series(dtype=str)).dropna().unique()])
+            contexts = sorted([c for c in df.get("context", pd.Series(dtype=str)).dropna().unique()])
+
+            colf1, colf2 = st.columns(2)
+            with colf1:
+                model_filter = st.multiselect("Filter by model", options=models, default=models)
+            with colf2:
+                context_filter = st.multiselect("Filter by context", options=contexts, default=contexts)
+
+            filtered = df.copy()
+            if model_filter:
+                filtered = filtered[filtered["model"].isin(model_filter)]
+            if context_filter:
+                filtered = filtered[filtered["context"].isin(context_filter)]
+
+            if filtered.empty:
+                st.info("No records match the selected filters.")
+            else:
+                total_cost = filtered["cost_usd"].sum() if "cost_usd" in filtered else 0
+                prompt_tokens = filtered["prompt_tokens"].sum() if "prompt_tokens" in filtered else 0
+                response_tokens = filtered["response_tokens"].sum() if "response_tokens" in filtered else 0
+                total_tokens = filtered["total_tokens"].sum() if "total_tokens" in filtered else 0
+
+                colm1, colm2, colm3 = st.columns(3)
+                with colm1:
+                    st.metric("Total cost (USD)", f"${total_cost:,.4f}")
+                with colm2:
+                    st.metric("Prompt tokens", f"{prompt_tokens:,.0f}")
+                with colm3:
+                    st.metric("Response tokens", f"{response_tokens:,.0f}")
+
+                cost_by_day = filtered.groupby("date").agg(
+                    cost_usd=("cost_usd", "sum"),
+                    calls=("id", "count") if "id" in filtered.columns else ("cost_usd", "count")
+                ).reset_index()
+                st.markdown("**Cost by day**")
+                st.dataframe(cost_by_day, use_container_width=True, hide_index=True)
+
+                if "model" in filtered.columns:
+                    by_model = filtered.groupby("model").agg(
+                        cost_usd=("cost_usd", "sum"),
+                        calls=("id", "count") if "id" in filtered.columns else ("cost_usd", "count"),
+                        prompt_tokens=("prompt_tokens", "sum"),
+                        response_tokens=("response_tokens", "sum"),
+                        total_tokens=("total_tokens", "sum")
+                    ).reset_index()
+                    st.markdown("**Cost by model**")
+                    st.dataframe(by_model, use_container_width=True, hide_index=True)
+
+                if "context" in filtered.columns:
+                    by_context = filtered.groupby("context").agg(
+                        cost_usd=("cost_usd", "sum"),
+                        calls=("id", "count") if "id" in filtered.columns else ("cost_usd", "count"),
+                        prompt_tokens=("prompt_tokens", "sum"),
+                        response_tokens=("response_tokens", "sum"),
+                        total_tokens=("total_tokens", "sum")
+                    ).reset_index()
+                    st.markdown("**Cost by context**")
+                    st.dataframe(by_context, use_container_width=True, hide_index=True)
+
+                with st.expander("Raw usage records"):
+                    st.dataframe(filtered.sort_values("created_at", ascending=False), use_container_width=True)
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
