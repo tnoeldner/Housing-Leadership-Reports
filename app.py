@@ -88,29 +88,61 @@ else:
         # --- Sidebar Navigation (single instance, after login) ---
         st.sidebar.title("Navigation")
         st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
-        st.sidebar.write(f"Role: {st.session_state.get('role', 'user').title()}")
-        if st.session_state.get("is_supervisor"):
+
+        actual_role = st.session_state.get("role", "user")
+        actual_is_supervisor = st.session_state.get("is_supervisor", False)
+
+        # Admin-only preview lets you see user/supervisor navigation without changing data access
+        effective_role = actual_role
+        effective_is_supervisor = actual_is_supervisor
+        if actual_role == "admin":
+            preview_label_map = {
+                "Admin (default)": "admin",
+                "Supervisor": "supervisor",
+                "User": "user",
+            }
+            selected_preview = st.sidebar.selectbox(
+                "View as",
+                list(preview_label_map.keys()),
+                index=list(preview_label_map.keys()).index("Admin (default)"),
+                key="role_preview",
+                help="Preview navigation as a supervisor or user while keeping your admin session active.",
+            )
+            preview_value = preview_label_map.get(selected_preview, "admin")
+            if preview_value == "supervisor":
+                effective_role = "supervisor"
+                effective_is_supervisor = True
+            elif preview_value == "user":
+                effective_role = "user"
+                effective_is_supervisor = False
+            else:
+                effective_role = actual_role
+                effective_is_supervisor = actual_is_supervisor
+        else:
+            # Clear stale preview selection when not admin
+            st.session_state.pop("role_preview", None)
+
+        st.sidebar.write(f"Role: {actual_role.title()}")
+        if effective_role != actual_role:
+            st.sidebar.write(f"Viewing as: {effective_role.title()}")
+        if effective_is_supervisor:
             st.sidebar.write("✓ Supervisor")
         if st.sidebar.button("Logout", key="sidebar_logout"):
-            # You may need to implement the logout() function
             st.session_state.clear()
             st.rerun()
 
-        # Build pages based on user role
-        # Pages available to ALL users
+        # Build pages based on effective role
         pages = {
             "My Profile": profile_page,
             "Submit / Edit Report": submit_and_edit_page,
             "User Manual": user_manual_page,
         }
         
-        # Pages available to supervisors
-        if st.session_state.get("is_supervisor"):
+        if effective_is_supervisor:
             pages["Supervisor Summaries"] = supervisor_summaries_page
             pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
         
-        # Pages available to admins
-        if st.session_state.get("role") == "admin":
+        if effective_role == "admin":
             pages["Saved Reports"] = saved_reports_page
             pages["Staff Recognition"] = staff_recognition_page
             pages["Quarterly Recognition"] = quarterly_recognition_page
