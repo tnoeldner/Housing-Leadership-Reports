@@ -285,7 +285,7 @@ def submit_and_edit_page():
                 "NORTH rubric (for pillar meaning):\n" + north_rubric + "\n" \
                 "Items: " + json.dumps(items_to_categorize)
             )
-            ai_response = call_gemini_ai(prompt)
+            ai_response = call_gemini_ai(prompt, context="individual_report_classify")
             st.session_state["ai_classify_raw_response"] = ai_response
             parsed = parse_ai_json(ai_response)
             if isinstance(parsed, list):

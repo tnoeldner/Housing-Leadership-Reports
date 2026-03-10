@@ -172,8 +172,47 @@ import streamlit as st
 import json
 import google.generativeai as genai
 from src.config import get_secret
+from src.database import get_admin_client
 
-def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
+AI_RATE_CARD = {
+    # USD per 1K tokens (prompt, response) — replace with your actual rate card
+    "models/gemini-2.5-flash": {"prompt": 0.000018, "response": 0.000054},
+    "models/gemini-2.5-pro": {"prompt": 0.000125, "response": 0.000375},
+    "gemini-2.5-flash": {"prompt": 0.000018, "response": 0.000054},
+    "gemini-2.5-pro": {"prompt": 0.000125, "response": 0.000375},
+}
+
+
+def log_ai_usage(model_name, usage, context=None):
+    """Persist AI usage metadata to Supabase for cost tracking."""
+    if not usage:
+        return
+    prompt_tokens = getattr(usage, "prompt_token_count", None) or usage.get("prompt_token_count") if isinstance(usage, dict) else None
+    response_tokens = getattr(usage, "candidates_token_count", None) or usage.get("candidates_token_count") if isinstance(usage, dict) else None
+    total_tokens = getattr(usage, "total_token_count", None) or usage.get("total_token_count") if isinstance(usage, dict) else None
+
+    rate = AI_RATE_CARD.get(model_name, AI_RATE_CARD.get(model_name.replace("models/", ""), {"prompt": 0, "response": 0}))
+    prompt_cost = ((prompt_tokens or 0) / 1000.0) * rate.get("prompt", 0)
+    response_cost = ((response_tokens or 0) / 1000.0) * rate.get("response", 0)
+    cost_usd = prompt_cost + response_cost
+
+    try:
+        client = get_admin_client()
+        payload = {
+            "model": model_name,
+            "prompt_tokens": prompt_tokens,
+            "response_tokens": response_tokens,
+            "total_tokens": total_tokens,
+            "cost_usd": round(cost_usd, 6),
+            "context": context or "",
+        }
+        client.table("ai_usage_logs").insert(payload).execute()
+    except Exception:
+        # Silent fail; logging shouldn't break app flow
+        pass
+
+
+def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context=None):
     # Always initialize debug info in session state
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
@@ -182,6 +221,9 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash"):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
         response = model.generate_content([{"role": "user", "parts": [{"text": prompt}] }])
+        # Log usage/cost if available
+        usage = getattr(response, "usage_metadata", None)
+        log_ai_usage(model_name, usage, context=context)
         # Extract text from response
         response_text = None
         try:
@@ -254,7 +296,7 @@ Well-being Rating: {well_being_rating}
         director_concerns=director_concerns
     )
     try:
-        response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash")
+        response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context="individual_report_summary")
         st.session_state["raw_ai_response"] = response_text
         return clean_summary_response(response_text)
     except Exception as e:
