@@ -242,6 +242,21 @@ def submit_and_edit_page():
                     return opt
             return default
 
+        def parse_ai_json(text):
+            if not text:
+                return None
+            cleaned = text.strip()
+            # Remove code fences and label prefixes
+            cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+            # Sometimes the model prepends text; try to find the first '[' or '{'
+            first_bracket = min([pos for pos in [cleaned.find("[") , cleaned.find("{")] if pos != -1] or [-1])
+            if first_bracket > 0:
+                cleaned = cleaned[first_bracket:]
+            try:
+                return json.loads(cleaned)
+            except Exception:
+                return None
+
         from src.ai import generate_individual_report_summary
         individual_summary = generate_individual_report_summary(items_to_categorize)
         # Ask AI to categorize each item into ASCEND and NORTH; fallback to safe defaults on failure
@@ -256,7 +271,7 @@ def submit_and_edit_page():
             )
             ai_response = call_gemini_ai(prompt)
             st.session_state["ai_classify_raw_response"] = ai_response
-            parsed = json.loads(ai_response)
+            parsed = parse_ai_json(ai_response)
             if isinstance(parsed, list):
                 for entry in parsed:
                     if not isinstance(entry, dict):
