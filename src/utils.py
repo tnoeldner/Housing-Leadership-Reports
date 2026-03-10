@@ -13,7 +13,6 @@ except ImportError:
         return timezone.utc
 import streamlit as st
 from src.config import ASCEND_VALUES, NORTH_VALUES
-from src.ai import clean_summary_response
 
 def get_deadline_settings(supabase_client):
     """Get the current deadline configuration from admin settings"""
