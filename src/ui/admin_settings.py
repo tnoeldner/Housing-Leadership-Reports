@@ -1,11 +1,15 @@
 import time
 import os
+import json
 import pandas as pd
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from pathlib import Path
 from src.database import supabase, get_admin_client
 from src.utils import get_deadline_settings
 from src.email_service import send_email
+from src.config import ASCEND_VALUES, NORTH_VALUES, CORE_SECTIONS
+from src.ai import generate_individual_report_summary, call_gemini_ai
 import streamlit as st
 
 def admin_settings_page():
@@ -385,6 +389,172 @@ You are writing a weekly staff recognition summary. From the following staff rep
         from src.ui.dashboard import dashboard_page
         # Show the admin dashboard summary generation
         dashboard_page(supervisor_mode=False)
+
+        st.divider()
+        st.subheader("Reprocess ASCEND/NORTH Categories (Admin)")
+        st.markdown("Re-run categorization for finalized reports using the latest ASCEND/NORTH rubrics. This updates stored categories and AI summaries.")
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            start_date = st.date_input("Start date", value=datetime.now().date() - timedelta(days=30))
+        with col_b:
+            end_date = st.date_input("End date", value=datetime.now().date())
+
+        update_summaries = st.checkbox("Regenerate AI individual summaries", value=True, help="If checked, each report's summary is rebuilt after recategorizing.")
+
+        if st.button("Reprocess ASCEND/NORTH", type="primary"):
+            try:
+                admin_client = get_admin_client()
+            except Exception as e:
+                st.error(f"Admin client unavailable: {e}")
+                st.stop()
+
+            with st.spinner("Reprocessing reports..."):
+                try:
+                    resp = admin_client.table("reports") \
+                        .select("*") \
+                        .eq("status", "finalized") \
+                        .gte("week_ending_date", start_date.isoformat()) \
+                        .lte("week_ending_date", end_date.isoformat()) \
+                        .execute()
+                    reports = resp.data or []
+                except Exception as e:
+                    st.error(f"Failed to fetch reports: {e}")
+                    reports = []
+
+                processed = 0
+                errors = []
+
+                def parse_ai_json(text):
+                    if not text:
+                        return None
+                    cleaned = text.strip().replace("```json", "").replace("```", "").strip()
+                    first_bracket = min([pos for pos in [cleaned.find("[") , cleaned.find("{")] if pos != -1] or [-1])
+                    if first_bracket > 0:
+                        cleaned = cleaned[first_bracket:]
+                    try:
+                        return json.loads(cleaned)
+                    except Exception:
+                        return None
+
+                def load_rubric_text(filename):
+                    try:
+                        base_dir = Path(__file__).resolve().parents[2] / "rubrics-integration" / "rubrics"
+                        rubric_path = base_dir / filename
+                        return rubric_path.read_text(encoding="utf-8")
+                    except Exception:
+                        return ""
+
+                north_rubric = load_rubric_text("north_rubric.md")
+                ascend_rubric = load_rubric_text("ascend_rubric.md")
+
+                for report in reports:
+                    try:
+                        report_body = report.get("report_body") or {}
+                        items = []
+                        idx = 0
+                        for section_key, section_data in (report_body.items() if isinstance(report_body, dict) else []):
+                            if not isinstance(section_data, dict):
+                                continue
+                            for item_type in ["successes", "challenges"]:
+                                for entry in section_data.get(item_type, []) or []:
+                                    text = entry.get("text", "") if isinstance(entry, dict) else ""
+                                    if text:
+                                        items.append({
+                                            "id": idx,
+                                            "text": text,
+                                            "section": section_key,
+                                            "type": item_type,
+                                        })
+                                        idx += 1
+
+                        # Build classification prompt
+                        default_ascend = "Dedicated & Driven"
+                        default_north = "Navigate Needs"
+                        prompt = (
+                            "Classify each weekly report entry into ASCEND and Guiding NORTH categories. "
+                            "Return ONLY JSON as a list of objects with keys id, ascend_category, north_category. "
+                            "Use EXACT values from these lists (case-insensitive match is fine): "
+                            f"ASCEND = {ASCEND_VALUES}; NORTH = {NORTH_VALUES}. "
+                            "Use the following rubrics to decide the best-fit category. Summaries, detailed behaviors, and intent matter more than exact wording. "
+                            "ASCEND rubric (for pillar meaning):\n" + ascend_rubric + "\n"
+                            "NORTH rubric (for pillar meaning):\n" + north_rubric + "\n"
+                            "Items: " + json.dumps(items)
+                        )
+
+                        ai_response = call_gemini_ai(prompt)
+                        parsed = parse_ai_json(ai_response)
+                        categorized_lookup = {}
+                        if isinstance(parsed, list):
+                            for entry in parsed:
+                                if not isinstance(entry, dict):
+                                    continue
+                                rid = entry.get("id")
+                                # normalize
+                                def norm(val, allowed, default):
+                                    if not val:
+                                        return default
+                                    s = str(val).strip()
+                                    for opt in allowed:
+                                        if s.lower() == opt.lower():
+                                            return opt
+                                    return default
+                                ascend_val = norm(entry.get("ascend_category"), ASCEND_VALUES, default_ascend)
+                                north_val = norm(entry.get("north_category"), NORTH_VALUES, default_north)
+                                categorized_lookup[rid] = {
+                                    "ascend_category": ascend_val,
+                                    "north_category": north_val,
+                                }
+
+                        # Rebuild report_body with new categories
+                        new_body = {k: {"successes": [], "challenges": []} for k in CORE_SECTIONS.keys()}
+                        for item in items:
+                            cat = categorized_lookup.get(item["id"], {})
+                            new_body[item["section"]][item["type"]].append({
+                                "text": item["text"],
+                                "ascend_category": cat.get("ascend_category", default_ascend),
+                                "north_category": cat.get("north_category", default_north),
+                            })
+
+                        update_data = {
+                            "report_body": new_body,
+                        }
+
+                        if update_summaries:
+                            # Temporarily set session fields for summary generation
+                            backup = {}
+                            for key, val in {
+                                "full_name": report.get("team_member"),
+                                "week_ending_date": report.get("week_ending_date"),
+                                "prof_dev": report.get("professional_development", ""),
+                                "lookahead": report.get("key_topics_lookahead", ""),
+                                "personal_check_in": report.get("personal_check_in", ""),
+                                "director_concerns": report.get("director_concerns", ""),
+                                "well_being_rating": report.get("well_being_rating", ""),
+                            }.items():
+                                backup[key] = st.session_state.get(key)
+                                st.session_state[key] = val
+                            try:
+                                indiv_summary = generate_individual_report_summary(items)
+                                update_data["individual_summary"] = indiv_summary
+                            finally:
+                                # restore
+                                for k, v in backup.items():
+                                    if v is None and k in st.session_state:
+                                        del st.session_state[k]
+                                    else:
+                                        st.session_state[k] = v
+
+                        admin_client.table("reports").update(update_data).eq("id", report.get("id")).execute()
+                        processed += 1
+                    except Exception as e:
+                        errors.append(f"Report {report.get('id')}: {e}")
+
+                st.success(f"Reprocessed {processed} reports between {start_date} and {end_date}.")
+                if errors:
+                    with st.expander("View errors"):
+                        for err in errors:
+                            st.error(err)
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
