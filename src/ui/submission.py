@@ -233,6 +233,15 @@ def submit_and_edit_page():
         if not items_to_categorize:
             return None
 
+        def normalize_category(value, allowed, default):
+            if not value:
+                return default
+            value_stripped = str(value).strip()
+            for opt in allowed:
+                if value_stripped.lower() == opt.lower():
+                    return opt
+            return default
+
         from src.ai import generate_individual_report_summary
         individual_summary = generate_individual_report_summary(items_to_categorize)
         # Ask AI to categorize each item into ASCEND and NORTH; fallback to safe defaults on failure
@@ -241,19 +250,20 @@ def submit_and_edit_page():
             prompt = (
                 "Classify each weekly report entry into ASCEND and Guiding NORTH categories. "
                 "Return ONLY JSON as a list of objects with keys id, ascend_category, north_category. "
-                f"Allowed ASCEND values: {ASCEND_VALUES}. "
-                f"Allowed NORTH values: {NORTH_VALUES}. "
+                "Use EXACT values from these lists (case-insensitive match is fine): "
+                f"ASCEND = {ASCEND_VALUES}; NORTH = {NORTH_VALUES}. "
                 "Items: " + json.dumps(items_to_categorize)
             )
             ai_response = call_gemini_ai(prompt)
+            st.session_state["ai_classify_raw_response"] = ai_response
             parsed = json.loads(ai_response)
             if isinstance(parsed, list):
                 for entry in parsed:
                     if not isinstance(entry, dict):
                         continue
                     item_id = entry.get("id")
-                    ascend = entry.get("ascend_category") if entry.get("ascend_category") in ASCEND_VALUES else "Development"
-                    north = entry.get("north_category") if entry.get("north_category") in NORTH_VALUES else "Nurturing Student Success & Development"
+                    ascend = normalize_category(entry.get("ascend_category"), ASCEND_VALUES, "Development")
+                    north = normalize_category(entry.get("north_category"), NORTH_VALUES, "Nurturing")
                     categorized_items.append({
                         "id": item_id,
                         "ascend_category": ascend,
@@ -268,7 +278,7 @@ def submit_and_edit_page():
                 {
                     "id": item["id"],
                     "ascend_category": "Development",
-                    "north_category": "Nurturing Student Success & Development"
+                    "north_category": "Nurturing"
                 } for item in items_to_categorize
             ]
         return {
@@ -470,7 +480,7 @@ def submit_and_edit_page():
                             categorized_item = {
                                 "text": item["text"],
                                 "ascend_category": categories.get("ascend_category", "Development"),  # Safe default
-                                "north_category": categories.get("north_category", "Nurturing Student Success & Development"),  # Safe default
+                                "north_category": categories.get("north_category", "Nurturing"),  # Safe default aligned to allowed list
                             }
                             report_body[item["section"]][item["type"]].append(categorized_item)
 
