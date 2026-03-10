@@ -21,6 +21,7 @@ from google import genai
 
 from src.database import supabase
 from src.config import CORE_SECTIONS, ASCEND_VALUES, NORTH_VALUES
+from pathlib import Path
 from src.utils import calculate_deadline_info, clear_form_state
 from src.ai import clean_summary_response, call_gemini_ai
 
@@ -242,6 +243,14 @@ def submit_and_edit_page():
                     return opt
             return default
 
+        def load_rubric_text(filename):
+            try:
+                base_dir = Path(__file__).resolve().parents[2] / "rubrics-integration" / "rubrics"
+                rubric_path = base_dir / filename
+                return rubric_path.read_text(encoding="utf-8")
+            except Exception:
+                return ""
+
         def parse_ai_json(text):
             if not text:
                 return None
@@ -262,11 +271,18 @@ def submit_and_edit_page():
         # Ask AI to categorize each item into ASCEND and NORTH; fallback to safe defaults on failure
         categorized_items = []
         try:
+            north_rubric = load_rubric_text("north_rubric.md")
+            ascend_rubric = load_rubric_text("ascend_rubric.md")
+            default_ascend = "Dedicated & Driven"
+            default_north = "Navigating"
             prompt = (
                 "Classify each weekly report entry into ASCEND and Guiding NORTH categories. "
                 "Return ONLY JSON as a list of objects with keys id, ascend_category, north_category. "
                 "Use EXACT values from these lists (case-insensitive match is fine): "
                 f"ASCEND = {ASCEND_VALUES}; NORTH = {NORTH_VALUES}. "
+                "Use the following rubrics to decide the best-fit category. Summaries, detailed behaviors, and intent matter more than exact wording. "
+                "ASCEND rubric (for pillar meaning):\n" + ascend_rubric + "\n" \
+                "NORTH rubric (for pillar meaning):\n" + north_rubric + "\n" \
                 "Items: " + json.dumps(items_to_categorize)
             )
             ai_response = call_gemini_ai(prompt)
@@ -277,8 +293,8 @@ def submit_and_edit_page():
                     if not isinstance(entry, dict):
                         continue
                     item_id = entry.get("id")
-                    ascend = normalize_category(entry.get("ascend_category"), ASCEND_VALUES, "Development")
-                    north = normalize_category(entry.get("north_category"), NORTH_VALUES, "Nurturing")
+                    ascend = normalize_category(entry.get("ascend_category"), ASCEND_VALUES, default_ascend)
+                    north = normalize_category(entry.get("north_category"), NORTH_VALUES, default_north)
                     categorized_items.append({
                         "id": item_id,
                         "ascend_category": ascend,
@@ -292,8 +308,8 @@ def submit_and_edit_page():
             categorized_items = [
                 {
                     "id": item["id"],
-                    "ascend_category": "Development",
-                    "north_category": "Nurturing"
+                    "ascend_category": "Dedicated & Driven",
+                    "north_category": "Navigating"
                 } for item in items_to_categorize
             ]
         return {
@@ -494,8 +510,8 @@ def submit_and_edit_page():
                             categories = categorized_lookup.get(item_id, {})
                             categorized_item = {
                                 "text": item["text"],
-                                "ascend_category": categories.get("ascend_category", "Development"),  # Safe default
-                                "north_category": categories.get("north_category", "Nurturing"),  # Safe default aligned to allowed list
+                                "ascend_category": categories.get("ascend_category", "Dedicated & Driven"),  # Safe default
+                                "north_category": categories.get("north_category", "Navigating"),  # Safe default aligned to allowed list
                             }
                             report_body[item["section"]][item["type"]].append(categorized_item)
 

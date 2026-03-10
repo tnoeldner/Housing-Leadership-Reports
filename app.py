@@ -178,8 +178,16 @@ def init_connection():
 supabase: Client = init_connection()
 
 # --- CONSTANTS ---
-ASCEND_VALUES = ["Accountability", "Service", "Community", "Excellence", "Nurture", "Development", "N/A"]
-NORTH_VALUES = ["Nurturing", "Operational", "Resource", "Transformative", "Holistic", "N/A"]
+ASCEND_VALUES = [
+    "Affinity & Community Building",
+    "Service Excellence & Support",
+    "Cultivating Equity & Inclusion",
+    "Empowering Learning & Growth",
+    "Navigating Discovery & Innovation",
+    "Dedicated & Driven",
+    "N/A",
+]
+NORTH_VALUES = ["Navigating", "Operational", "Resource", "Transformative", "Holistic", "N/A"]
 CORE_SECTIONS = {
     "students": "Students/Stakeholders",
     "projects": "Projects",
