@@ -504,6 +504,18 @@ def submit_and_edit_page():
             st.metric("Your Well-being Score for this Week:", f"{rating}/5")
         st.markdown("---")
 
+        # Show the AI summary up front so users see it immediately
+        st.markdown("### AI-Generated Summary (editable)")
+        st.text_area(
+            "AI Summary",
+            value=draft.get("individual_summary", ""),
+            key="review_summary",
+            height=180,
+        )
+        if not draft.get("individual_summary"):
+            st.warning("AI summary is empty. You can still edit the text above or go back to regenerate.")
+        st.markdown("---")
+
         with st.form("review_form"):
             st.markdown(f"**Report for:** {draft.get('team_member_name','Unknown')} | **Week Ending:** {draft.get('week_ending_date','Unknown')}")
             st.divider()
@@ -537,10 +549,6 @@ def submit_and_edit_page():
                                 north_index = NORTH_VALUES.index(item.get("north_category")) if item.get("north_category") in NORTH_VALUES else len(NORTH_VALUES) - 1
                                 col1.selectbox("ASCEND Category", options=ASCEND_VALUES, index=ascend_index, key=f"review_{section_key}_{item_type}_{i}_ascend")
                                 col2.selectbox("Guiding NORTH Category", options=NORTH_VALUES, index=north_index, key=f"review_{section_key}_{item_type}_{i}_north")
-            st.divider()
-            st.subheader("Editable Individual Summary")
-            # (Removed RAW AI debug info from UI for individual report summary)
-            st.text_area("AI-Generated Summary", value=draft.get("individual_summary", ""), key="review_summary", height=150)
             st.divider()
             col1, col2 = st.columns([3, 1])
             with col2:
@@ -582,7 +590,7 @@ def submit_and_edit_page():
                     "week_ending_date": draft.get("week_ending_date"),
                     "report_body": final_report_body,
                     "professional_development": st.session_state.get("review_prof_dev", ""),
-                    "key_topics_lookahead": st.session_state.get("lookahead", ""),
+                    "key_topics_lookahead": st.session_state.get("review_lookahead", ""),
                     "personal_check_in": st.session_state.get("review_personal_check_in", ""),
                     "well_being_rating": st.session_state.get("review_well_being", 3),
                     "individual_summary": st.session_state.get("review_summary", ""),
