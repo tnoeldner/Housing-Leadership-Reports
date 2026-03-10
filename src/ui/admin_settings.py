@@ -567,9 +567,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
         default_start = today - timedelta(days=14)
         col1, col2 = st.columns(2)
         with col1:
-            start_date = st.date_input("Start date", value=default_start, key="ai_usage_start")
+            start_date = st.date_input("AI Usage Start", value=default_start, key="ai_usage_start_date_input")
         with col2:
-            end_date = st.date_input("End date", value=today, key="ai_usage_end")
+            end_date = st.date_input("AI Usage End", value=today, key="ai_usage_end_date_input")
 
         if start_date > end_date:
             st.error("Start date cannot be after end date.")
