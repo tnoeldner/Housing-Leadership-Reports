@@ -274,7 +274,7 @@ def submit_and_edit_page():
             north_rubric = load_rubric_text("north_rubric.md")
             ascend_rubric = load_rubric_text("ascend_rubric.md")
             default_ascend = "Dedicated & Driven"
-            default_north = "Navigating"
+            default_north = "Navigate Needs"
             prompt = (
                 "Classify each weekly report entry into ASCEND and Guiding NORTH categories. "
                 "Return ONLY JSON as a list of objects with keys id, ascend_category, north_category. "
@@ -309,7 +309,7 @@ def submit_and_edit_page():
                 {
                     "id": item["id"],
                     "ascend_category": "Dedicated & Driven",
-                    "north_category": "Navigating"
+                    "north_category": "Navigate Needs"
                 } for item in items_to_categorize
             ]
         return {
@@ -511,7 +511,7 @@ def submit_and_edit_page():
                             categorized_item = {
                                 "text": item["text"],
                                 "ascend_category": categories.get("ascend_category", "Dedicated & Driven"),  # Safe default
-                                "north_category": categories.get("north_category", "Navigating"),  # Safe default aligned to allowed list
+                                "north_category": categories.get("north_category", "Navigate Needs"),  # Safe default aligned to allowed list
                             }
                             report_body[item["section"]][item["type"]].append(categorized_item)
 

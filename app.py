@@ -187,7 +187,14 @@ ASCEND_VALUES = [
     "Dedicated & Driven",
     "N/A",
 ]
-NORTH_VALUES = ["Navigating", "Operational", "Resource", "Transformative", "Holistic", "N/A"]
+NORTH_VALUES = [
+    "Navigate Needs",
+    "Own the Outcome",
+    "Respond Respectfully",
+    "Timely & Truthful",
+    "Help Proactively",
+    "N/A",
+]
 CORE_SECTIONS = {
     "students": "Students/Stakeholders",
     "projects": "Projects",
