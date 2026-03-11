@@ -1,5 +1,5 @@
 import streamlit as st
-from src.database import select_quarterly_winners, supabase
+from src.database import select_quarterly_winners, supabase, log_user_activity
 import datetime
 import json
 import time
@@ -169,6 +169,19 @@ def quarterly_recognition_page():
 
             if not result.get("success"):
                 st.error(f"An error occurred: {result.get('message')}")
+                try:
+                    log_user_activity(
+                        "quarterly_recognition_select",
+                        context="quarterly_recognition",
+                        metadata={
+                            "fiscal_year": selected_fy,
+                            "quarter": selected_quarter,
+                            "status": "error",
+                            "message": result.get("message"),
+                        },
+                    )
+                except Exception:
+                    pass
             elif result.get("status") == "tie":
                 st.warning(f"🤝 A tie was found for the {result['category']} category.")
                 st.write("AI is analyzing each candidate's performance...")
@@ -179,6 +192,21 @@ def quarterly_recognition_page():
                 st.session_state['fiscal_year'] = selected_fy
                 st.session_state['quarter'] = selected_quarter
                 st.session_state['ai_summaries'] = result.get('ai_summaries', {})
+
+                try:
+                    log_user_activity(
+                        "quarterly_recognition_select",
+                        context="quarterly_recognition",
+                        metadata={
+                            "fiscal_year": selected_fy,
+                            "quarter": selected_quarter,
+                            "status": "tie",
+                            "category": result['category'],
+                            "winners": result['winners'],
+                        },
+                    )
+                except Exception:
+                    pass
                 
                 print(f"[DEBUG] Winners list: {result['winners']}")
                 print(f"[DEBUG] AI Summaries: {result.get('ai_summaries', {})}")
@@ -217,6 +245,21 @@ def quarterly_recognition_page():
                     st.success("✅ Quarterly winners selected and saved successfully!")
                     st.balloons()
                     st.subheader(f"FY{selected_fy} Q{selected_quarter} Winners")
+
+                    try:
+                        log_user_activity(
+                            "quarterly_recognition_select",
+                            context="quarterly_recognition",
+                            metadata={
+                                "fiscal_year": selected_fy,
+                                "quarter": selected_quarter,
+                                "status": "success",
+                                "ascend_winner": ascend_winner,
+                                "north_winner": north_winner,
+                            },
+                        )
+                    except Exception:
+                        pass
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -387,6 +430,20 @@ def quarterly_recognition_page():
                 if success:
                     st.success(f"✅ Winner for {category} saved successfully!")
                     st.write(f"Category={category}, Winner={winner}, FY={fiscal_year}, Q={quarter}")
+                    try:
+                        log_user_activity(
+                            "quarterly_recognition_save",
+                            context="quarterly_recognition_manual",
+                            metadata={
+                                "fiscal_year": fiscal_year,
+                                "quarter": quarter,
+                                "category": category,
+                                "winner": winner,
+                                "operation": operation,
+                            },
+                        )
+                    except Exception:
+                        pass
                     # Clear session state
                     if 'manual_winner' in st.session_state:
                         del st.session_state.manual_winner
