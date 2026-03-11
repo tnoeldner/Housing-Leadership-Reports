@@ -48,7 +48,9 @@ def log_user_activity(event_type: str, context: str = None, metadata: dict = Non
                 resolved_email = getattr(user_obj, "email", None) or (user_obj.get("email") if isinstance(user_obj, dict) else None)
     # Fall back to session_state email if present
     if not resolved_email and isinstance(st.session_state, dict):
-        resolved_email = st.session_state.get("email")
+        resolved_email = st.session_state.get("email") or st.session_state.get("user_email")
+    if resolved_id is None and isinstance(st.session_state, dict):
+        resolved_id = st.session_state.get("user_id")
 
     payload = {
         "event_type": event_type,

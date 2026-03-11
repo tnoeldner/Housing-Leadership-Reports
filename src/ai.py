@@ -247,6 +247,11 @@ def log_ai_usage(model_name, usage, context=None):
         client.table("ai_usage_logs").insert(payload).execute()
         # Also log activity for attribution
         user_obj = st.session_state.get("user") if isinstance(st.session_state, dict) else None
+        user_id = getattr(user_obj, "id", None)
+        user_email = getattr(user_obj, "email", None)
+        if isinstance(st.session_state, dict):
+            user_id = user_id or st.session_state.get("user_id")
+            user_email = user_email or st.session_state.get("user_email")
         log_user_activity(
             event_type="ai_call",
             context=context or model_name,
@@ -258,8 +263,8 @@ def log_ai_usage(model_name, usage, context=None):
                 "cost_usd": round(cost_usd, 6),
             },
             user=user_obj,
-            user_id=getattr(user_obj, "id", None),
-            user_email=getattr(user_obj, "email", None),
+            user_id=user_id,
+            user_email=user_email,
         )
     except Exception:
         # Silent fail; logging shouldn't break app flow
