@@ -739,6 +739,21 @@ You are writing a weekly staff recognition summary. From the following staff rep
         st.subheader("User Activity Logs (login & AI calls)")
         act_start = st.date_input("Activity Start", value=start_date, key="activity_start")
         act_end = st.date_input("Activity End", value=end_date, key="activity_end")
+        # Quick admin debug helper to verify inserts work
+        if st.button("Insert test activity (admin)", key="activity_test_insert"):
+            try:
+                admin_client = get_admin_client()
+                test_payload = {
+                    "event_type": "debug_test",
+                    "context": "admin_settings",
+                    "user_email": getattr(st.session_state.get("user"), "email", None) if st.session_state.get("user") else None,
+                    "metadata": {"source": "admin test button"},
+                }
+                resp_test = admin_client.table("user_activity_logs").insert(test_payload).execute()
+                new_id = resp_test.data[0]["id"] if resp_test and resp_test.data else "unknown"
+                st.success(f"Inserted test activity row (id={new_id}).")
+            except Exception as e:
+                st.error(f"Test insert failed: {e}")
         if act_start > act_end:
             st.error("Activity start date cannot be after end date.")
         else:
