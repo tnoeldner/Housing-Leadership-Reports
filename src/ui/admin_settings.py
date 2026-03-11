@@ -8,7 +8,7 @@ from pathlib import Path
 from src.database import supabase, get_admin_client
 from src.utils import get_deadline_settings
 from src.email_service import send_email
-from src.config import ASCEND_VALUES, NORTH_VALUES, CORE_SECTIONS
+from src.config import ASCEND_VALUES, NORTH_VALUES, CORE_SECTIONS, get_secret
 from src.ai import generate_individual_report_summary, call_gemini_ai
 import streamlit as st
 
@@ -573,8 +573,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
         # Optional: run BigQuery backfill from the UI
         with st.expander("Sync from BigQuery billing export"):
-            default_bq_table = os.getenv("BQ_BILLING_TABLE", "")
-            bq_table = st.text_input("Billing table (project.dataset.table)", value=default_bq_table, help="Example: gen-lang-client-0478633344.detailed_billing_report.gcp_billing_export_resource_v1_0188A0_7A6E35_DA34CA")
+            # Default from secret/env, cached in session so you don't retype
+            default_bq_table = st.session_state.get("bq_table_cached") or get_secret("BQ_BILLING_TABLE") or os.getenv("BQ_BILLING_TABLE", "")
+            bq_table = st.text_input("Billing table (project.dataset.table)", value=default_bq_table, key="ai_usage_bq_table", help="Example: gen-lang-client-0478633344.detailed_billing_report.gcp_billing_export_resource_v1_0188A0_7A6E35_DA34CA")
             sync_start = st.date_input("Billing start date", value=start_date, key="ai_usage_bq_start")
             sync_end = st.date_input("Billing end date", value=end_date, key="ai_usage_bq_end")
             if st.button("Run BigQuery sync", type="primary", key="ai_usage_run_bq_sync"):
@@ -588,7 +589,24 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             import subprocess, sys
                             from pathlib import Path
 
+                            # Resolve script path (repo root/backfill_ai_usage.py)
                             script_path = Path(__file__).resolve().parents[1] / "backfill_ai_usage.py"
+                            if not script_path.exists():
+                                script_path = Path(__file__).resolve().parents[2] / "backfill_ai_usage.py"
+
+                            # Prepare temp GCP credentials from secrets if provided
+                            gcp_sa_json = get_secret("GCP_SERVICE_ACCOUNT") or None
+                            env = os.environ.copy()
+                            tmp_path = None
+                            if gcp_sa_json:
+                                import tempfile
+                                tmp_fd, tmp_name = tempfile.mkstemp(prefix="gcp_sa_", suffix=".json")
+                                os.close(tmp_fd)
+                                with open(tmp_name, "w", encoding="utf-8") as tf:
+                                    tf.write(gcp_sa_json)
+                                env["GOOGLE_APPLICATION_CREDENTIALS"] = tmp_name
+                                tmp_path = tmp_name
+
                             cmd = [
                                 sys.executable,
                                 str(script_path),
@@ -596,13 +614,19 @@ You are writing a weekly staff recognition summary. From the following staff rep
                                 "--start", sync_start.isoformat(),
                                 "--end", sync_end.isoformat(),
                             ]
-                            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                            st.session_state["bq_table_cached"] = bq_table
+                            result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=env)
                             st.success("BigQuery sync completed.")
                             if result.stdout:
                                 st.code(result.stdout[-4000:], language="text")
                             if result.stderr:
                                 st.info("stderr:")
                                 st.code(result.stderr[-2000:], language="text")
+                            if tmp_path:
+                                try:
+                                    os.remove(tmp_path)
+                                except Exception:
+                                    pass
                         except subprocess.CalledProcessError as e:
                             st.error(f"Sync failed: {e}")
                             st.code((e.stdout or "") + "\n" + (e.stderr or ""), language="text")
