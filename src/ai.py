@@ -11,9 +11,22 @@ def generate_admin_dashboard_summary(selected_date_for_summary, staff_reports_te
     Returns:
         str: Cleaned summary response
     """
+    from pathlib import Path
+    from src.config import ASCEND_VALUES, NORTH_VALUES
     from src.ai_prompts import get_admin_prompt
-    default_dashboard_prompt = """
-You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {selected_date_for_summary} into a single, comprehensive summary report.
+
+    def load_rubric_text(filename):
+        try:
+            base_dir = Path(__file__).resolve().parents[1] / "rubrics-integration" / "rubrics"
+            return (base_dir / filename).read_text(encoding="utf-8")
+        except Exception:
+            return ""
+
+    ascend_rubric = load_rubric_text("ascend_rubric.md")
+    north_rubric = load_rubric_text("north_rubric.md")
+
+    default_dashboard_prompt = f"""
+You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {{selected_date_for_summary}} into a single, comprehensive summary report.
 
 IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
 
@@ -28,55 +41,25 @@ The report MUST contain the following sections, in this order, using markdown he
 A 2-3 sentence high-level overview of the week's key takeaways.
 
 ## ASCEND Framework Summary
-Summarize work aligned with the ASCEND framework (Accountability, Service, Community, Excellence, Nurture, Development). Start this section with the purpose statement: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." For each ASCEND category include a heading and bullet points that reference staff by name and the date of each activity (where applicable).
+ASCEND pillars (use EXACT values): {ASCEND_VALUES}. Start with: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." Use the ASCEND rubric below to choose the best-fit pillar for each activity. For each pillar include bullet points that reference staff by name and date.
 
-### Accountability
-[Include relevant staff activities, names, and dates]
-
-### Service
-[Include relevant staff activities, names, and dates]
-
-### Community
-[Include relevant staff activities, names, and dates]
-
-### Excellence
-[Include relevant staff activities, names, and dates]
-
-### Nurture
-[Include relevant staff activities, names, and dates]
-
-### Development
-[Include relevant staff activities, names, and dates]
+ASCEND rubric:
+{ascend_rubric}
 
 ## Guiding NORTH Pillars Summary
-Summarize work aligned with the Guiding NORTH pillars. Start with the purpose statement: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." For each pillar include a heading and bullet points that reference staff by name and the date of each activity (where applicable).
+Guiding NORTH pillars (use EXACT values): {NORTH_VALUES}. Start with: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." Use the NORTH rubric below to choose the best-fit pillar for each activity. For each pillar include bullet points that reference staff by name and date.
+
+NORTH rubric:
+{north_rubric}
 
 ## UND LEADS Summary
-Start with the purpose statement: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze all activities and categorize them under these UND LEADS pillars with staff names and the date of each activity (where applicable):
-
-### Learning
-Professional development, training, skill building, educational initiatives, mentoring
-
-### Equity
-Diversity initiatives, inclusive practices, accessibility improvements, fair treatment efforts
-
-### Affinity
-Community building, relationship development, team cohesion, campus connections
-
-### Discovery
-Research, innovation, new approaches, creative problem-solving, exploration of best practices
-
-### Service
-Community service, helping others, volunteer work, supporting university initiatives
+Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze activities under these pillars with staff names and dates where applicable: Learning, Equity, Affinity, Discovery, Service.
 
 ## Overall Staff Well-being
-Start by stating, "The average well-being score for the week was {average_score} out of 5." Provide a 1-2 sentence qualitative summary and include a subsection.
-
-### Staff to Connect With
-List staff who reported low scores or concerning comments, with a brief reason.
+Start with "The average well-being score for the week was {{average_score}} out of 5." Provide a short qualitative summary and include a "Staff to Connect With" subsection listing low scores or concerning comments.
 
 ## Campus Events Summary
-Create a markdown table with the exact format below:
+Create a markdown table with this exact format:
 
 | Event/Committee | Date | Attendees | Alignment |
 |-----------------|------|-----------|-----------|
@@ -85,40 +68,40 @@ Create a markdown table with the exact format below:
 Include all campus events and committee meetings attended by staff this week. Group multiple attendees for the same event in one row.
 
 ## For the Director's Attention
-A clear list of items that require director-level attention; mention the staff member who raised each item. If none, state "No specific concerns were raised for the Director this week."
+List items needing director-level attention; if none, state "No specific concerns were raised for the Director this week."
 
 ## Key Challenges
-Bullet-point summary of significant or recurring challenges reported by staff, noting who reported them where relevant.
+Bullet-point significant or recurring challenges, noting who reported them.
 
 ## Operational & Safety Summary
-If duty reports data is available, create this section with:
+If duty reports exist, include:
 
 ### Quantitative Metrics
-Create a hall-by-hall breakdown table using this exact format:
+Hall-by-hall table (keep columns exactly):
 
 | Hall/Building | Total Reports | Lockouts | Maintenance | Policy Violations | Safety Concerns | Staff Responses |
 |---------------|---------------|----------|-------------|-------------------|-----------------|-----------------|
 | Hall Name | # | # | # | # | # | # |
 
-Include summary totals row at the bottom.
+Add a totals row at the bottom.
 
 ### Trending Issues
-Bullet-point summary of patterns in lockouts, maintenance requests, policy violations based on the quantitative data above.
+Patterns in lockouts, maintenance, policy violations.
 
 ### Staff Response Effectiveness
-Assessment of duty staff performance and response times based on staff response data.
+Assessment of duty staff performance and response times.
 
 ### Safety & Security Highlights
-Critical incidents and follow-up actions needed based on safety concerns identified.
+Critical incidents and follow-up actions needed.
 
 ## Upcoming Projects & Initiatives
-Bullet-point list of key upcoming projects based on the 'Lookahead' sections of the reports.
- 
+Bullet key upcoming projects based on the 'Lookahead' sections.
+
 CRITICAL FORMATTING REQUIREMENTS:
 
 STAFF REPORTS DATA:
-{staff_reports_text}
-
+{{staff_reports_text}}
+"""
 {duty_reports_section}
 
 {engagement_reports_section}
