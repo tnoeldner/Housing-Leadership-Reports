@@ -101,10 +101,12 @@ CRITICAL FORMATTING REQUIREMENTS:
 
 STAFF REPORTS DATA:
 {{staff_reports_text}}
-"""
-{duty_reports_section}
 
-{engagement_reports_section}
+DUTY REPORTS DATA:
+{{duty_reports_section}}
+
+ENGAGEMENT REPORTS DATA:
+{{engagement_reports_section}}
 """
     prompt_template = get_admin_prompt("dashboard_prompt", default_dashboard_prompt)
     prompt = prompt_template.format(
