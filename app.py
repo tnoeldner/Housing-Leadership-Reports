@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timedelta, date, time as dt_time
 from supabase import create_client, Client
 from src.ai import init_ai, get_gemini_models, gemini_test_prompt
+from src.database import log_user_activity
 
 try:
     from zoneinfo import ZoneInfo  # Python 3.9+
@@ -4245,6 +4246,11 @@ def login_form():
                     # Store user object and access token separately
                     st.session_state["user"] = user_session.user
                     st.session_state["access_token"] = getattr(getattr(user_session, "session", None), "access_token", None)
+                    # Log login activity via service role
+                    try:
+                        log_user_activity("login", context="auth", metadata={"email": email}, user=user_session.user)
+                    except Exception:
+                        pass
                     # Fetch profile info and set in session_state
                     user_id = user_session.user.id
                     profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
