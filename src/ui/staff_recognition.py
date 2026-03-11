@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 import pandas as pd
 import io
-from google import genai
+from src.ai import call_gemini_ai  # centralizes Gemini calls and usage logging
 from src.database import save_staff_recognition, save_staff_performance_scores, supabase
 try:
     from zoneinfo import ZoneInfo
@@ -41,14 +41,6 @@ def evaluate_staff_performance(weekly_reports, rubrics):
     """Use AI to evaluate staff performance against ASCEND and NORTH criteria"""
     if not weekly_reports or not rubrics:
         return None
-    
-        from src.config import get_secret
-        api_key = get_secret("GOOGLE_API_KEY")
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-pro",
-            contents=prompt
-        )
     
     # Build staff performance data
     staff_data = []
@@ -130,22 +122,17 @@ REMINDER:
 """
 
     try:
-        from src.config import get_secret
-        api_key = get_secret("GOOGLE_API_KEY")
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-pro",
-            contents=prompt
-        )
+        # Use shared helper so usage_metadata is logged to ai_usage_logs
+        response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context="weekly_staff_recognition")
         
         # Debug: Show prompt and raw response
         with st.expander("🕵️ Debug: AI Input & Output"):
             st.subheader("Prompt Sent to AI")
             st.code(prompt, language="text")
             st.subheader("Raw AI Response")
-            st.code(response.text, language="json")
+            st.code(response_text, language="json")
             
-        clean_response = response.text.strip().replace("```json", "").replace("```", "")
+        clean_response = response_text.strip().replace("```json", "").replace("```", "")
         result = json.loads(clean_response)
         
         # Clamp scores to 1-4 range for top performers
