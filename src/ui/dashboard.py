@@ -636,7 +636,7 @@ def dashboard_page(supervisor_mode=False):
 
             st.subheader("Generated Summary (Editable)")
             # Warn if the AI output does not contain the required section
-            summary_text = summary_data.get("text", "")
+            summary_text = summary_data.get("text") or ""
             if "Operational & Safety Summary" not in summary_text:
                 st.warning("⚠️ The AI output does not contain the 'Operational & Safety Summary' section. Please review the prompt and summary.")
             with st.form("save_summary_form"):
