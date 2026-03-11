@@ -56,8 +56,13 @@ def log_user_activity(event_type: str, context: str = None, metadata: dict = Non
     }
     try:
         admin.table("user_activity_logs").insert(payload).execute()
-    except Exception:
-        # Don't break the app on logging failures
+    except Exception as e:
+        # Emit a lightweight debug message so we can see failures without breaking the app
+        print(f"[WARN] user_activity_logs insert failed: {type(e).__name__}: {e}")
+        try:
+            st.warning("User activity log insert failed; check service role key and RLS policies.")
+        except Exception:
+            pass
         return
 
 def safe_db_query(query_builder, operation_name="Database query", max_retries=3):
