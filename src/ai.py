@@ -22,8 +22,12 @@ def generate_admin_dashboard_summary(selected_date_for_summary, staff_reports_te
         except Exception:
             return ""
 
-    ascend_rubric = load_rubric_text("ascend_rubric.md")
-    north_rubric = load_rubric_text("north_rubric.md")
+    def escape_braces(text):
+        # Prevent str.format from treating rubric placeholders like {__app_id} as format keys
+        return text.replace("{", "{{").replace("}", "}}") if isinstance(text, str) else text
+
+    ascend_rubric = escape_braces(load_rubric_text("ascend_rubric.md"))
+    north_rubric = escape_braces(load_rubric_text("north_rubric.md"))
 
     default_dashboard_prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {{selected_date_for_summary}} into a single, comprehensive summary report.
@@ -111,9 +115,9 @@ ENGAGEMENT REPORTS DATA:
     prompt_template = get_admin_prompt("dashboard_prompt", default_dashboard_prompt)
     prompt = prompt_template.format(
         selected_date_for_summary=selected_date_for_summary,
-        staff_reports_text=staff_reports_text,
-        duty_reports_section=duty_reports_section,
-        engagement_reports_section=engagement_reports_section,
+        staff_reports_text=(staff_reports_text or "").replace("{", "{{").replace("}", "}}"),
+        duty_reports_section=(duty_reports_section or "").replace("{", "{{").replace("}", "}}"),
+        engagement_reports_section=(engagement_reports_section or "").replace("{", "{{").replace("}", "}}"),
         average_score=average_score
     )
     import streamlit as st
