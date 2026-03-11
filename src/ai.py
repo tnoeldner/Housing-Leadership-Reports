@@ -258,6 +258,8 @@ def log_ai_usage(model_name, usage, context=None):
                 "cost_usd": round(cost_usd, 6),
             },
             user=user_obj,
+            user_id=getattr(user_obj, "id", None),
+            user_email=getattr(user_obj, "email", None),
         )
     except Exception:
         # Silent fail; logging shouldn't break app flow

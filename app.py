@@ -4246,9 +4246,16 @@ def login_form():
                     # Store user object and access token separately
                     st.session_state["user"] = user_session.user
                     st.session_state["access_token"] = getattr(getattr(user_session, "session", None), "access_token", None)
-                    # Log login activity via service role
+                    # Log login activity via service role with explicit id/email
                     try:
-                        log_user_activity("login", context="auth", metadata={"email": email}, user=user_session.user)
+                        log_user_activity(
+                            "login",
+                            context="auth",
+                            metadata={"email": email},
+                            user=user_session.user,
+                            user_id=getattr(user_session.user, "id", None),
+                            user_email=getattr(user_session.user, "email", None),
+                        )
                     except Exception:
                         pass
                     # Fetch profile info and set in session_state

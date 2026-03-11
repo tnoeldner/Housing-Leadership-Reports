@@ -29,7 +29,7 @@ def get_admin_client():
     return create_client(url, service_key)
 
 
-def log_user_activity(event_type: str, context: str = None, metadata: dict = None, user: dict = None):
+def log_user_activity(event_type: str, context: str = None, metadata: dict = None, user: dict = None, user_id=None, user_email=None):
     """Best-effort user activity logger (login, ai_call, etc.). Uses service role to bypass RLS."""
     try:
         admin = get_admin_client()
@@ -38,20 +38,23 @@ def log_user_activity(event_type: str, context: str = None, metadata: dict = Non
 
     # Resolve user info
     user_obj = user or getattr(st.session_state, "get", lambda *_: None)("user")
-    user_id = None
-    user_email = None
-    if user_obj:
-        user_id = getattr(user_obj, "id", None) or user_obj.get("id") if isinstance(user_obj, dict) else None
-        user_email = getattr(user_obj, "email", None) or user_obj.get("email") if isinstance(user_obj, dict) else None
+    resolved_id = user_id
+    resolved_email = user_email
+    if not resolved_id or not resolved_email:
+        if user_obj:
+            if resolved_id is None:
+                resolved_id = getattr(user_obj, "id", None) or (user_obj.get("id") if isinstance(user_obj, dict) else None)
+            if resolved_email is None:
+                resolved_email = getattr(user_obj, "email", None) or (user_obj.get("email") if isinstance(user_obj, dict) else None)
     # Fall back to session_state email if present
-    if not user_email:
-        user_email = st.session_state.get("email") if isinstance(st.session_state, dict) else None
+    if not resolved_email and isinstance(st.session_state, dict):
+        resolved_email = st.session_state.get("email")
 
     payload = {
         "event_type": event_type,
         "context": context or "",
-        "user_id": user_id,
-        "user_email": user_email,
+        "user_id": resolved_id,
+        "user_email": resolved_email,
         "metadata": metadata or {},
     }
     try:
