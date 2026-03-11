@@ -1378,16 +1378,20 @@ def select_quarterly_winners(quarter, fiscal_year):
         if north_winner_obj and north_summary:
             north_winner_obj['reasoning'] = north_summary
 
+        # Store as JSON objects; the Supabase client will serialize dicts to jsonb
         save_data = {
             "fiscal_year": fiscal_year,
             "quarter": quarter,
-            "ascend_winner": json.dumps(ascend_winner_obj),
-            "north_winner": json.dumps(north_winner_obj)
+            "ascend_winner": ascend_winner_obj,
+            "north_winner": north_winner_obj
         }
+
+        # Use service-role client for RLS-protected writes
+        admin = get_admin_client()
 
         # Check if a record for this quarter already exists
         check_success, existing_records, check_error = safe_db_query(
-            supabase.table("quarterly_staff_recognition")
+            admin.table("quarterly_staff_recognition")
             .select("id")
             .eq("fiscal_year", fiscal_year)
             .eq("quarter", quarter),
@@ -1397,7 +1401,7 @@ def select_quarterly_winners(quarter, fiscal_year):
         if check_success and existing_records and len(existing_records) > 0:
             # Record exists, update it
             success, _, error = safe_db_query(
-                supabase.table("quarterly_staff_recognition")
+                admin.table("quarterly_staff_recognition")
                 .update(save_data)
                 .eq("fiscal_year", fiscal_year)
                 .eq("quarter", quarter),
@@ -1406,7 +1410,7 @@ def select_quarterly_winners(quarter, fiscal_year):
         else:
             # Record doesn't exist, insert it
             success, _, error = safe_db_query(
-                supabase.table("quarterly_staff_recognition").insert(save_data),
+                admin.table("quarterly_staff_recognition").insert(save_data),
                 "Saving quarterly winners"
             )
 
