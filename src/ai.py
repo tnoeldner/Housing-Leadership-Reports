@@ -133,6 +133,10 @@ ENGAGEMENT REPORTS DATA:
         # Log usage/cost if metadata is available
         usage = extract_usage_metadata(result)
         log_ai_usage("models/gemini-2.5-pro", usage, context="admin_dashboard_summary")
+        try:
+            st.session_state["last_ai_usage"] = usage
+        except Exception:
+            pass
 
         st.info(f"DEBUG: model.generate_content returned: {repr(result)}")
         response_text = getattr(result, "text", None)
@@ -215,9 +219,13 @@ def log_ai_usage(model_name, usage, context=None):
     """Persist AI usage metadata to Supabase for cost tracking."""
     if not usage:
         return
-    prompt_tokens = getattr(usage, "prompt_token_count", None) or usage.get("prompt_token_count") if isinstance(usage, dict) else None
-    response_tokens = getattr(usage, "candidates_token_count", None) or usage.get("candidates_token_count") if isinstance(usage, dict) else None
-    total_tokens = getattr(usage, "total_token_count", None) or usage.get("total_token_count") if isinstance(usage, dict) else None
+    # Support multiple possible usage field names from Gemini responses
+    def _get(name):
+        return getattr(usage, name, None) if not isinstance(usage, dict) else usage.get(name)
+
+    prompt_tokens = _get("prompt_token_count") or _get("input_token_count") or _get("input_tokens")
+    response_tokens = _get("candidates_token_count") or _get("output_token_count") or _get("output_tokens")
+    total_tokens = _get("total_token_count") or _get("total_tokens")
 
     rate = AI_RATE_CARD.get(model_name, AI_RATE_CARD.get(model_name.replace("models/", ""), {"prompt": 0, "response": 0}))
     prompt_cost = ((prompt_tokens or 0) / 1000.0) * rate.get("prompt", 0)
@@ -233,6 +241,7 @@ def log_ai_usage(model_name, usage, context=None):
             "total_tokens": total_tokens,
             "cost_usd": round(cost_usd, 6),
             "context": context or "",
+            "raw_usage": usage if isinstance(usage, dict) else None,
         }
         client.table("ai_usage_logs").insert(payload).execute()
     except Exception:
@@ -252,6 +261,11 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context=None):
         # Log usage/cost if available (robust extraction)
         usage = extract_usage_metadata(response)
         log_ai_usage(model_name, usage, context=context)
+        try:
+            import streamlit as st  # local import to avoid dependency when not in Streamlit
+            st.session_state["last_ai_usage"] = usage
+        except Exception:
+            pass
         # Extract text from response
         response_text = None
         try:
