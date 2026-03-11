@@ -131,7 +131,7 @@ ENGAGEMENT REPORTS DATA:
         model = genai.GenerativeModel("gemini-2.5-pro")
         result = model.generate_content(prompt)
         # Log usage/cost if metadata is available
-        usage = getattr(result, "usage_metadata", None)
+        usage = extract_usage_metadata(result)
         log_ai_usage("models/gemini-2.5-pro", usage, context="admin_dashboard_summary")
 
         st.info(f"DEBUG: model.generate_content returned: {repr(result)}")
@@ -176,6 +176,41 @@ AI_RATE_CARD = {
 }
 
 
+def extract_usage_metadata(response):
+    """Best-effort extraction of usage metadata from Gemini responses."""
+    if response is None:
+        return None
+
+    # Common attributes
+    for attr in ["usage_metadata", "usageMetadata"]:
+        val = getattr(response, attr, None)
+        if val:
+            return val
+
+    # Nested result object
+    res = getattr(response, "result", None) or getattr(response, "_result", None)
+    if res:
+        for attr in ["usage_metadata", "usageMetadata"]:
+            val = getattr(res, attr, None)
+            if val:
+                return val
+
+    # Fallback to dict form if available
+    to_dict = getattr(response, "to_dict", None)
+    if callable(to_dict):
+        try:
+            data = to_dict()
+            usage = data.get("usage_metadata") or data.get("usageMetadata")
+            if usage:
+                return usage
+            result = data.get("result") or data.get("_result")
+            if result:
+                return result.get("usage_metadata") or result.get("usageMetadata")
+        except Exception:
+            pass
+    return None
+
+
 def log_ai_usage(model_name, usage, context=None):
     """Persist AI usage metadata to Supabase for cost tracking."""
     if not usage:
@@ -213,9 +248,9 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context=None):
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
-        response = model.generate_content([{"role": "user", "parts": [{"text": prompt}] }])
-        # Log usage/cost if available
-        usage = getattr(response, "usage_metadata", None)
+        response = model.generate_content([{ "role": "user", "parts": [{"text": prompt}] }])
+        # Log usage/cost if available (robust extraction)
+        usage = extract_usage_metadata(response)
         log_ai_usage(model_name, usage, context=context)
         # Extract text from response
         response_text = None
@@ -224,7 +259,7 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context=None):
                 response_text = response.text
             elif hasattr(response, 'candidates') and response.candidates:
                 response_text = response.candidates[0].content.parts[0].text
-            elif hasattr(response, 'result') and hasattr(response.result, 'candidates'):
+            elif hasattr(response, 'result') and hasattr(response.result, 'candidates') and response.result.candidates:
                 response_text = response.result.candidates[0].content.parts[0].text
             else:
                 response_text = str(response)
