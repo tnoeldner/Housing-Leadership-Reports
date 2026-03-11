@@ -571,6 +571,44 @@ You are writing a weekly staff recognition summary. From the following staff rep
         with col2:
             end_date = st.date_input("AI Usage End", value=today, key="ai_usage_end_date_input")
 
+        # Optional: run BigQuery backfill from the UI
+        with st.expander("Sync from BigQuery billing export"):
+            default_bq_table = os.getenv("BQ_BILLING_TABLE", "")
+            bq_table = st.text_input("Billing table (project.dataset.table)", value=default_bq_table, help="Example: gen-lang-client-0478633344.detailed_billing_report.gcp_billing_export_resource_v1_0188A0_7A6E35_DA34CA")
+            sync_start = st.date_input("Billing start date", value=start_date, key="ai_usage_bq_start")
+            sync_end = st.date_input("Billing end date", value=end_date, key="ai_usage_bq_end")
+            if st.button("Run BigQuery sync", type="primary", key="ai_usage_run_bq_sync"):
+                if not bq_table:
+                    st.error("Please provide a billing export table path.")
+                elif sync_start > sync_end:
+                    st.error("Start date cannot be after end date for sync.")
+                else:
+                    with st.spinner("Syncing ai_usage_logs from BigQuery..."):
+                        try:
+                            import subprocess, sys
+                            from pathlib import Path
+
+                            script_path = Path(__file__).resolve().parents[1] / "backfill_ai_usage.py"
+                            cmd = [
+                                sys.executable,
+                                str(script_path),
+                                "--bq-table", bq_table,
+                                "--start", sync_start.isoformat(),
+                                "--end", sync_end.isoformat(),
+                            ]
+                            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                            st.success("BigQuery sync completed.")
+                            if result.stdout:
+                                st.code(result.stdout[-4000:], language="text")
+                            if result.stderr:
+                                st.info("stderr:")
+                                st.code(result.stderr[-2000:], language="text")
+                        except subprocess.CalledProcessError as e:
+                            st.error(f"Sync failed: {e}")
+                            st.code((e.stdout or "") + "\n" + (e.stderr or ""), language="text")
+                        except Exception as e:
+                            st.error(f"Sync failed: {e}")
+
         if start_date > end_date:
             st.error("Start date cannot be after end date.")
             st.stop()
@@ -607,11 +645,19 @@ You are writing a weekly staff recognition summary. From the following staff rep
             with colf2:
                 context_filter = st.multiselect("Filter by context", options=contexts, default=contexts)
 
+            search_term = st.text_input("Search in model/context", key="ai_usage_search", placeholder="e.g., weekly_staff_recognition or gemini-2.5-pro")
+
             filtered = df.copy()
             if model_filter:
                 filtered = filtered[filtered["model"].isin(model_filter)]
             if context_filter:
                 filtered = filtered[filtered["context"].isin(context_filter)]
+            if search_term:
+                term = search_term.lower()
+                filtered = filtered[
+                    filtered["model"].fillna("").str.lower().str.contains(term)
+                    | filtered["context"].fillna("").str.lower().str.contains(term)
+                ]
 
             if filtered.empty:
                 st.info("No records match the selected filters.")
@@ -658,8 +704,68 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     st.markdown("**Cost by context**")
                     st.dataframe(by_context, use_container_width=True, hide_index=True)
 
-                with st.expander("Raw usage records"):
-                    st.dataframe(filtered.sort_values("created_at", ascending=False), use_container_width=True)
+                # Raw log table (user-friendly view)
+                st.markdown("**Raw usage records**")
+                display_cols = [col for col in ["created_at", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "id"] if col in filtered.columns]
+                raw_sorted = filtered.sort_values("created_at", ascending=False)
+                st.dataframe(raw_sorted[display_cols], use_container_width=True, hide_index=True)
+
+        # --- User Activity Logs ---
+        st.markdown("---")
+        st.subheader("User Activity Logs (login & AI calls)")
+        act_start = st.date_input("Activity Start", value=start_date, key="activity_start")
+        act_end = st.date_input("Activity End", value=end_date, key="activity_end")
+        if act_start > act_end:
+            st.error("Activity start date cannot be after end date.")
+        else:
+            try:
+                admin_client = get_admin_client()
+                end_exclusive = act_end + timedelta(days=1)
+                resp_act = admin_client.table("user_activity_logs") \
+                    .select("*") \
+                    .gte("created_at", act_start.isoformat()) \
+                    .lt("created_at", end_exclusive.isoformat()) \
+                    .order("created_at", desc=True) \
+                    .execute()
+                acts = resp_act.data or []
+            except Exception as e:
+                st.error(f"Failed to load activity logs: {e}")
+                acts = []
+
+            if not acts:
+                st.info("No activity records in the selected range.")
+            else:
+                adf = pd.DataFrame(acts)
+                adf["created_at"] = pd.to_datetime(adf["created_at"], errors="coerce")
+                event_types = sorted(adf.get("event_type", pd.Series(dtype=str)).dropna().unique())
+                contexts = sorted(adf.get("context", pd.Series(dtype=str)).dropna().unique())
+
+                col_a1, col_a2, col_a3 = st.columns(3)
+                with col_a1:
+                    ev_filter = st.multiselect("Filter by event", options=event_types, default=event_types)
+                with col_a2:
+                    ctx_filter = st.multiselect("Filter by context", options=contexts, default=contexts)
+                with col_a3:
+                    user_search = st.text_input("Search user/email", key="activity_user_search", placeholder="email or part of it")
+
+                af = adf.copy()
+                if ev_filter:
+                    af = af[af["event_type"].isin(ev_filter)]
+                if ctx_filter:
+                    af = af[af["context"].isin(ctx_filter)]
+                if user_search:
+                    term = user_search.lower()
+                    af = af[
+                        af["user_email"].fillna("").str.lower().str.contains(term)
+                        | af["context"].fillna("").str.lower().str.contains(term)
+                    ]
+
+                if af.empty:
+                    st.info("No activity records match the filters.")
+                else:
+                    st.markdown("**Activity records**")
+                    disp_cols = [c for c in ["created_at", "event_type", "context", "user_email", "user_id", "metadata"] if c in af.columns]
+                    st.dataframe(af.sort_values("created_at", ascending=False)[disp_cols], use_container_width=True, hide_index=True)
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")

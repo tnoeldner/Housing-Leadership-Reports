@@ -1,5 +1,5 @@
 import streamlit as st
-from src.database import supabase
+from src.database import supabase, log_user_activity
 from src.utils import clear_form_state
 
 def login_form():
@@ -18,6 +18,8 @@ def login_form():
                 if getattr(user_session, "user", None):
                     st.session_state["user"] = user_session.user
                     print(f"DEBUG: Login successful for {email}")
+                    # Log login activity
+                    log_user_activity("login", context="auth", metadata={"email": email})
                     if hasattr(user_session, 'session'):
                         print(f"DEBUG: Found session attribute")
                         st.session_state["supabase_session"] = user_session.session

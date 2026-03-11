@@ -28,6 +28,38 @@ def get_admin_client():
     
     return create_client(url, service_key)
 
+
+def log_user_activity(event_type: str, context: str = None, metadata: dict = None, user: dict = None):
+    """Best-effort user activity logger (login, ai_call, etc.). Uses service role to bypass RLS."""
+    try:
+        admin = get_admin_client()
+    except Exception:
+        return  # silently skip if no service key
+
+    # Resolve user info
+    user_obj = user or getattr(st.session_state, "get", lambda *_: None)("user")
+    user_id = None
+    user_email = None
+    if user_obj:
+        user_id = getattr(user_obj, "id", None) or user_obj.get("id") if isinstance(user_obj, dict) else None
+        user_email = getattr(user_obj, "email", None) or user_obj.get("email") if isinstance(user_obj, dict) else None
+    # Fall back to session_state email if present
+    if not user_email:
+        user_email = st.session_state.get("email") if isinstance(st.session_state, dict) else None
+
+    payload = {
+        "event_type": event_type,
+        "context": context or "",
+        "user_id": user_id,
+        "user_email": user_email,
+        "metadata": metadata or {},
+    }
+    try:
+        admin.table("user_activity_logs").insert(payload).execute()
+    except Exception:
+        # Don't break the app on logging failures
+        return
+
 def safe_db_query(query_builder, operation_name="Database query", max_retries=3):
     """
     Safely execute a Supabase query with retry logic and error handling.

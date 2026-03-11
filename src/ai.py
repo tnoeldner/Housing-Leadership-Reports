@@ -161,6 +161,7 @@ import json
 import re
 import google.generativeai as genai
 from src.config import get_secret
+from src.database import get_admin_client, log_user_activity
 
 client = None
 
@@ -244,6 +245,20 @@ def log_ai_usage(model_name, usage, context=None):
             "raw_usage": usage if isinstance(usage, dict) else None,
         }
         client.table("ai_usage_logs").insert(payload).execute()
+        # Also log activity for attribution
+        user_obj = st.session_state.get("user") if isinstance(st.session_state, dict) else None
+        log_user_activity(
+            event_type="ai_call",
+            context=context or model_name,
+            metadata={
+                "model": model_name,
+                "prompt_tokens": prompt_tokens,
+                "response_tokens": response_tokens,
+                "total_tokens": total_tokens,
+                "cost_usd": round(cost_usd, 6),
+            },
+            user=user_obj,
+        )
     except Exception:
         # Silent fail; logging shouldn't break app flow
         pass
