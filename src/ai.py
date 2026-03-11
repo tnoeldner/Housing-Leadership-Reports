@@ -130,6 +130,10 @@ ENGAGEMENT REPORTS DATA:
         st.info("DEBUG: Creating GenerativeModel and calling generate_content...")
         model = genai.GenerativeModel("gemini-2.5-pro")
         result = model.generate_content(prompt)
+        # Log usage/cost if metadata is available
+        usage = getattr(result, "usage_metadata", None)
+        log_ai_usage("models/gemini-2.5-pro", usage, context="admin_dashboard_summary")
+
         st.info(f"DEBUG: model.generate_content returned: {repr(result)}")
         response_text = getattr(result, "text", None)
         st.info(f"DEBUG: Extracted response_text: {repr(response_text)}")
