@@ -273,7 +273,6 @@ def log_ai_usage(model_name, usage, context=None):
     except Exception as e:
         # Emit a visible warning so we can debug RLS/credential issues in production
         try:
-            import streamlit as st
             st.warning(f"AI usage log insert failed: {type(e).__name__}: {e}")
         except Exception:
             pass
