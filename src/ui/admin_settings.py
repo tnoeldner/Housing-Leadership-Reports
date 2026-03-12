@@ -859,6 +859,84 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     act_df["date"] = act_df["created_at"].dt.date
                 if not bq_df.empty:
                     bq_df["date"] = pd.to_datetime(bq_df["date"], errors="coerce").dt.date
+                    if "bq_cost_usd" in bq_df.columns and "cost_usd" not in bq_df.columns:
+                        bq_df["cost_usd"] = bq_df["bq_cost_usd"]
+
+                # Show a combined transaction view so every source row is visible
+                if ai_df.empty and bq_df.empty:
+                    st.info("No AI usage or BigQuery billing rows in this range.")
+                else:
+                    local_tz = "America/Chicago"
+
+                    app_trans = ai_df.copy()
+                    if not app_trans.empty:
+                        app_trans["source"] = "app_ai_usage"
+                        app_trans["created_at"] = pd.to_datetime(app_trans["created_at"], errors="coerce")
+                        try:
+                            if app_trans["created_at"].dt.tz is None:
+                                app_trans["created_local"] = app_trans["created_at"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+                            else:
+                                app_trans["created_local"] = app_trans["created_at"].dt.tz_convert(local_tz)
+                        except Exception:
+                            app_trans["created_local"] = app_trans["created_at"]
+                        app_trans["record_id"] = app_trans["id"] if "id" in app_trans.columns else None
+                    else:
+                        app_trans = pd.DataFrame(columns=["date", "source", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "user_email", "user_id", "created_local", "created_at", "record_id"])
+
+                    bq_trans = pd.DataFrame(columns=["date", "source", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "user_email", "user_id", "created_local", "created_at", "record_id"])
+                    if not bq_df.empty:
+                        bq_trans = bq_df.copy()
+                        bq_trans["source"] = "bigquery"
+                        bq_trans["model"] = "gemini_billing_export"
+                        bq_trans["context"] = "bq_billing_rollup"
+                        bq_trans["user_email"] = None
+                        bq_trans["user_id"] = None
+                        bq_trans["prompt_tokens"] = None
+                        bq_trans["response_tokens"] = None
+                        bq_trans["total_tokens"] = None
+                        bq_trans["record_id"] = None
+                        bq_trans["created_at"] = pd.to_datetime(bq_trans["date"], errors="coerce")
+                        try:
+                            if bq_trans["created_at"].dt.tz is None:
+                                bq_trans["created_local"] = bq_trans["created_at"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+                            else:
+                                bq_trans["created_local"] = bq_trans["created_at"].dt.tz_convert(local_tz)
+                        except Exception:
+                            bq_trans["created_local"] = bq_trans["created_at"]
+                        if "cost_usd" not in bq_trans.columns:
+                            bq_trans["cost_usd"] = 0.0
+
+                    details_cols = [
+                        "date",
+                        "source",
+                        "cost_usd",
+                        "model",
+                        "context",
+                        "user_email",
+                        "user_id",
+                        "prompt_tokens",
+                        "response_tokens",
+                        "total_tokens",
+                        "created_local",
+                        "record_id",
+                        "created_at",
+                    ]
+                    details = pd.concat([app_trans, bq_trans], ignore_index=True)
+                    details = details[details_cols]
+                    details = details.sort_values(["date", "source", "created_at"], ascending=[False, True, False])
+                    st.markdown("**Reconciliation transactions (app AI logs and BigQuery imports)**")
+                    display_cols = [
+                        "date",
+                        "source",
+                        "cost_usd",
+                        "model",
+                        "context",
+                        "user_email",
+                        "user_id",
+                        "created_local",
+                        "record_id",
+                    ]
+                    st.dataframe(details[display_cols], use_container_width=True, hide_index=True)
 
                 # Cost reconciliation (ai_usage_logs vs BigQuery)
                 if ai_df.empty:
