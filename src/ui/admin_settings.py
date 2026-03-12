@@ -2,6 +2,7 @@ import time
 import os
 import json
 import pandas as pd
+import tempfile
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -745,6 +746,144 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 display_cols = [col for col in ["created_local", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "id"] if col in filtered.columns]
                 raw_sorted = filtered.sort_values("created_at", ascending=False)
                 st.dataframe(raw_sorted[display_cols], use_container_width=True, hide_index=True)
+
+        # --- Reconciliation: BigQuery vs app logs ---
+        with st.expander("Reconcile AI usage vs BigQuery and activity logs"):
+            tol = st.number_input("Cost tolerance (USD)", min_value=0.0, value=0.05, step=0.01, key="ai_recon_tol")
+            if st.button("Run reconciliation", type="primary", key="ai_usage_reconcile_btn"):
+                end_exclusive = end_date + timedelta(days=1)
+
+                # Load app AI usage
+                try:
+                    admin_client = get_admin_client()
+                    resp_ai = admin_client.table("ai_usage_logs") \
+                        .select("*") \
+                        .gte("created_at", start_date.isoformat()) \
+                        .lt("created_at", end_exclusive.isoformat()) \
+                        .execute()
+                    ai_rows = resp_ai.data or []
+                except Exception as e:
+                    st.error(f"Failed to load ai_usage_logs for reconciliation: {e}")
+                    ai_rows = []
+
+                # Load activity logs (ai_call)
+                try:
+                    admin_client = get_admin_client()
+                    resp_act = admin_client.table("user_activity_logs") \
+                        .select("*") \
+                        .eq("event_type", "ai_call") \
+                        .gte("created_at", start_date.isoformat()) \
+                        .lt("created_at", end_exclusive.isoformat()) \
+                        .execute()
+                    act_rows = resp_act.data or []
+                except Exception as e:
+                    st.error(f"Failed to load user_activity_logs: {e}")
+                    act_rows = []
+
+                # BigQuery daily costs
+                bq_rows = []
+                bq_error = None
+                if not bq_table:
+                    bq_error = "Billing table not provided. Set BQ_BILLING_TABLE or fill the input above."
+                else:
+                    try:
+                        from google.cloud import bigquery
+                        gcp_sa_json = get_secret("GCP_SERVICE_ACCOUNT") or None
+                        tmp_path = None
+                        if gcp_sa_json:
+                            tmp_fd, tmp_name = tempfile.mkstemp(prefix="gcp_sa_", suffix=".json")
+                            os.close(tmp_fd)
+                            with open(tmp_name, "w", encoding="utf-8") as tf:
+                                tf.write(gcp_sa_json)
+                            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp_name
+                            tmp_path = tmp_name
+
+                        client = bigquery.Client()
+                        query = f"""
+                            WITH base AS (
+                                SELECT DATE(usage_start_time) AS usage_day, cost AS cost_usd
+                                FROM `{bq_table}`
+                            )
+                            SELECT usage_day, SUM(cost_usd) AS cost_usd
+                            FROM base
+                            WHERE usage_day BETWEEN @start AND @end
+                            GROUP BY usage_day
+                            ORDER BY usage_day
+                        """
+                        job = client.query(
+                            query,
+                            job_config=bigquery.QueryJobConfig(
+                                query_parameters=[
+                                    bigquery.ScalarQueryParameter("start", "DATE", start_date.isoformat()),
+                                    bigquery.ScalarQueryParameter("end", "DATE", end_date.isoformat()),
+                                ]
+                            ),
+                        )
+                        bq_rows = [
+                            {"date": r.get("usage_day"), "bq_cost_usd": float(r.get("cost_usd", 0.0))}
+                            for r in job
+                        ]
+                    except Exception as e:
+                        bq_error = str(e)
+                    finally:
+                        if tmp_path:
+                            try:
+                                os.remove(tmp_path)
+                            except Exception:
+                                pass
+
+                # Build DataFrames
+                ai_df = pd.DataFrame(ai_rows)
+                act_df = pd.DataFrame(act_rows)
+                bq_df = pd.DataFrame(bq_rows)
+
+                if not ai_df.empty:
+                    ai_df["created_at"] = pd.to_datetime(ai_df["created_at"], errors="coerce")
+                    ai_df["date"] = ai_df["created_at"].dt.date
+                if not act_df.empty:
+                    act_df["created_at"] = pd.to_datetime(act_df["created_at"], errors="coerce")
+                    act_df["date"] = act_df["created_at"].dt.date
+                if not bq_df.empty:
+                    bq_df["date"] = pd.to_datetime(bq_df["date"], errors="coerce").dt.date
+
+                # Cost reconciliation (ai_usage_logs vs BigQuery)
+                if ai_df.empty:
+                    st.warning("No ai_usage_logs in range to reconcile.")
+                else:
+                    daily_app = ai_df.groupby("date")["cost_usd"].sum().reset_index(name="app_cost_usd")
+                    daily_cost = daily_app
+                    if not bq_df.empty:
+                        daily_cost = daily_app.merge(bq_df, on="date", how="outer").fillna({"app_cost_usd": 0.0, "bq_cost_usd": 0.0})
+                    else:
+                        daily_cost["bq_cost_usd"] = 0.0
+                    daily_cost["delta_usd"] = daily_cost["app_cost_usd"] - daily_cost["bq_cost_usd"]
+                    mism = daily_cost[daily_cost["delta_usd"].abs() > tol]
+                    st.markdown("**Cost reconciliation (per day)**")
+                    st.dataframe(daily_cost.sort_values("date"), use_container_width=True, hide_index=True)
+                    if bq_error:
+                        st.warning(f"BigQuery not compared: {bq_error}")
+                    if mism.empty:
+                        st.success(f"No cost mismatches above ${tol:.2f}.")
+                    else:
+                        st.error(f"Mismatches above ${tol:.2f} (rows below):")
+                        st.dataframe(mism.sort_values("date"), use_container_width=True, hide_index=True)
+
+                # Activity reconciliation (ai_usage_logs vs user_activity_logs ai_call)
+                if ai_df.empty and act_df.empty:
+                    st.warning("No data to reconcile for activity logs.")
+                else:
+                    app_counts = ai_df.groupby("date")["id" if "id" in ai_df.columns else "cost_usd"].count().reset_index(name="ai_usage_count") if not ai_df.empty else pd.DataFrame(columns=["date", "ai_usage_count"])
+                    act_counts = act_df.groupby("date")["id" if "id" in act_df.columns else "event_type"].count().reset_index(name="activity_count") if not act_df.empty else pd.DataFrame(columns=["date", "activity_count"])
+                    daily_counts = app_counts.merge(act_counts, on="date", how="outer").fillna({"ai_usage_count": 0, "activity_count": 0})
+                    daily_counts["delta_count"] = daily_counts["ai_usage_count"] - daily_counts["activity_count"]
+                    st.markdown("**AI call count reconciliation (per day)**")
+                    st.dataframe(daily_counts.sort_values("date"), use_container_width=True, hide_index=True)
+                    mism_counts = daily_counts[daily_counts["delta_count"] != 0]
+                    if mism_counts.empty:
+                        st.success("AI usage rows and activity logs align by day.")
+                    else:
+                        st.error("Mismatched counts (rows below):")
+                        st.dataframe(mism_counts.sort_values("date"), use_container_width=True, hide_index=True)
 
         # --- User Activity Logs ---
         st.markdown("---")
