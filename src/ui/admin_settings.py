@@ -947,11 +947,52 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         ]
                         st.dataframe(details[display_cols], use_container_width=True, hide_index=True)
 
-                # Cost reconciliation (ai_usage_logs vs BigQuery)
+                # App calls annotated with daily BigQuery cost (match/no match)
                 if ai_df.empty:
                     st.warning("No ai_usage_logs in range to reconcile.")
                 else:
-                    daily_app = ai_df.groupby("date")["cost_usd"].sum().reset_index(name="app_cost_usd")
+                    bq_cost_map = bq_df.set_index("date")["cost_usd"].to_dict() if not bq_df.empty else {}
+                    app_with_match = ai_df.copy()
+                    app_with_match["created_local"] = app_with_match["created_at"]
+                    try:
+                        if app_with_match["created_at"].dt.tz is None:
+                            app_with_match["created_local"] = app_with_match["created_at"].dt.tz_localize("UTC").dt.tz_convert("America/Chicago")
+                        else:
+                            app_with_match["created_local"] = app_with_match["created_at"].dt.tz_convert("America/Chicago")
+                    except Exception:
+                        pass
+                    app_with_match["bq_cost_usd_for_date"] = app_with_match["date"].map(bq_cost_map) if bq_cost_map else None
+                    app_with_match["match_status"] = app_with_match["bq_cost_usd_for_date"].apply(lambda x: "matched" if pd.notna(x) else "no_bq_match")
+                    app_display_cols = [
+                        "date",
+                        "created_local",
+                        "model",
+                        "context",
+                        "cost_usd",
+                        "bq_cost_usd_for_date",
+                        "match_status",
+                        "user_email",
+                        "user_id",
+                        "id" if "id" in app_with_match.columns else None,
+                    ]
+                    app_display_cols = [c for c in app_display_cols if c]
+                    st.markdown("**App AI calls with daily BigQuery match status**")
+                    st.dataframe(app_with_match[app_display_cols].sort_values(["date", "created_at"], ascending=[False, False]), use_container_width=True, hide_index=True)
+
+                    # BigQuery rows annotated with app activity per day
+                    app_cost_by_date = app_with_match.groupby("date")["cost_usd"].sum().to_dict()
+                    app_calls_by_date = app_with_match.groupby("date")["context"].count().to_dict()
+                    bq_match = bq_df.copy() if not bq_df.empty else pd.DataFrame(columns=["date", "cost_usd"])
+                    if bq_match.empty:
+                        bq_match = pd.DataFrame(columns=["date", "cost_usd", "app_cost_usd", "app_calls", "match_status"])
+                    bq_match["app_cost_usd"] = bq_match["date"].map(app_cost_by_date).fillna(0.0)
+                    bq_match["app_calls"] = bq_match["date"].map(app_calls_by_date).fillna(0).astype(int)
+                    bq_match["match_status"] = bq_match.apply(lambda r: "matched" if (r.get("app_cost_usd", 0) > 0 or r.get("app_calls", 0) > 0) else "no_app_match", axis=1)
+                    st.markdown("**BigQuery daily rows with app activity summary**")
+                    st.dataframe(bq_match[["date", "cost_usd", "app_cost_usd", "app_calls", "match_status"]].sort_values("date", ascending=False), use_container_width=True, hide_index=True)
+
+                    # Cost reconciliation (ai_usage_logs vs BigQuery)
+                    daily_app = app_with_match.groupby("date")["cost_usd"].sum().reset_index(name="app_cost_usd")
                     daily_cost = daily_app
                     if not bq_df.empty:
                         daily_cost = daily_app.merge(bq_df, on="date", how="outer").fillna({"app_cost_usd": 0.0, "bq_cost_usd": 0.0})
