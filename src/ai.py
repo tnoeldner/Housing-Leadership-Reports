@@ -122,26 +122,9 @@ ENGAGEMENT REPORTS DATA:
     )
     import streamlit as st
     try:
-        api_key = get_secret("GOOGLE_API_KEY")
-        if not api_key:
-            st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
-            st.stop()
-        genai.configure(api_key=api_key)
-        st.info("DEBUG: Creating GenerativeModel and calling generate_content...")
-        model = genai.GenerativeModel("gemini-2.5-pro")
-        result = model.generate_content(prompt)
-        # Log usage/cost if metadata is available
-        usage = extract_usage_metadata(result)
-        log_ai_usage("models/gemini-2.5-pro", usage, context="admin_dashboard_summary")
-        try:
-            st.session_state["last_ai_usage"] = usage
-        except Exception:
-            pass
-
-        st.info(f"DEBUG: model.generate_content returned: {repr(result)}")
-        response_text = getattr(result, "text", None)
+        response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context="admin_dashboard_summary")
         st.info(f"DEBUG: Extracted response_text: {repr(response_text)}")
-        if not response_text or not response_text.strip():
+        if not response_text or not str(response_text).strip():
             st.info("Prompt sent to AI:")
             st.code(prompt)
             st.info("Input data summary:")
@@ -216,7 +199,32 @@ def extract_usage_metadata(response):
     return None
 
 
-def log_ai_usage(model_name, usage, context=None):
+def resolve_user_identity(explicit_user_id=None, explicit_email=None, explicit_user=None):
+    """Best-effort resolution of user id/email from explicit args, session_state, or Supabase auth."""
+    uid = explicit_user_id
+    email = explicit_email
+    user_obj = explicit_user or (st.session_state.get("user") if isinstance(st.session_state, dict) else None)
+    if user_obj:
+        uid = uid or getattr(user_obj, "id", None) or (user_obj.get("id") if isinstance(user_obj, dict) else None)
+        email = email or getattr(user_obj, "email", None) or (user_obj.get("email") if isinstance(user_obj, dict) else None)
+    if isinstance(st.session_state, dict):
+        uid = uid or st.session_state.get("user_id")
+        email = email or st.session_state.get("user_email")
+    # Fallback: pull from Supabase auth if access_token is present
+    if (uid is None or email is None) and isinstance(st.session_state, dict):
+        try:
+            user_client = get_user_client()
+            current = user_client.auth.get_user()
+            current_user = getattr(current, "user", current)
+            if current_user:
+                uid = uid or getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
+                email = email or getattr(current_user, "email", None) or (current_user.get("email") if isinstance(current_user, dict) else None)
+        except Exception:
+            pass
+    return uid, email
+
+
+def log_ai_usage(model_name, usage, context=None, user_id=None, user_email=None):
     """Persist AI usage metadata to Supabase for cost tracking. Logs even if usage metadata is missing."""
     # Support multiple possible usage field names from Gemini responses
     def _get(name):
@@ -238,33 +246,9 @@ def log_ai_usage(model_name, usage, context=None):
     response_cost = ((response_tokens or 0) / 1000.0) * rate.get("response", 0)
     cost_usd = prompt_cost + response_cost
 
-    def resolve_user_identity(explicit_user=None):
-        uid = None
-        email = None
-        user_obj = explicit_user or (st.session_state.get("user") if isinstance(st.session_state, dict) else None)
-        if user_obj:
-            uid = getattr(user_obj, "id", None) or (user_obj.get("id") if isinstance(user_obj, dict) else None)
-            email = getattr(user_obj, "email", None) or (user_obj.get("email") if isinstance(user_obj, dict) else None)
-        if isinstance(st.session_state, dict):
-            uid = uid or st.session_state.get("user_id")
-            email = email or st.session_state.get("user_email")
-        # Fallback: pull from Supabase auth if access_token is present
-        if (uid is None or email is None) and isinstance(st.session_state, dict):
-            try:
-                user_client = get_user_client()
-                current = user_client.auth.get_user()
-                # current may be a dict-like or object with .user
-                current_user = getattr(current, "user", current)
-                if current_user:
-                    uid = uid or getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
-                    email = email or getattr(current_user, "email", None) or (current_user.get("email") if isinstance(current_user, dict) else None)
-            except Exception:
-                pass
-        return uid, email
-
     try:
         client = get_admin_client()
-        user_id, user_email = resolve_user_identity()
+        user_id, user_email = resolve_user_identity(user_id, user_email)
 
         payload = {
             "model": model_name,
@@ -307,12 +291,13 @@ def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context=None):
     if not api_key:
         raise RuntimeError("Missing Google AI API key. Please check your secrets or environment variables.")
     try:
+        user_id, user_email = resolve_user_identity()
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
         response = model.generate_content([{ "role": "user", "parts": [{"text": prompt}] }])
         # Log usage/cost if available (robust extraction)
         usage = extract_usage_metadata(response)
-        log_ai_usage(model_name, usage, context=context)
+        log_ai_usage(model_name, usage, context=context, user_id=user_id, user_email=user_email)
         try:
             import streamlit as st  # local import to avoid dependency when not in Streamlit
             st.session_state["last_ai_usage"] = usage
@@ -714,14 +699,9 @@ def summarize_form_submissions(selected_forms, max_forms=10):
         from src.database import supabase
         prompt_template = get_general_form_analysis_prompt(supabase)
         prompt = prompt_template.format(reports_text=forms_text)
-        # Use the same AI configuration as the rest of the app
-        import google.generativeai as genai
-        init_ai()
         with st.spinner("AI is analyzing form submissions..."):
-            model = genai.GenerativeModel("gemini-2.5-pro")
-            result = model.generate_content(prompt)
-            response_text = getattr(result, "text", None)
-            if not response_text or not response_text.strip():
+            response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context="form_analysis")
+            if not response_text or not str(response_text).strip():
                 st.info("Prompt sent to AI:")
                 st.code(prompt)
                 st.info("Input data summary:")
