@@ -203,15 +203,28 @@ def resolve_user_identity(explicit_user_id=None, explicit_email=None, explicit_u
     """Best-effort resolution of user id/email from explicit args, session_state, or Supabase auth."""
     uid = explicit_user_id
     email = explicit_email
-    user_obj = explicit_user or (st.session_state.get("user") if isinstance(st.session_state, dict) else None)
+
+    # Helper to safely pull from st.session_state even though it's not a dict
+    def ss_get(key, default=None):
+        try:
+            getter = getattr(st.session_state, "get", None)
+            if callable(getter):
+                return getter(key, default)
+            # Fallback attribute access
+            return getattr(st.session_state, key, default)
+        except Exception:
+            return default
+
+    user_obj = explicit_user or ss_get("user")
     if user_obj:
         uid = uid or getattr(user_obj, "id", None) or (user_obj.get("id") if isinstance(user_obj, dict) else None)
         email = email or getattr(user_obj, "email", None) or (user_obj.get("email") if isinstance(user_obj, dict) else None)
-    if isinstance(st.session_state, dict):
-        uid = uid or st.session_state.get("user_id")
-        email = email or st.session_state.get("user_email")
+
+    uid = uid or ss_get("user_id")
+    email = email or ss_get("user_email") or ss_get("email")
+
     # Fallback: pull from Supabase auth if access_token is present
-    if (uid is None or email is None) and isinstance(st.session_state, dict):
+    if uid is None or email is None:
         try:
             user_client = get_user_client()
             current = user_client.auth.get_user()
