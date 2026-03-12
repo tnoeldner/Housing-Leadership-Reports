@@ -742,7 +742,22 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
                 # Raw log table (user-friendly view)
                 st.markdown("**Raw usage records**")
-                display_cols = [col for col in ["created_local", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "id"] if col in filtered.columns]
+                display_cols = [
+                    col
+                    for col in [
+                        "created_local",
+                        "model",
+                        "context",
+                        "user_email",
+                        "user_id",
+                        "cost_usd",
+                        "prompt_tokens",
+                        "response_tokens",
+                        "total_tokens",
+                        "id",
+                    ]
+                    if col in filtered.columns
+                ]
                 raw_sorted = filtered.sort_values("created_at", ascending=False)
                 st.dataframe(raw_sorted[display_cols], use_container_width=True, hide_index=True)
 
