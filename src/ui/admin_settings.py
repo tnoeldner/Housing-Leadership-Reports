@@ -655,6 +655,15 @@ You are writing a weekly staff recognition summary. From the following staff rep
         else:
             df = pd.DataFrame(logs)
             df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+            # Localize to America/Chicago for display alongside UTC dates
+            local_tz = "America/Chicago"
+            try:
+                if df["created_at"].dt.tz is None:
+                    df["created_local"] = df["created_at"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+                else:
+                    df["created_local"] = df["created_at"].dt.tz_convert(local_tz)
+            except Exception:
+                df["created_local"] = df["created_at"]
             df["date"] = df["created_at"].dt.date
             for col in ["prompt_tokens", "response_tokens", "total_tokens", "cost_usd"]:
                 if col in df.columns:
@@ -730,7 +739,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
                 # Raw log table (user-friendly view)
                 st.markdown("**Raw usage records**")
-                display_cols = [col for col in ["created_at", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "id"] if col in filtered.columns]
+                display_cols = [col for col in ["created_local", "model", "context", "cost_usd", "prompt_tokens", "response_tokens", "total_tokens", "id"] if col in filtered.columns]
                 raw_sorted = filtered.sort_values("created_at", ascending=False)
                 st.dataframe(raw_sorted[display_cols], use_container_width=True, hide_index=True)
 
@@ -896,10 +905,18 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     try:
                         if isinstance(submitted_at, str):
                             submission_time = pd.to_datetime(submitted_at)
+                            # Localize to Chicago for display
+                            local_tz = "America/Chicago"
+                            if submission_time.tzinfo is None:
+                                submission_time_local = submission_time.tz_localize("UTC").tz_convert(local_tz)
+                            else:
+                                submission_time_local = submission_time.tz_convert(local_tz)
                         else:
                             submission_time = None
+                            submission_time_local = None
                     except Exception:
                         submission_time = None
+                        submission_time_local = None
                     try:
                         if isinstance(week_ending_val, str):
                             week_ending = pd.to_datetime(week_ending_val)
@@ -927,9 +944,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         status = "❌ Late"
                     staff_member = report.get("team_member", "Unknown") if isinstance(report.get, type(lambda: None)) else "Unknown"
                     week_ending_str = week_ending_val if week_ending_val else "Unknown"
-                    submitted_str = submission_time.strftime("%Y-%m-%d %H:%M:%S") if submission_time else "Unknown"
-                    day_of_week_str = submission_time.strftime("%A") if submission_time else "Unknown"
-                    time_str = submission_time.strftime("%H:%M") if submission_time else "Unknown"
+                    submitted_str = submission_time_local.strftime("%Y-%m-%d %H:%M:%S %Z") if submission_time_local is not None else "Unknown"
+                    day_of_week_str = submission_time_local.strftime("%A") if submission_time_local is not None else "Unknown"
+                    time_str = submission_time_local.strftime("%H:%M") if submission_time_local is not None else "Unknown"
                     deadline_str = deadline_datetime.strftime("%Y-%m-%d %H:%M") if deadline_datetime else "Unknown"
                     admin_created = "Yes" if (isinstance(report.get, type(lambda: None)) and (report.get("status") == "admin_created" or report.get("created_by_admin"))) else "No"
                     submission_data.append({

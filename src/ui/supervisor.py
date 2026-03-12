@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import json
+import pandas as pd
 from datetime import datetime, timedelta
 from src.database import supabase, get_admin_client
 from src.ai import summarize_form_submissions, create_duty_report_summary, clean_summary_response
@@ -181,6 +182,24 @@ def weekly_reports_viewer(supervisor_id=None):
                         status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
                         report_id = report.get('id', '')
                         user_id = report.get('user_id', '')
+                        # Localize created/submitted timestamps for display
+                        submitted_at = report.get('submitted_at') if isinstance(report, dict) else None
+                        created_at = report.get('created_at') if isinstance(report, dict) else None
+                        local_tz = "America/Chicago"
+                        def _fmt(ts):
+                            if not ts:
+                                return "Unknown"
+                            try:
+                                dt = pd.to_datetime(ts)
+                                if dt.tzinfo is None:
+                                    dt = dt.tz_localize("UTC").tz_convert(local_tz)
+                                else:
+                                    dt = dt.tz_convert(local_tz)
+                                return dt.strftime("%Y-%m-%d %H:%M %Z")
+                            except Exception:
+                                return str(ts)
+                        submitted_local = _fmt(submitted_at)
+                        created_local = _fmt(created_at)
                 
                         with st.container(border=True):
                             st.markdown(f"#### {name}")
@@ -189,6 +208,7 @@ def weekly_reports_viewer(supervisor_id=None):
                             status_lower = status.lower()
                             status_class = "status-submitted" if status_lower == "finalized" else ("status-approved" if status_lower == "approved" else "status-draft")
                             st.markdown(f'<div style="margin-bottom: 1rem;"><span class="status-badge {status_class}">{status}</span></div>', unsafe_allow_html=True)
+                            st.caption(f"Submitted: {submitted_local}  •  Created: {created_local}")
                     
                             # Well-being Metric
                             if report.get('well_being_rating'):
@@ -207,6 +227,8 @@ def weekly_reports_viewer(supervisor_id=None):
                                 st.write(f"Report ID: {report_id}")
                                 st.write(f"User ID: {user_id}")
                                 st.write(f"Email: {report.get('email', 'NOT FOUND')}")
+                                st.write(f"Submitted (local): {submitted_local}")
+                                st.write(f"Created (local): {created_local}")
                                 st.write(f"Status: {status_lower}")
                     
                             # Buttons - View Details and Respond
