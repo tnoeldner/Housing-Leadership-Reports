@@ -708,6 +708,8 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     df["created_local"] = df["created_at"].dt.tz_convert(local_tz)
             except Exception:
                 df["created_local"] = df["created_at"]
+            # Fallback for any rows that still lack created_local (e.g., backfill rows with date-only timestamps)
+            df["created_local"] = df["created_local"].fillna(df["created_at"])
             df["date"] = df["created_at"].dt.date
             for col in ["prompt_tokens", "response_tokens", "total_tokens", "cost_usd"]:
                 if col in df.columns:
