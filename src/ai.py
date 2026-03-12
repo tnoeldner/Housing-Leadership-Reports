@@ -671,14 +671,10 @@ def create_duty_report_summary(selected_forms, start_date, end_date):
         from src.database import supabase
         prompt_template = get_weekly_duty_prompt(supabase)
         prompt = prompt_template.format(reports_text=reports_text)
-        # Use Gemini 2.5 Flash for better quota efficiency
-        import google.generativeai as genai
-        init_ai()
+        # Use centralized call wrapper for logging/user attribution
         with st.spinner(f"AI is analyzing {len(selected_forms)} duty reports..."):
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            result = model.generate_content(prompt)
-            response_text = getattr(result, "text", None)
-            if not response_text or not response_text.strip():
+            response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context="duty_analysis")
+            if not response_text or not str(response_text).strip():
                 return {"summary": "Error: AI did not return a summary. Please check your API quota, prompt, or try again later."}
             return {"summary": response_text}
     except Exception as e:

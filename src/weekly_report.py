@@ -1,7 +1,7 @@
 from collections import defaultdict
-import google.generativeai as genai
 import streamlit as st
 from datetime import datetime
+from src.ai import call_gemini_ai
 
 def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
     """Create a weekly quantitative duty report with hall breakdowns for admin summaries"""
@@ -150,24 +150,10 @@ DUTY REPORTS DATA:
 Generate the weekly duty analysis summary below:
 """
 
-        api_key = None
-        try:
-            from src.config import get_secret
-            api_key = get_secret("GOOGLE_API_KEY")
-        except Exception:
-            api_key = None
-        if not api_key:
-            st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
-            return {"summary": "Error: Missing Google AI API key."}
-        st.info(f"[DEBUG] Using Google API key: {api_key[:6]}... (truncated)")
-        model = genai.GenerativeModel("models/gemini-2.5-pro")
         with st.spinner(f"AI is generating weekly duty report from {len(selected_forms)} reports..."):
             try:
-                st.info("[DEBUG] Sending prompt to Gemini AI model...")
-                result = model.generate_content(prompt)
-                st.info(f"[DEBUG] Gemini AI model returned: {getattr(result, 'text', None)[:500]}... (truncated)")
-                summary_text = result.text if result and hasattr(result, 'text') else None
-                if not summary_text or not summary_text.strip():
+                summary_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context="weekly_duty_report")
+                if not summary_text or not str(summary_text).strip():
                     st.info("Prompt sent to AI:")
                     st.code(prompt)
                     st.info("Input data summary:")
