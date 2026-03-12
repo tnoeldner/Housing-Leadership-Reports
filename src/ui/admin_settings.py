@@ -6,7 +6,7 @@ import tempfile
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from src.database import supabase, get_admin_client
+from src.database import supabase, get_admin_client, log_user_activity
 from src.utils import get_deadline_settings
 from src.email_service import send_email
 from src.config import ASCEND_VALUES, NORTH_VALUES, CORE_SECTIONS, get_secret
@@ -625,6 +625,19 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             if result.stderr:
                                 st.info("stderr:")
                                 st.code(result.stderr[-2000:], language="text")
+                            try:
+                                log_user_activity(
+                                    event_type="billing_import",
+                                    context="bigquery_sync",
+                                    metadata={
+                                        "table": bq_table,
+                                        "start": sync_start.isoformat(),
+                                        "end": sync_end.isoformat(),
+                                        "status": "success",
+                                    },
+                                )
+                            except Exception:
+                                pass
                             if tmp_path:
                                 try:
                                     os.remove(tmp_path)
@@ -633,8 +646,36 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         except subprocess.CalledProcessError as e:
                             st.error(f"Sync failed: {e}")
                             st.code((e.stdout or "") + "\n" + (e.stderr or ""), language="text")
+                            try:
+                                log_user_activity(
+                                    event_type="billing_import",
+                                    context="bigquery_sync",
+                                    metadata={
+                                        "table": bq_table,
+                                        "start": sync_start.isoformat(),
+                                        "end": sync_end.isoformat(),
+                                        "status": "failed",
+                                        "error": str(e),
+                                    },
+                                )
+                            except Exception:
+                                pass
                         except Exception as e:
                             st.error(f"Sync failed: {e}")
+                            try:
+                                log_user_activity(
+                                    event_type="billing_import",
+                                    context="bigquery_sync",
+                                    metadata={
+                                        "table": bq_table,
+                                        "start": sync_start.isoformat(),
+                                        "end": sync_end.isoformat(),
+                                        "status": "failed",
+                                        "error": str(e),
+                                    },
+                                )
+                            except Exception:
+                                pass
 
         if start_date > end_date:
             st.error("Start date cannot be after end date.")
