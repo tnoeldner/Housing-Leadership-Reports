@@ -247,7 +247,6 @@ def log_ai_usage(model_name, usage, context=None):
             "total_tokens": total_tokens,
             "cost_usd": round(cost_usd, 6),
             "context": context or "",
-            "raw_usage": usage if isinstance(usage, dict) else None,
         }
         client.table("ai_usage_logs").insert(payload).execute()
         # Also log activity for attribution
