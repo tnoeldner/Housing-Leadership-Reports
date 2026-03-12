@@ -704,7 +704,11 @@ Format your response as follows - use this EXACT format:
 
 Be specific, data-driven based on the recognitions provided, and compelling. Focus on sustained excellence over the 3-month period."""
         
-        response = call_gemini_ai(prompt, model_name="models/gemini-2.5-flash")
+        response = call_gemini_ai(
+            prompt,
+            model_name="models/gemini-2.5-flash",
+            context=f"quarterly_recognition_summary_{category.lower()}_FY{fiscal_year}_Q{quarter}",
+        )
         
         if not response:
             return candidate_summaries

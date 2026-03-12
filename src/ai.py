@@ -217,16 +217,16 @@ def extract_usage_metadata(response):
 
 
 def log_ai_usage(model_name, usage, context=None):
-    """Persist AI usage metadata to Supabase for cost tracking."""
-    if not usage:
-        return
+    """Persist AI usage metadata to Supabase for cost tracking. Logs even if usage metadata is missing."""
     # Support multiple possible usage field names from Gemini responses
     def _get(name):
-        return getattr(usage, name, None) if not isinstance(usage, dict) else usage.get(name)
+        return getattr(usage, name, None) if usage and not isinstance(usage, dict) else (usage.get(name) if isinstance(usage, dict) else None)
 
     prompt_tokens = _get("prompt_token_count") or _get("input_token_count") or _get("input_tokens")
     response_tokens = _get("candidates_token_count") or _get("output_token_count") or _get("output_tokens")
-    total_tokens = _get("total_token_count") or _get("total_tokens")
+    total_tokens = _get("total_token_count") or _get("total_tokens") or (
+        ((prompt_tokens or 0) + (response_tokens or 0)) if (prompt_tokens is not None or response_tokens is not None) else None
+    )
 
     rate = AI_RATE_CARD.get(model_name, AI_RATE_CARD.get(model_name.replace("models/", ""), {"prompt": 0, "response": 0}))
     prompt_cost = ((prompt_tokens or 0) / 1000.0) * rate.get("prompt", 0)

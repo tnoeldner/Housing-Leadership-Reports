@@ -482,7 +482,10 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             "Items: " + json.dumps(items)
                         )
 
-                        ai_response = call_gemini_ai(prompt)
+                        ai_response = call_gemini_ai(
+                            prompt,
+                            context="admin_reprocess_recategorize",
+                        )
                         parsed = parse_ai_json(ai_response)
                         categorized_lookup = {}
                         if isinstance(parsed, list):
