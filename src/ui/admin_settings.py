@@ -603,7 +603,6 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             env = os.environ.copy()
                             tmp_path = None
                             if gcp_sa_json:
-                                import tempfile
                                 tmp_fd, tmp_name = tempfile.mkstemp(prefix="gcp_sa_", suffix=".json")
                                 os.close(tmp_fd)
                                 with open(tmp_name, "w", encoding="utf-8") as tf:
