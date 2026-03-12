@@ -123,7 +123,11 @@ REMINDER:
 
     try:
         # Use shared helper so usage_metadata is logged to ai_usage_logs
-        response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context="weekly_staff_recognition")
+        response_text = call_gemini_ai(
+            prompt,
+            model_name="models/gemini-2.5-pro",
+            context="weekly_staff_recognition",
+        )
         
         # Debug: Show prompt and raw response
         with st.expander("🕵️ Debug: AI Input & Output"):

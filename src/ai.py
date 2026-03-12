@@ -228,6 +228,11 @@ def log_ai_usage(model_name, usage, context=None):
         ((prompt_tokens or 0) + (response_tokens or 0)) if (prompt_tokens is not None or response_tokens is not None) else None
     )
 
+    # Normalize missing token counts to zero to avoid null inserts in ai_usage_logs
+    prompt_tokens = 0 if prompt_tokens is None else prompt_tokens
+    response_tokens = 0 if response_tokens is None else response_tokens
+    total_tokens = (prompt_tokens + response_tokens) if total_tokens is None else total_tokens
+
     rate = AI_RATE_CARD.get(model_name, AI_RATE_CARD.get(model_name.replace("models/", ""), {"prompt": 0, "response": 0}))
     prompt_cost = ((prompt_tokens or 0) / 1000.0) * rate.get("prompt", 0)
     response_cost = ((response_tokens or 0) / 1000.0) * rate.get("response", 0)
