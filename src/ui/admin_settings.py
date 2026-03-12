@@ -816,6 +816,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
                 # Raw log table (user-friendly view)
                 st.markdown("**Raw usage records**")
+                filtered = filtered.copy()
+                filtered["created_at"] = pd.to_datetime(filtered.get("created_at"), errors="coerce")
+                filtered["created_at"] = filtered["created_at"].fillna(pd.Timestamp.min)
                 display_cols = [
                     col
                     for col in [
