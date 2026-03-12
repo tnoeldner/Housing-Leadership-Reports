@@ -715,15 +715,14 @@ You are writing a weekly staff recognition summary. From the following staff rep
             st.info("No AI usage records found for the selected range.")
         else:
             df = pd.DataFrame(logs)
+            # Normalize created_at to datetimes for all rows (including backfill)
             df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
-            # Ensure created_at is datetime for rows where conversion failed by using start_date for backfill context
             if df["created_at"].isna().any():
                 if "context" in df.columns:
                     mask_backfill = df["created_at"].isna() & df["context"].fillna("").str.contains("backfill_bigquery_standard")
                     df.loc[mask_backfill, "created_at"] = pd.to_datetime(start_date)
-                # For any remaining NaT, fill with start_date to keep tables rendering
                 df["created_at"] = df["created_at"].fillna(pd.to_datetime(start_date))
-            # Guarantee datetime dtype for downstream .dt usage
+            # Recast to ensure datetime dtype (not object)
             df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
             # Localize to America/Chicago for display alongside UTC dates
             local_tz = "America/Chicago"
@@ -741,7 +740,8 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 mask = df["created_local"].isna() & df.get("context", pd.Series(dtype=str)).fillna("").str.contains("backfill_bigquery_standard")
                 df.loc[mask, "created_local"] = pd.to_datetime(start_date)
                 df.loc[mask, "created_at"] = pd.to_datetime(start_date)
-            df["date"] = df["created_at"].dt.date
+            # Safely derive date from created_at
+            df["date"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
             for col in ["prompt_tokens", "response_tokens", "total_tokens", "cost_usd"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
