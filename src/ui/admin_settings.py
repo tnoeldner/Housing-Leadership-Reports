@@ -690,23 +690,6 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 .lt("created_at", end_exclusive.isoformat()) \
                 .execute()
             logs = resp.data or []
-
-            # Include recent backfill rows even if their created_at is null or outside the range
-            try:
-                extra = admin_client.table("ai_usage_logs") \
-                    .select("*") \
-                    .eq("context", "backfill_bigquery_standard") \
-                    .order("id", desc=True) \
-                    .limit(200) \
-                    .execute()
-                extra_rows = extra.data or []
-                if extra_rows:
-                    seen_ids = {r.get("id") for r in logs if r.get("id") is not None}
-                    for r in extra_rows:
-                        if r.get("id") not in seen_ids:
-                            logs.append(r)
-            except Exception:
-                pass
         except Exception as e:
             st.error(f"Failed to load AI usage logs: {e}")
             logs = []
@@ -715,14 +698,6 @@ You are writing a weekly staff recognition summary. From the following staff rep
             st.info("No AI usage records found for the selected range.")
         else:
             df = pd.DataFrame(logs)
-            # Normalize created_at to datetimes for all rows (including backfill)
-            df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
-            if df["created_at"].isna().any():
-                if "context" in df.columns:
-                    mask_backfill = df["created_at"].isna() & df["context"].fillna("").str.contains("backfill_bigquery_standard")
-                    df.loc[mask_backfill, "created_at"] = pd.to_datetime(start_date)
-                df["created_at"] = df["created_at"].fillna(pd.to_datetime(start_date))
-            # Recast to ensure datetime dtype (not object)
             df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
             # Localize to America/Chicago for display alongside UTC dates
             local_tz = "America/Chicago"
@@ -733,15 +708,9 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     df["created_local"] = df["created_at"].dt.tz_convert(local_tz)
             except Exception:
                 df["created_local"] = df["created_at"]
-            # Fallback for any rows that still lack created_local (e.g., backfill rows with date-only or null timestamps)
+            # Fallback for any rows that still lack created_local (e.g., backfill rows with date-only timestamps)
             df["created_local"] = df["created_local"].fillna(df["created_at"])
-            # If still missing and context indicates backfill, use the selected start_date as a placeholder for display
-            if df["created_local"].isna().any():
-                mask = df["created_local"].isna() & df.get("context", pd.Series(dtype=str)).fillna("").str.contains("backfill_bigquery_standard")
-                df.loc[mask, "created_local"] = pd.to_datetime(start_date)
-                df.loc[mask, "created_at"] = pd.to_datetime(start_date)
-            # Safely derive date from created_at
-            df["date"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
+            df["date"] = df["created_at"].dt.date
             for col in ["prompt_tokens", "response_tokens", "total_tokens", "cost_usd"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
@@ -816,9 +785,6 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
                 # Raw log table (user-friendly view)
                 st.markdown("**Raw usage records**")
-                filtered = filtered.copy()
-                filtered["created_at"] = pd.to_datetime(filtered.get("created_at"), errors="coerce")
-                filtered["created_at"] = filtered["created_at"].fillna(pd.Timestamp.min)
                 display_cols = [
                     col
                     for col in [
