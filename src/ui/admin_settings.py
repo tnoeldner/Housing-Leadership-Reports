@@ -779,7 +779,10 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 # Show local time (America/Chicago) alongside UTC
                 local_tz = "America/Chicago"
                 try:
-                    adf["created_local"] = adf["created_at"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+                    if adf["created_at"].dt.tz is None:
+                        adf["created_local"] = adf["created_at"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+                    else:
+                        adf["created_local"] = adf["created_at"].dt.tz_convert(local_tz)
                 except Exception:
                     # If already tz-aware or conversion fails, fall back to created_at
                     adf["created_local"] = adf["created_at"]
