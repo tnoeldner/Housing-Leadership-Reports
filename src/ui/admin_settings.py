@@ -723,6 +723,8 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     df.loc[mask_backfill, "created_at"] = pd.to_datetime(start_date)
                 # For any remaining NaT, fill with start_date to keep tables rendering
                 df["created_at"] = df["created_at"].fillna(pd.to_datetime(start_date))
+            # Guarantee datetime dtype for downstream .dt usage
+            df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
             # Localize to America/Chicago for display alongside UTC dates
             local_tz = "America/Chicago"
             try:
