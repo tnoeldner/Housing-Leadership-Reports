@@ -19,7 +19,7 @@ except ImportError:
 
 from google import genai
 
-from src.database import supabase
+from src.database import supabase, log_user_activity
 from src.config import CORE_SECTIONS, ASCEND_VALUES, NORTH_VALUES
 from pathlib import Path
 from src.utils import calculate_deadline_info, clear_form_state
@@ -649,6 +649,21 @@ def submit_and_edit_page():
                     if is_update:
                         user_client.table("weekly_summaries").delete().eq("week_ending_date", draft.get("week_ending_date")).execute()
                         st.warning(f"Note: The saved team summary for {draft.get('week_ending_date')} has been deleted. An admin will need to regenerate it.")
+                    try:
+                        log_user_activity(
+                            "weekly_report_submit",
+                            context="submission",
+                            metadata={
+                                "week_ending_date": draft.get("week_ending_date"),
+                                "status": "finalized",
+                                "is_update": is_update,
+                            },
+                            user=st.session_state.get("user"),
+                            user_id=getattr(st.session_state.get("user"), "id", None),
+                            user_email=getattr(st.session_state.get("user"), "email", None),
+                        )
+                    except Exception:
+                        pass
                     clear_form_state()
                     time.sleep(1)
                     st.rerun()
