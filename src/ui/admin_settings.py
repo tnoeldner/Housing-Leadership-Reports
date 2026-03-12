@@ -973,9 +973,10 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         "match_status",
                         "user_email",
                         "user_id",
+                        "created_at",
                         "id" if "id" in app_with_match.columns else None,
                     ]
-                    app_display_cols = [c for c in app_display_cols if c]
+                    app_display_cols = [c for c in app_display_cols if c and c in app_with_match.columns]
                     st.markdown("**App AI calls with daily BigQuery match status**")
                     st.dataframe(app_with_match[app_display_cols].sort_values(["date", "created_at"], ascending=[False, False]), use_container_width=True, hide_index=True)
 
