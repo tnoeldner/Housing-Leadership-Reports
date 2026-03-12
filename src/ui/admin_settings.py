@@ -923,20 +923,29 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     ]
                     details = pd.concat([app_trans, bq_trans], ignore_index=True)
                     details = details[details_cols]
-                    details = details.sort_values(["date", "source", "created_at"], ascending=[False, True, False])
-                    st.markdown("**Reconciliation transactions (app AI logs and BigQuery imports)**")
-                    display_cols = [
-                        "date",
-                        "source",
-                        "cost_usd",
-                        "model",
-                        "context",
-                        "user_email",
-                        "user_id",
-                        "created_local",
-                        "record_id",
-                    ]
-                    st.dataframe(details[display_cols], use_container_width=True, hide_index=True)
+
+                    if details.empty:
+                        st.info("No reconciliation transactions to display.")
+                    else:
+                        # Normalize types to avoid pandas categorical sort errors
+                        details["created_at"] = pd.to_datetime(details["created_at"], errors="coerce")
+                        details["date"] = pd.to_datetime(details["date"], errors="coerce").dt.date
+                        details["source"] = details["source"].astype(str)
+                        details = details.sort_values(["date", "source", "created_at"], ascending=[False, True, False])
+
+                        st.markdown("**Reconciliation transactions (app AI logs and BigQuery imports)**")
+                        display_cols = [
+                            "date",
+                            "source",
+                            "cost_usd",
+                            "model",
+                            "context",
+                            "user_email",
+                            "user_id",
+                            "created_local",
+                            "record_id",
+                        ]
+                        st.dataframe(details[display_cols], use_container_width=True, hide_index=True)
 
                 # Cost reconciliation (ai_usage_logs vs BigQuery)
                 if ai_df.empty:
