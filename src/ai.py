@@ -271,9 +271,15 @@ def log_ai_usage(model_name, usage, context=None):
             user_id=user_id,
             user_email=user_email,
         )
-    except Exception:
-        # Silent fail; logging shouldn't break app flow
-        pass
+    except Exception as e:
+        # Emit a visible warning so we can debug RLS/credential issues in production
+        try:
+            import streamlit as st
+            st.warning(f"AI usage log insert failed: {type(e).__name__}: {e}")
+        except Exception:
+            pass
+        print(f"[WARN] ai_usage_logs insert failed: {type(e).__name__}: {e}")
+        return
 
 
 def call_gemini_ai(prompt, model_name="models/gemini-2.5-flash", context=None):
