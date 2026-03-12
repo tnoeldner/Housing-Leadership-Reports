@@ -813,7 +813,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     st.info("No activity records match the filters.")
                 else:
                     st.markdown("**Activity records**")
-                    disp_cols = [c for c in ["created_local", "created_at", "event_type", "context", "user_email", "user_id", "metadata"] if c in af.columns]
+                    disp_cols = [c for c in ["created_local", "event_type", "context", "user_email", "user_id", "metadata"] if c in af.columns]
                     st.dataframe(af.sort_values("created_at", ascending=False)[disp_cols], use_container_width=True, hide_index=True)
 
     with tab1:
