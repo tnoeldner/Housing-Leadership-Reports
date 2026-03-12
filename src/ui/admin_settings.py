@@ -776,6 +776,13 @@ You are writing a weekly staff recognition summary. From the following staff rep
             else:
                 adf = pd.DataFrame(acts)
                 adf["created_at"] = pd.to_datetime(adf["created_at"], errors="coerce")
+                # Show local time (America/Chicago) alongside UTC
+                local_tz = "America/Chicago"
+                try:
+                    adf["created_local"] = adf["created_at"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+                except Exception:
+                    # If already tz-aware or conversion fails, fall back to created_at
+                    adf["created_local"] = adf["created_at"]
                 event_types = sorted(adf.get("event_type", pd.Series(dtype=str)).dropna().unique())
                 contexts = sorted(adf.get("context", pd.Series(dtype=str)).dropna().unique())
 
@@ -803,7 +810,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     st.info("No activity records match the filters.")
                 else:
                     st.markdown("**Activity records**")
-                    disp_cols = [c for c in ["created_at", "event_type", "context", "user_email", "user_id", "metadata"] if c in af.columns]
+                    disp_cols = [c for c in ["created_local", "created_at", "event_type", "context", "user_email", "user_id", "metadata"] if c in af.columns]
                     st.dataframe(af.sort_values("created_at", ascending=False)[disp_cols], use_container_width=True, hide_index=True)
 
     with tab1:
