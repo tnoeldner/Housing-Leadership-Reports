@@ -161,7 +161,7 @@ import json
 import re
 import google.generativeai as genai
 from src.config import get_secret
-from src.database import get_admin_client, log_user_activity
+from src.database import get_admin_client, get_user_client, log_user_activity
 
 client = None
 
@@ -238,14 +238,33 @@ def log_ai_usage(model_name, usage, context=None):
     response_cost = ((response_tokens or 0) / 1000.0) * rate.get("response", 0)
     cost_usd = prompt_cost + response_cost
 
+    def resolve_user_identity(explicit_user=None):
+        uid = None
+        email = None
+        user_obj = explicit_user or (st.session_state.get("user") if isinstance(st.session_state, dict) else None)
+        if user_obj:
+            uid = getattr(user_obj, "id", None) or (user_obj.get("id") if isinstance(user_obj, dict) else None)
+            email = getattr(user_obj, "email", None) or (user_obj.get("email") if isinstance(user_obj, dict) else None)
+        if isinstance(st.session_state, dict):
+            uid = uid or st.session_state.get("user_id")
+            email = email or st.session_state.get("user_email")
+        # Fallback: pull from Supabase auth if access_token is present
+        if (uid is None or email is None) and isinstance(st.session_state, dict):
+            try:
+                user_client = get_user_client()
+                current = user_client.auth.get_user()
+                # current may be a dict-like or object with .user
+                current_user = getattr(current, "user", current)
+                if current_user:
+                    uid = uid or getattr(current_user, "id", None) or (current_user.get("id") if isinstance(current_user, dict) else None)
+                    email = email or getattr(current_user, "email", None) or (current_user.get("email") if isinstance(current_user, dict) else None)
+            except Exception:
+                pass
+        return uid, email
+
     try:
         client = get_admin_client()
-        user_obj = st.session_state.get("user") if isinstance(st.session_state, dict) else None
-        user_id = getattr(user_obj, "id", None)
-        user_email = getattr(user_obj, "email", None)
-        if isinstance(st.session_state, dict):
-            user_id = user_id or st.session_state.get("user_id")
-            user_email = user_email or st.session_state.get("user_email")
+        user_id, user_email = resolve_user_identity()
 
         payload = {
             "model": model_name,
@@ -269,7 +288,6 @@ def log_ai_usage(model_name, usage, context=None):
                 "total_tokens": total_tokens,
                 "cost_usd": round(cost_usd, 6),
             },
-            user=user_obj,
             user_id=user_id,
             user_email=user_email,
         )
