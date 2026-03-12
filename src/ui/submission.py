@@ -229,7 +229,6 @@ def submit_and_edit_page():
                     st.session_state["report_to_edit"] = selected_report
                     st.rerun()
 
-    @st.cache_data
     def process_report_with_ai(items_to_categorize):
         if not items_to_categorize:
             return None
