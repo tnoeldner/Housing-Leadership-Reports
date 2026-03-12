@@ -716,6 +716,13 @@ You are writing a weekly staff recognition summary. From the following staff rep
         else:
             df = pd.DataFrame(logs)
             df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+            # Ensure created_at is datetime for rows where conversion failed by using start_date for backfill context
+            if df["created_at"].isna().any():
+                if "context" in df.columns:
+                    mask_backfill = df["created_at"].isna() & df["context"].fillna("").str.contains("backfill_bigquery_standard")
+                    df.loc[mask_backfill, "created_at"] = pd.to_datetime(start_date)
+                # For any remaining NaT, fill with start_date to keep tables rendering
+                df["created_at"] = df["created_at"].fillna(pd.to_datetime(start_date))
             # Localize to America/Chicago for display alongside UTC dates
             local_tz = "America/Chicago"
             try:
