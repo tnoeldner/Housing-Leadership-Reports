@@ -189,7 +189,6 @@ def dashboard_page(supervisor_mode=False):
         for person in sorted(missing_staff):
             st.markdown(f"- {person}")
 
-    st.divider()
     # Fetch saved summaries including creator info
     summaries_response = supabase.table('weekly_summaries').select('week_ending_date, summary_text, created_by').execute()
     saved_summaries_raw = {}
