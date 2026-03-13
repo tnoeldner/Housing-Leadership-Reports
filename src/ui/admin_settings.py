@@ -1339,6 +1339,13 @@ You are writing a weekly staff recognition summary. From the following staff rep
             if not profiles:
                 st.info("No profiles found.")
             else:
+                role_options = ["All roles"] + sorted({(p.get("role") or "user") for p in profiles})
+                selected_role = st.selectbox("Filter by role", options=role_options, index=0, key="submission_role_filter")
+                profiles_view = [p for p in profiles if selected_role == "All roles" or (p.get("role") or "user") == selected_role]
+
+                if not profiles_view:
+                    st.info("No users match the selected role filter.")
+                    st.stop()
                 week_set = set(pd.to_datetime(w).date() for w in weeks)
 
                 def parse_date(value):
@@ -1368,7 +1375,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 rows = []
                 completed_pairs = 0
                 total_pairs = 0
-                for p in sorted(profiles, key=lambda x: x.get("full_name") or x.get("email") or ""):
+                for p in sorted(profiles_view, key=lambda x: x.get("full_name") or x.get("email") or ""):
                     uid = p.get("id")
                     name = p.get("full_name") or p.get("email") or "Unknown"
                     role = p.get("role") or "user"
@@ -1412,7 +1419,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     with col_s2:
                         st.metric("Max weeks per user", len(week_set))
                     with col_s3:
-                        st.metric("Users", len(profiles))
+                        st.metric("Users", len(profiles_view))
 
                 df = pd.DataFrame(rows)
                 st.markdown("**Staff submission summary**")
