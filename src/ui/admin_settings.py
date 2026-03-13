@@ -1434,6 +1434,8 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             created_at = None
                     creation_week = nearest_saturday(created_at) if created_at else start_week
                     entry = {"Name": p["Name"]}
+                    pct = p.get("Completion %")
+                    entry["% Complete"] = f"{pct}%" if isinstance(pct, (int, float)) else pct
                     for w in weeks:
                         w_date = pd.to_datetime(w).date()
                         if w_date < creation_week:
@@ -1443,7 +1445,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
                     matrix_rows.append(entry)
                 matrix_df = pd.DataFrame(matrix_rows)
-                st.dataframe(matrix_df[["Name", *week_labels]], use_container_width=True, hide_index=True)
+                st.dataframe(matrix_df[["Name", "% Complete", *week_labels]], use_container_width=True, hide_index=True)
 
     with tab3:
         st.subheader("Email Configuration")
