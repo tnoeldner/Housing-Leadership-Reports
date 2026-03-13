@@ -19,7 +19,17 @@ def admin_settings_page():
         st.stop()
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📅 Deadline Settings", "📊 Submission Tracking", "📧 Email Configuration", "👥 User Management", "📝 AI Prompt Templates", "📋 Weekly Reports Summary", "📊 Weekly Summary Generator", "💰 AI Usage"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+        "📅 Deadline Settings",
+        "📊 Submission Tracking",
+        "📧 Email Configuration",
+        "👥 User Management",
+        "📝 AI Prompt Templates",
+        "📋 Weekly Reports Summary",
+        "📊 Weekly Summary Generator",
+        "💰 AI Usage",
+        "📜 Activity Logs",
+    ])
     
     with tab4:
         st.subheader("User Management")
@@ -1102,12 +1112,13 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         st.error("Mismatched counts (rows below):")
                         st.dataframe(friendly_cols(mism_counts.sort_values("date")), use_container_width=True, hide_index=True)
 
-        # --- User Activity Logs ---
-        st.markdown("---")
-        st.subheader("User Activity Logs (login & AI calls)")
-        act_start = st.date_input("Activity Start", value=start_date, key="activity_start")
-        act_end = st.date_input("Activity End", value=end_date, key="activity_end")
-        # Quick admin debug helper to verify inserts work
+    with tab9:
+        st.subheader("User Activity Logs")
+        st.write("Login, page views, admin actions, AI calls, and other events.")
+        default_act_start = datetime.now().date() - timedelta(days=14)
+        act_start = st.date_input("Activity Start", value=default_act_start, key="activity_start")
+        act_end = st.date_input("Activity End", value=datetime.now().date(), key="activity_end")
+
         if st.button("Insert test activity (admin)", key="activity_test_insert"):
             try:
                 admin_client = get_admin_client()
@@ -1122,6 +1133,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 st.success(f"Inserted test activity row (id={new_id}).")
             except Exception as e:
                 st.error(f"Test insert failed: {e}")
+
         if act_start > act_end:
             st.error("Activity start date cannot be after end date.")
         else:
@@ -1144,7 +1156,6 @@ You are writing a weekly staff recognition summary. From the following staff rep
             else:
                 adf = pd.DataFrame(acts)
                 adf["created_at"] = pd.to_datetime(adf["created_at"], errors="coerce")
-                # Show local time (America/Chicago) alongside UTC
                 local_tz = "America/Chicago"
                 try:
                     if adf["created_at"].dt.tz is None:
@@ -1152,8 +1163,8 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     else:
                         adf["created_local"] = adf["created_at"].dt.tz_convert(local_tz)
                 except Exception:
-                    # If already tz-aware or conversion fails, fall back to created_at
                     adf["created_local"] = adf["created_at"]
+
                 event_types = sorted(adf.get("event_type", pd.Series(dtype=str)).dropna().unique())
                 contexts = sorted(adf.get("context", pd.Series(dtype=str)).dropna().unique())
 
