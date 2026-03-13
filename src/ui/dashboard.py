@@ -433,6 +433,9 @@ Weekly staff reports:\n{reports_text}
                             st.error(f"Failed to generate summary: {e}")
             # end tabs[2]
 
+        # All supervisor content is contained within tabs; avoid rendering admin sections below
+        return
+
     else:
         # Only show admin dashboard content when explicitly called, not at the top of every page
         # Fetch both finalized and draft reports for admin dashboard
