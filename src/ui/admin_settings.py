@@ -694,6 +694,37 @@ You are writing a weekly staff recognition summary. From the following staff rep
             st.error(f"Failed to load AI usage logs: {e}")
             logs = []
 
+        def friendly_cols(frame: pd.DataFrame) -> pd.DataFrame:
+            rename_map = {
+                "date": "Date",
+                "created_at": "Timestamp (UTC)",
+                "created_local": "Local Time (CT)",
+                "model": "Model",
+                "context": "Context",
+                "user_email": "User Email",
+                "user_id": "User ID",
+                "cost_usd": "Cost (USD)",
+                "prompt_tokens": "Prompt Tokens",
+                "response_tokens": "Response Tokens",
+                "total_tokens": "Total Tokens",
+                "id": "Record ID",
+                "source": "Source",
+                "bq_cost_usd_for_date": "BQ Cost (Day)",
+                "match_status": "Match Status",
+                "record_id": "Record ID",
+                "app_cost_usd": "App Cost (Day)",
+                "app_calls": "App Calls (Day)",
+                "bq_cost_usd": "BQ Cost (Day)",
+                "bq_error": "BigQuery Error",
+                "ai_usage_count": "App AI Calls",
+                "activity_count": "Activity Log Calls",
+                "delta_count": "Difference",
+                "calls": "Calls",
+                "event_type": "Event",
+                "metadata": "Details",
+            }
+            return frame.rename(columns={k: v for k, v in rename_map.items() if k in frame.columns})
+
         if not logs:
             st.info("No AI usage records found for the selected range.")
         else:
@@ -714,31 +745,6 @@ You are writing a weekly staff recognition summary. From the following staff rep
             for col in ["prompt_tokens", "response_tokens", "total_tokens", "cost_usd"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-            def friendly_cols(frame: pd.DataFrame) -> pd.DataFrame:
-                rename_map = {
-                    "date": "Date",
-                    "created_at": "Timestamp (UTC)",
-                    "created_local": "Local Time (CT)",
-                    "model": "Model",
-                    "context": "Context",
-                    "user_email": "User Email",
-                    "user_id": "User ID",
-                    "cost_usd": "Cost (USD)",
-                    "prompt_tokens": "Prompt Tokens",
-                    "response_tokens": "Response Tokens",
-                    "total_tokens": "Total Tokens",
-                    "id": "Record ID",
-                    "source": "Source",
-                    "bq_cost_usd_for_date": "BQ Cost (Day)",
-                    "match_status": "Match Status",
-                    "record_id": "Record ID",
-                    "app_cost_usd": "App Cost (Day)",
-                    "app_calls": "App Calls (Day)",
-                    "bq_cost_usd": "BQ Cost (Day)",
-                    "bq_error": "BigQuery Error",
-                }
-                return frame.rename(columns={k: v for k, v in rename_map.items() if k in frame.columns})
 
             models = sorted([m for m in df.get("model", pd.Series(dtype=str)).dropna().unique()])
             contexts = sorted([c for c in df.get("context", pd.Series(dtype=str)).dropna().unique()])
@@ -1176,7 +1182,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 else:
                     st.markdown("**Activity records**")
                     disp_cols = [c for c in ["created_local", "event_type", "context", "user_email", "user_id", "metadata"] if c in af.columns]
-                    st.dataframe(af.sort_values("created_at", ascending=False)[disp_cols], use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(af.sort_values("created_at", ascending=False)[disp_cols]), use_container_width=True, hide_index=True)
 
     with tab1:
         st.subheader("Weekly Report Deadline Configuration")
