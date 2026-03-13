@@ -116,10 +116,24 @@ def get_user_client():
     import streamlit as st
     url = get_secret("SUPABASE_URL")
     key = get_secret("SUPABASE_KEY")
+    # Prefer stored session object (holds both access and refresh tokens)
+    supabase_session = st.session_state.get("supabase_session")
     access_token = st.session_state.get("access_token")
+    refresh_token = st.session_state.get("refresh_token")
+
+    if supabase_session:
+        access_token = getattr(supabase_session, "access_token", access_token)
+        refresh_token = getattr(supabase_session, "refresh_token", refresh_token)
+
     client = create_client(url, key)
-    if access_token:
-        client.auth.set_session(access_token, access_token)
+    if access_token and refresh_token:
+        try:
+            client.auth.set_session(access_token, refresh_token)
+        except Exception as e:
+            print(f"[WARN] Failed to set user session: {type(e).__name__}: {e}")
+    else:
+        if access_token and not refresh_token:
+            print("[WARN] No refresh_token available; skipping set_session to avoid auth error")
     return client
 
 def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None, db_client=None):

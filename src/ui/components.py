@@ -23,6 +23,9 @@ def login_form():
                     if hasattr(user_session, 'session'):
                         print(f"DEBUG: Found session attribute")
                         st.session_state["supabase_session"] = user_session.session
+                        # Persist tokens so downstream clients can set session without re-login
+                        st.session_state["access_token"] = user_session.session.access_token
+                        st.session_state["refresh_token"] = user_session.session.refresh_token
                         supabase.auth.set_session(user_session.session.access_token, user_session.session.refresh_token)
                     st.rerun()
                 else:
@@ -70,6 +73,9 @@ def restore_auth_session():
         try:
             session = st.session_state["supabase_session"]
             supabase.auth.set_session(session.access_token, session.refresh_token)
+            # Ensure tokens are also available individually for other client factories
+            st.session_state["access_token"] = getattr(session, "access_token", None)
+            st.session_state["refresh_token"] = getattr(session, "refresh_token", None)
         except Exception as e:
             print(f"Failed to restore auth session: {e}")
 
