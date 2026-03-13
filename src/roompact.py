@@ -121,7 +121,6 @@ def fetch_roompact_forms(cursor=None, max_pages=600, target_start_date=None, pro
             
             # Check dates to see if we've gone far enough back
             oldest_date_in_batch = None
-            forms_older_than_target = 0
             
             if target_start_date and forms:
                 # Convert target_start_date to datetime if it's a date object
@@ -132,28 +131,26 @@ def fetch_roompact_forms(cursor=None, max_pages=600, target_start_date=None, pro
                 for form in forms:
                     current_revision = form.get('current_revision', {})
                     date_str = current_revision.get('date', '')
-                    if date_str:
-                        try:
-                            # Roompact dates are usually ISO format
-                            form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                            # Make offset-naive for comparison if needed
-                            if form_date.tzinfo and not target_start_date.tzinfo:
-                                form_date = form_date.replace(tzinfo=None)
-                            
-                            if not oldest_date_in_batch or form_date < oldest_date_in_batch:
-                                oldest_date_in_batch = form_date
-                                
-                            if form_date < target_start_date:
-                                forms_older_than_target += 1
-                                
-                        except (ValueError, TypeError):
-                            continue
-                
-                # Stop if most forms in the batch are older than the target date
-                # Use 80% threshold to handle out-of-order records while still stopping efficiently
-                if len(forms) > 0 and forms_older_than_target >= (len(forms) * 0.8):
-                    reached_target_date = True
-                    print(f"DEBUG: Reached target date - {forms_older_than_target}/{len(forms)} forms older than {target_start_date}")
+                    if not date_str:
+                        continue
+
+                    try:
+                        # Roompact dates are usually ISO format
+                        form_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        # Make offset-naive for comparison if needed
+                        if form_date.tzinfo and not target_start_date.tzinfo:
+                            form_date = form_date.replace(tzinfo=None)
+
+                        if not oldest_date_in_batch or form_date < oldest_date_in_batch:
+                            oldest_date_in_batch = form_date
+
+                        # Stop as soon as we see anything older than the target
+                        if form_date < target_start_date:
+                            reached_target_date = True
+                            break
+
+                    except (ValueError, TypeError):
+                        continue
             
             # Setup for next page
             # CRITICAL FIX: Roompact API returns pagination in 'links' array, not 'pagination' object

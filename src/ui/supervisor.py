@@ -751,6 +751,26 @@ def engagement_analysis_section():
             else:
                 st.warning("No event submissions found")
 
+@st.cache_data(show_spinner=False)
+def _store_general_discovery(payload):
+    """Cache the most recent form discovery payload across reruns."""
+    return payload
+
+
+def save_general_discovery(payload):
+    """Persist discovery payload in cache."""
+    _store_general_discovery.clear()
+    _store_general_discovery(payload)
+
+
+def load_general_discovery():
+    """Retrieve cached discovery payload if available."""
+    try:
+        return _store_general_discovery()
+    except Exception:
+        return None
+
+
 def general_form_analysis_section():
     """General form analysis section for any form type with automatic discovery"""
     st.subheader("📊 General Form Analysis - Custom Report Generation")
@@ -825,16 +845,29 @@ def general_form_analysis_section():
             st.error(f"Failed to discover forms: {error or 'Unknown error'}")
             return
         
-        # Store discovered forms in session state
+        # Store discovered forms in session state and cache for future reruns
         st.session_state['general_form_types'] = form_types_info
         st.session_state['general_discovery_date'] = discovery_start_date
         st.session_state['general_discovery_end'] = discovery_end_date
+        save_general_discovery({
+            "form_types": form_types_info,
+            "discovery_start": discovery_start_date,
+            "discovery_end": discovery_end_date,
+        })
         
         if form_types_info:
             st.success(f"✅ Discovered {len(form_types_info)} different form types")
         else:
             st.warning("No forms found in the specified date range")
     
+    # Pull from cache on first load so user does not need to rediscover
+    if 'general_form_types' not in st.session_state:
+        cached = load_general_discovery()
+        if cached:
+            st.session_state['general_form_types'] = cached.get('form_types', [])
+            st.session_state['general_discovery_date'] = cached.get('discovery_start')
+            st.session_state['general_discovery_end'] = cached.get('discovery_end')
+
     # Display discovered form types
     if 'general_form_types' in st.session_state:
         form_types_info = st.session_state['general_form_types']
