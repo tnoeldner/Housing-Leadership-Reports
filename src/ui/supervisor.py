@@ -14,355 +14,6 @@ from src.roompact import (
     get_roompact_config,
     make_roompact_request
 )
-from src.weekly_report import create_weekly_duty_report_summary
-
-def supervisor_summaries_page():
-    st.title("My Saved Team Summaries")
-    st.write("Saved summaries you've generated for your team.")
-    try:
-        resp = supabase.rpc('get_supervisor_summaries', {'p_super': st.session_state['user'].id}).execute()
-        summaries = resp.data if isinstance(resp.data, list) else []
-        if not summaries:
-            st.info("You have no saved team summaries yet.")
-        else:
-            for s in summaries:
-                if isinstance(s, dict):
-                    with st.expander(f"Week Ending {s.get('week_ending_date', 'Unknown')} — Saved {s.get('created_at', 'Unknown')}"):
-                        st.markdown(clean_summary_response(s.get('summary_text', '')))
-    except Exception as e:
-        st.error(f"Failed to fetch supervisor summaries: {e}")
-    
-    st.divider()
-    st.subheader("View Your Team's Weekly Reports")
-    
-    # Show weekly reports for this supervisor's team only
-    weekly_reports_viewer(supervisor_id=st.session_state['user'].id)
-
-def supervisors_section_page():
-    """Page for supervisors to view and analyze Roompact form submissions"""
-    st.title("📋 Form Analysis")
-    st.markdown("""
-    This section provides specialized analysis tools for reviewing form submissions 
-    and generating AI-powered summaries with actionable insights.
-    """)
-    
-    # Create tabs for the analysis sections
-    tab1, tab2, tab3 = st.tabs(["🛡️ Duty Analysis", "📊 General Form Analysis", "📋 Individual Reports"])
-    
-    with tab1:
-        duty_analysis_section()
-    
-    with tab2:
-        general_form_analysis_section()
-    
-    with tab3:
-        individual_reports_viewer()
-
-def weekly_reports_viewer(supervisor_id=None):
-    """View and filter weekly reports submitted via the app
-    
-    Args:
-        supervisor_id: If provided, only show reports from users with this supervisor_id.
-                      If None, show all reports (admin only).
-    """
-    st.subheader("📝 Weekly Reports")
-    st.markdown("""
-    View weekly reports submitted by staff members through the application.
-    """)
-    
-    # Initialize session state for reports
-    if 'weekly_reports_by_week' not in st.session_state:
-        st.session_state['weekly_reports_by_week'] = {}
-    if 'weekly_reports_supervisor_id' not in st.session_state:
-        st.session_state['weekly_reports_supervisor_id'] = supervisor_id
-    
-    # Filter controls
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        start_date = st.date_input(
-            "📅 Start Date",
-            value=datetime.now().date() - timedelta(days=30),
-            help="View reports from this date forward",
-            key="weekly_start_date"
-        )
-    
-    with col2:
-        end_date = st.date_input(
-            "📅 End Date",
-            value=datetime.now().date(),
-            help="View reports up to this date",
-            key="weekly_end_date"
-        )
-    
-    # Fetch button
-    if st.button("🔄 Fetch Weekly Reports", type="primary", key="fetch_weekly_reports"):
-        with st.spinner("Fetching reports from database..."):
-            try:
-                # Check if user is admin - if so, use admin client to bypass RLS
-                role = st.session_state.get('role', 'user')
-                
-                if role == 'admin':
-                    try:
-                        admin_client = get_admin_client()
-                        db_client = admin_client
-                    except Exception as e:
-                        st.error(f"Failed to get admin client: {e}")
-                        db_client = supabase
-                else:
-                    db_client = supabase
-                
-                # Fetch reports with date filter
-                response = db_client.table("reports") \
-                    .select("*") \
-                    .gte("week_ending_date", start_date.isoformat()) \
-                    .lte("week_ending_date", end_date.isoformat()) \
-                    .order("week_ending_date", desc=True) \
-                    .execute()
-                
-                reports = response.data or []
-                
-                # Filter by supervisor if needed
-                if supervisor_id:
-                    # Get all users who report to this supervisor
-                    users_response = supabase.table("profiles").select("id").eq("supervisor_id", supervisor_id).execute()
-                    supervised_user_ids = {u.get("id") for u in users_response.data if isinstance(u, dict)}
-                    # Filter reports to only those from supervised users
-                    reports = [r for r in reports if isinstance(r, dict) and r.get("user_id") in supervised_user_ids]
-                
-                # Fetch emails from profiles for all reports
-                if reports:
-                    user_ids = {r.get("user_id") for r in reports if isinstance(r, dict) and r.get("user_id")}
-                    if user_ids:
-                        profiles_response = supabase.table("profiles").select("id, email").in_("id", list(user_ids)).execute()
-                        email_map = {p.get("id"): p.get("email") for p in profiles_response.data if isinstance(p, dict)}
-                        
-                        # Add email to each report
-                        for report in reports:
-                            if isinstance(report, dict):
-                                user_id = report.get("user_id")
-                                report['email'] = email_map.get(user_id, None)
-                
-                if not reports:
-                    st.warning("No reports found in the selected date range.")
-                    st.session_state['weekly_reports_by_week'] = {}
-                else:
-                    st.success(f"✅ Found {len(reports)} reports")
-                    
-                    # Group by week ending date
-                    reports_by_week = {}
-                    for report in reports:
-                        if isinstance(report, dict):
-                            week = report.get('week_ending_date')
-                            if week not in reports_by_week:
-                                reports_by_week[week] = []
-                            reports_by_week[week].append(report)
-                    
-                    # Store in session state
-                    st.session_state['weekly_reports_by_week'] = reports_by_week
-            
-            except Exception as e:
-                st.error(f"Error fetching reports: {str(e)}")
-                st.session_state['weekly_reports_by_week'] = {}
-    
-    # Display reports from session state
-    if st.session_state.get('weekly_reports_by_week'):
-        reports_by_week = st.session_state['weekly_reports_by_week']
-        
-        # Display reports
-        for week, week_reports in reports_by_week.items():
-            with st.expander(f"Week Ending {week} ({len(week_reports)} reports)", expanded=False):
-                st.subheader("📋 Reports")
-                # Create grid layout (3 columns)
-                cols = st.columns(3)
-        
-                for i, report in enumerate(week_reports):
-                    with cols[i % 3]:
-                        name = report.get('team_member', 'Unknown') if isinstance(report, dict) else 'Unknown'
-                        status = report.get('status', 'draft').capitalize() if isinstance(report, dict) else 'Draft'
-                        report_id = report.get('id', '')
-                        user_id = report.get('user_id', '')
-                        # Localize created/submitted timestamps for display
-                        submitted_at = report.get('submitted_at') if isinstance(report, dict) else None
-                        created_at = report.get('created_at') if isinstance(report, dict) else None
-                        local_tz = "America/Chicago"
-                        def _fmt(ts):
-                            if not ts:
-                                return "Unknown"
-                            try:
-                                dt = pd.to_datetime(ts)
-                                if dt.tzinfo is None:
-                                    dt = dt.tz_localize("UTC").tz_convert(local_tz)
-                                else:
-                                    dt = dt.tz_convert(local_tz)
-                                return dt.strftime("%Y-%m-%d %H:%M %Z")
-                            except Exception:
-                                return str(ts)
-                        submitted_local = _fmt(submitted_at)
-                        created_local = _fmt(created_at)
-                
-                        with st.container(border=True):
-                            st.markdown(f"#### {name}")
-                    
-                            # Status Badge
-                            status_lower = status.lower()
-                            status_class = "status-submitted" if status_lower == "finalized" else ("status-approved" if status_lower == "approved" else "status-draft")
-                            st.markdown(f'<div style="margin-bottom: 1rem;"><span class="status-badge {status_class}">{status}</span></div>', unsafe_allow_html=True)
-                            st.caption(f"Submitted: {submitted_local}  •  Created: {created_local}")
-                    
-                            # Well-being Metric
-                            if report.get('well_being_rating'):
-                                st.metric("Well-being", f"{report.get('well_being_rating')}/5")
-                    
-                            # AI Summary Snippet
-                            summary = report.get('individual_summary') if isinstance(report, dict) else None
-                            clean_sum = None
-                            if summary:
-                                clean_sum = clean_summary_response(summary)
-                                snippet = clean_sum[:150] + "..." if len(clean_sum) > 150 else clean_sum
-                                st.info(snippet)
-                    
-                            # Debug info
-                            with st.expander("🔧 Debug", expanded=False):
-                                st.write(f"Report ID: {report_id}")
-                                st.write(f"User ID: {user_id}")
-                                st.write(f"Email: {report.get('email', 'NOT FOUND')}")
-                                st.write(f"Submitted (local): {submitted_local}")
-                                st.write(f"Created (local): {created_local}")
-                                st.write(f"Status: {status_lower}")
-                    
-                            # Buttons - View Details and Respond
-                            col_b1, col_b2 = st.columns([1, 1])
-                            with col_b1:
-                                toggle_details_key = f"toggle_details_{report_id}"
-                                show_details = st.session_state.get(toggle_details_key, False)
-                                if st.button("📖 Show Details" if not show_details else "📖 Hide Details", key=f"btn_view_{report_id}", use_container_width=True):
-                                    st.session_state[toggle_details_key] = not show_details
-                            
-                            with col_b2:
-                                # Only show respond button for finalized reports
-                                if status_lower == "finalized":
-                                    toggle_respond_key = f"toggle_respond_{report_id}"
-                                    show_respond = st.session_state.get(toggle_respond_key, False)
-                                    if st.button("💬 Respond" if not show_respond else "💬 Hide Form", key=f"btn_respond_{report_id}", use_container_width=True):
-                                        st.session_state[toggle_respond_key] = not show_respond
-                            
-                            # Show full report details if toggled
-                            if st.session_state.get(f"toggle_details_{report_id}", False):
-                                st.divider()
-                                st.markdown("##### 🤖 AI Summary")
-                                if clean_sum:
-                                    st.markdown(clean_sum)
-                                else:
-                                    st.info("No AI summary available")
-                                
-                                # Director Concerns
-                                if isinstance(report, dict) and report.get('director_concerns'):
-                                    st.error(f"**⚠️ Director Concerns:**\n{report.get('director_concerns')}")
-                    
-                                # General Updates
-                                st.markdown("##### 📝 General Updates")
-                                st.markdown(f"**Professional Development:**\n{report.get('professional_development', 'None') if isinstance(report, dict) else 'None'}")
-                                st.markdown(f"**Lookahead:**\n{report.get('key_topics_lookahead', 'None') if isinstance(report, dict) else 'None'}")
-                                st.markdown(f"**Personal Check-in:**\n{report.get('personal_check_in', 'None') if isinstance(report, dict) else 'None'}")
-                    
-                                # Core Activities
-                                st.markdown("##### 🎯 Core Activities")
-                                body = report.get('report_body', {}) if isinstance(report, dict) else {}
-                    
-                                for section_key, section_name in CORE_SECTIONS.items():
-                                    section_data = body.get(section_key, {}) if isinstance(body, dict) else {}
-                                    if section_data and (section_data.get('successes') or section_data.get('challenges')):
-                                        st.markdown(f"**{section_name}**")
-                                        if section_data.get('successes'):
-                                            st.markdown("*Successes:*")
-                                            for item in section_data['successes']:
-                                                if isinstance(item, dict):
-                                                    text = item.get('text', '')
-                                                    ascend = item.get('ascend_category', 'N/A')
-                                                    north = item.get('north_category', 'N/A')
-                                                    st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                                        if section_data.get('challenges'):
-                                            st.markdown("*Challenges:*")
-                                            for item in section_data['challenges']:
-                                                if isinstance(item, dict):
-                                                    text = item.get('text', '')
-                                                    ascend = item.get('ascend_category', 'N/A')
-                                                    north = item.get('north_category', 'N/A')
-                                                    st.markdown(f"- {text} `(ASCEND: {ascend}, NORTH: {north})`")
-                        
-                            # Show response form if toggled
-                            if st.session_state.get(f"toggle_respond_{report_id}", False) and status_lower == "finalized":
-                                st.divider()
-                                st.markdown("##### 📧 Send Response")
-                                comment_key = f"comment_{report_id}"
-                                clear_key = f"clear_comment_{report_id}"
-                                # Clear the textarea on rerun after a successful send to avoid session_state mutation errors
-                                if st.session_state.get(clear_key):
-                                    st.session_state[comment_key] = ""
-                                    st.session_state.pop(clear_key, None)
-
-                                comment = st.text_area(
-                                    "Your feedback:",
-                                    key=comment_key,
-                                    height=120,
-                                    placeholder="Type your response..."
-                                )
-                                
-                                col_send, col_cancel = st.columns([1, 1])
-                                with col_send:
-                                    if st.button("✉️ Send Email", key=f"btn_send_{report_id}", type="primary", use_container_width=True):
-                                        if not comment.strip():
-                                            st.error("❌ Please add a comment before sending.")
-                                        else:
-                                            staff_email = report.get('email')
-                                            supervisor_email = st.session_state.get('user').email if st.session_state.get('user') else None
-                                            
-                                            if not staff_email:
-                                                st.error("❌ No email found for this staff member.")
-                                            elif not supervisor_email:
-                                                st.error("❌ No email found for supervisor.")
-                                            else:
-                                                try:
-                                                    with st.spinner("📧 Sending email..."):
-                                                        sender_name = st.session_state.get('full_name', 'Supervisor/Admin')
-                                                        subject = f"Response to Your Weekly Report for {week}"
-                                                        body = f"Hello {name},\n\nI've reviewed your weekly report for {week}.\n\nMy feedback:\n{comment}\n\nBest regards,\n{sender_name}"
-                                                        
-                                                        # Send to staff member
-                                                        success_staff = send_email(staff_email, subject, body)
-                                                        
-                                                        # Send copy to supervisor
-                                                        supervisor_body = f"Sent response to {name}'s weekly report for {week}.\n\nFeedback sent:\n{comment}"
-                                                        success_supervisor = send_email(supervisor_email, f"[Copy] {subject}", supervisor_body)
-                                                        
-                                                        if success_staff and success_supervisor:
-                                                            st.success(f"✅ Email sent to {name} and copy sent to you!")
-                                                            # Clear form on next render
-                                                            st.session_state[clear_key] = True
-                                                            st.session_state[f"toggle_respond_{report_id}"] = False
-                                                            st.rerun()
-                                                        elif success_staff:
-                                                            st.warning(f"⚠️ Email sent to {name} but copy to supervisor failed.")
-                                                        else:
-                                                            st.error("❌ Failed to send email.")
-                                                except Exception as e:
-                                                    st.error(f"❌ Error: {str(e)}")
-                                
-                                with col_cancel:
-                                    if st.button("Cancel", key=f"btn_cancel_{report_id}", use_container_width=True):
-                                        st.session_state[f"toggle_respond_{report_id}"] = False
-    else:
-        st.info("Click 'Fetch Weekly Reports' to load reports")
-
-def duty_analysis_section():
-    """Specialized section for duty report analysis"""
-    st.subheader("🛡️ Duty Analysis")
-    st.markdown("""
-    **Focus:** Analyze specific duty reports from Resident Assistants, Community Assistants, RDs, and RMs.  
-    **Purpose:** Monitor daily operations, incidents, and staff performance during duty shifts.
-    """)
-    
     # Predefined duty form types - exact names from Roompact
     DUTY_FORM_TYPES = [
         "Resident Assistant Duty",
@@ -1489,6 +1140,9 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analys
             
             selected_forms = []
             
+            # Scrollable list with higher preview cap
+            st.markdown("<div style='max-height: 520px; overflow-y: auto; padding-right: 8px;'>", unsafe_allow_html=True)
+            legacy_preview_cap = 300
             # Show forms grouped by template
             for template_name, template_forms in forms_by_template.items():
                 st.markdown(f"**{template_name}** ({len(template_forms)} submissions)")
@@ -1498,8 +1152,9 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analys
                 if st.checkbox(f"Select all {template_name}", key=select_all_key):
                     selected_forms.extend(template_forms)
                 else:
-                    # Individual form checkboxes
-                    for i, form in enumerate(template_forms[:10]):  # Limit display to first 10 per template
+                    # Individual form checkboxes (scrollable per template)
+                    st.markdown("<div style='max-height: 260px; overflow-y: auto; padding-left: 4px;'>", unsafe_allow_html=True)
+                    for i, form in enumerate(template_forms[:legacy_preview_cap]):
                         current_revision = form.get('current_revision', {})
                         author = current_revision.get('author', 'Unknown')
                         date_str = current_revision.get('date', '')
@@ -1517,8 +1172,10 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analys
                         form_key = f"form_{template_name}_{i}"
                         if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
                             selected_forms.append(form)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
                 st.write("---")
+            st.markdown("</div>", unsafe_allow_html=True)
         
         with col2:
             st.markdown("**Analysis Options:**")
@@ -1552,81 +1209,114 @@ Generated by UND Housing & Residence Life Weekly Reporting Tool - General Analys
                     if is_duty_focused and 'All Form Types' not in form_types:
                         summary = create_duty_report_summary(
                             selected_forms[:max_forms], 
-                            filter_info['start_date'], 
-                            filter_info['end_date']
-                        )
-                    else:
-                        # Use general form analysis
-                        summary = summarize_form_submissions(selected_forms, max_forms)
-                    
-                    # Display results
-                    st.subheader("📊 AI Analysis Results")
-                    st.markdown(summary)
-                    
-                    # Offer download option
-                    filter_info = st.session_state.get('filter_info', {})
-                    form_types = filter_info.get('form_types', ['Forms'])
-                    
-                    # Determine analysis type for filename and label
-                    if len(form_types) == 1 and 'duty' in form_types[0].lower():
-                        analysis_type = "Duty Reports"
-                        file_prefix = "duty_reports"
-                    elif len(form_types) <= 3:
-                        analysis_type = " & ".join(form_types)
-                        file_prefix = "forms_analysis"
-                    else:
-                        analysis_type = f"{len(form_types)} Form Types"
-                        file_prefix = "multi_forms_analysis"
-                    
-                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
-                    form_types_text = ", ".join(form_types) if len(form_types) <= 5 else f"{len(form_types)} selected form types"
-                    
-                    summary_data = f"""# Roompact Forms Analysis Summary
+                            # Custom prompt for this legacy section as well
+                            legacy_prompt_default = "You are an expert student affairs analyst. Summarize key themes, concerns, action items, and recognition opportunities. Be concise and actionable."
+                            legacy_prompt = st.text_area(
+                                "AI prompt (optional)",
+                                value=legacy_prompt_default,
+                                height=140,
+                                help="Provide custom instructions for the AI. Leave as-is for the standard summary.",
+                                key="legacy_general_ai_prompt"
+                            )
 
-**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Form Types:** {form_types_text}  
-**Date Range:** {date_range}  
-**Forms Analyzed:** {min(len(selected_forms), max_forms)} of {len(selected_forms)} selected  
-
-{summary}
-
----
-Generated by UND Housing & Residence Life Weekly Reporting Tool
-"""
+                            if len(selected_forms) > 0:
+                                st.success(f"✅ {len(selected_forms)} forms selected")
+                
+                                if st.button("🤖 Generate AI Summary", type="primary"):
+                                    if len(selected_forms) > max_forms:
+                                        st.warning(f"⚠️ Too many forms selected. Analyzing first {max_forms} forms.")
                     
-                    st.download_button(
-                        label=f"📄 Download Analysis Report",
-                        data=summary_data,
-                        file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                        mime="text/markdown",
-                        help="Download the forms analysis as a markdown file"
-                    )
-            else:
-                st.info("Select forms above to enable AI analysis")
-    
-    else:
-        st.info("👆 Click 'Fetch Latest Forms' to load form submissions from Roompact")
+                                    # Check if focusing on duty reports for specialized analysis
+                                    filter_info = st.session_state.get('filter_info', {})
+                                    form_types = filter_info.get('form_types', [])
+                    
+                                    # Use specialized duty report analysis if only duty-related forms are selected
+                                    is_duty_focused = (
+                                        len(form_types) == 1 and 
+                                        any('duty' in form_type.lower() for form_type in form_types)
+                                    ) or (
+                                        len([ft for ft in form_types if 'duty' in ft.lower()]) > 0 and
+                                        len([ft for ft in form_types if 'duty' not in ft.lower()]) == 0
+                                    )
+                    
+                                    if is_duty_focused and 'All Form Types' not in form_types:
+                                        summary = create_duty_report_summary(
+                                            selected_forms[:max_forms], 
+                                            filter_info['start_date'], 
+                                            filter_info['end_date']
+                                        )
+                                    else:
+                                        # Use general form analysis with custom prompt
+                                        summary = summarize_form_submissions(
+                                            selected_forms[:max_forms], 
+                                            max_forms,
+                                            custom_prompt=legacy_prompt,
+                                            context="roompact_general_form_analysis"
+                                        )
 
+                                    # Log activity
+                                    try:
+                                        log_user_activity(
+                                            event_type="analysis_run",
+                                            context="roompact_general_form_analysis_legacy",
+                                            metadata={
+                                                "selected_forms": len(selected_forms),
+                                                "analyzed_forms": min(len(selected_forms), max_forms),
+                                                "form_types": form_types,
+                                                "date_range": [str(filter_info.get('start_date')), str(filter_info.get('end_date'))],
+                                                "custom_prompt": legacy_prompt
+                                            },
+                                            user=st.session_state.get("user")
+                                        )
+                                    except Exception:
+                                        pass
+                    
+                                    # Display results
+                                    st.subheader("📊 AI Analysis Results")
+                                    st.markdown(summary)
+                    
+                                    # Offer download option
+                                    filter_info = st.session_state.get('filter_info', {})
+                                    form_types = filter_info.get('form_types', ['Forms'])
+                    
+                                    # Determine analysis type for filename and label
+                                    if len(form_types) == 1 and 'duty' in form_types[0].lower():
+                                        analysis_type = "Duty Reports"
+                                        file_prefix = "duty_reports"
+                                    elif len(form_types) <= 3:
+                                        analysis_type = " & ".join(form_types)
+                                        file_prefix = "forms_analysis"
+                                    else:
+                                        analysis_type = f"{len(form_types)} Form Types"
+                                        file_prefix = "multi_forms_analysis"
+                    
+                                    date_range = f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}"
+                                    form_types_text = ", ".join(form_types) if len(form_types) <= 5 else f"{len(form_types)} selected form types"
+                    
+                                    summary_data = f"""# Roompact Forms Analysis Summary
 
-def individual_reports_viewer():
-    """View and filter individual staff reports"""
-    st.subheader("📋 Individual Reports Viewer")
-    st.markdown("""
-    View detailed individual staff submissions with filtering by date, staff member, and form type.
-    """)
-    
-    # Date range selection
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        start_date = st.date_input(
-            "📅 Start Date",
-            value=datetime.now().date() - timedelta(days=30),
-            help="View reports from this date forward",
-            key="individual_start_date"
-        )
-    
-    with col2:
+                **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+                **Analysis Type:** {analysis_type}  
+                **Date Range:** {date_range}  
+                **Form Types:** {form_types_text}  
+                **Forms Analyzed:** {min(len(selected_forms), max_forms)} of {len(selected_forms)} selected  
+                **Custom Prompt Used:** {bool(legacy_prompt)}  
+
+                {summary}
+
+                ---
+                Generated by UND Housing & Residence Life Weekly Reporting Tool
+                """
+                    
+                                    st.download_button(
+                                        label=f"📄 Download AI Summary ({analysis_type})",
+                                        data=summary_data,
+                                        file_name=f"{file_prefix}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                                        mime="text/markdown",
+                                        help="Download the analysis as a markdown file"
+                                    )
+                            else:
+                                st.info("Select forms above to enable analysis")
         end_date = st.date_input(
             "📅 End Date",
             value=datetime.now().date(),
