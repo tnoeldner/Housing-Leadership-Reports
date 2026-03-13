@@ -681,8 +681,8 @@ def create_duty_report_summary(selected_forms, start_date, end_date):
             return {"summary": f"⚠️ API Quota Exceeded: The analysis request was too large. Please try selecting a shorter date range or fewer reports. (Error: {error_msg})"}
         return {"summary": f"Error generating duty report summary: {error_msg}"}
 
-def summarize_form_submissions(selected_forms, max_forms=10):
-    """Use AI to summarize selected form submissions"""
+def summarize_form_submissions(selected_forms, max_forms=10, custom_prompt=None, context="form_analysis"):
+    """Use AI to summarize selected form submissions with optional custom prompt."""
     if not selected_forms:
         return "No forms selected for summarization."
     
@@ -707,13 +707,22 @@ def summarize_form_submissions(selected_forms, max_forms=10):
                 field_response = response.get('response', '')
                 if field_response and str(field_response).strip():
                     forms_text += f"**{field_label}:** {field_response}\n"
-        # Use admin-edited prompt template for staff recognition
+        # Prompt selection: use custom if provided, else configured template
         import streamlit as st
         from src.database import supabase
-        prompt_template = get_general_form_analysis_prompt(supabase)
-        prompt = prompt_template.format(reports_text=forms_text)
+        if custom_prompt and custom_prompt.strip():
+            prompt_template = custom_prompt.strip()
+        else:
+            prompt_template = get_general_form_analysis_prompt(supabase)
+
+        # If user prompt contains placeholder, format; otherwise append context
+        if "{reports_text}" in prompt_template:
+            prompt = prompt_template.format(reports_text=forms_text)
+        else:
+            prompt = f"{prompt_template}\n\nContext:\n{forms_text}"
+
         with st.spinner("AI is analyzing form submissions..."):
-            response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context="form_analysis")
+            response_text = call_gemini_ai(prompt, model_name="models/gemini-2.5-pro", context=context)
             if not response_text or not str(response_text).strip():
                 st.info("Prompt sent to AI:")
                 st.code(prompt)

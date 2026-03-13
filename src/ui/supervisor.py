@@ -1090,6 +1090,7 @@ def general_form_analysis_section():
         
         with col_select:
             st.markdown("**Select forms to analyze:**")
+            st.markdown("<div style='max-height: 520px; overflow-y: auto; padding-right: 8px;'>", unsafe_allow_html=True)
             
             # Group forms by type
             forms_by_type = {}
@@ -1101,16 +1102,19 @@ def general_form_analysis_section():
             
             selected_general_forms = []
             
+            # Set a reasonable preview cap to avoid UI overload but allow scrolling many items
+            preview_cap = st.session_state.get("general_preview_cap", 200)
+
             for form_type, type_forms in forms_by_type.items():
                 st.markdown(f"**{form_type}** ({len(type_forms)} forms)")
-                
                 # Select all checkbox for this type
                 select_all_key = f"select_all_general_{form_type.replace(' ', '_')}"
                 if st.checkbox(f"Select all {form_type}", key=select_all_key):
                     selected_general_forms.extend(type_forms)
                 else:
-                    # Individual form checkboxes (show first 15 per type)
-                    for i, form in enumerate(type_forms[:15]):
+                    # Individual form checkboxes (scrollable list)
+                    st.markdown("<div style='max-height: 260px; overflow-y: auto; padding-left: 4px;'>", unsafe_allow_html=True)
+                    for i, form in enumerate(type_forms[:preview_cap]):
                         current_revision = form.get('current_revision', {})
                         author = current_revision.get('author', 'Unknown')
                         date_str = current_revision.get('date', '')
@@ -1128,8 +1132,11 @@ def general_form_analysis_section():
                         form_key = f"general_form_{form_type}_{i}"
                         if st.checkbox(f"📄 {author} - {display_date}", key=form_key):
                             selected_general_forms.append(form)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
                 st.write("---")
+
+            st.markdown("</div>", unsafe_allow_html=True)
         
         with col_analyze:
             st.markdown("**Analysis Options:**")
@@ -1141,6 +1148,16 @@ def general_form_analysis_section():
                                 help="Set high limit to analyze all forms (AI can handle large datasets)",
                                 key="max_general_forms")
             
+            # Custom prompt for AI analysis
+            default_prompt = "You are an expert student affairs analyst. Summarize key themes, concerns, action items, and recognition opportunities from these forms. Be concise and actionable."
+            custom_prompt = st.text_area(
+                "AI prompt (optional)",
+                value=default_prompt,
+                height=140,
+                help="Provide custom instructions for the AI. Leave as-is for the standard summary.",
+                key="general_ai_prompt"
+            )
+
             if len(selected_general_forms) > 0:
                 st.success(f"✅ {len(selected_general_forms)} forms selected")
                 
@@ -1152,10 +1169,12 @@ def general_form_analysis_section():
                     if len(selected_general_forms) > max_general_forms:
                         st.warning(f"⚠️ Too many forms selected. Analyzing first {max_general_forms} forms.")
                     
-                    # Use general form summary
+                    # Use general form summary with optional custom prompt
                     summary = summarize_form_submissions(
                         selected_general_forms[:max_general_forms], 
-                        max_general_forms
+                        max_general_forms,
+                        custom_prompt=custom_prompt,
+                        context="roompact_general_form_analysis"
                     )
 
                     try:
@@ -1167,7 +1186,8 @@ def general_form_analysis_section():
                                 "analyzed_forms": min(len(selected_general_forms), max_general_forms),
                                 "form_types": filter_info.get('form_types', []),
                                 "date_range": [str(filter_info.get('start_date')), str(filter_info.get('end_date'))],
-                                "discovered_on": filter_info.get('discovered_on')
+                                "discovered_on": filter_info.get('discovered_on'),
+                                "custom_prompt": custom_prompt
                             },
                             user=st.session_state.get("user")
                         )
@@ -1187,6 +1207,7 @@ def general_form_analysis_section():
 **Form Types:** {', '.join(filter_info.get('form_types', []))}  
 **Date Range:** {date_range}  
 **Forms Analyzed:** {min(len(selected_general_forms), max_general_forms)} of {len(selected_general_forms)} selected  
+**Custom Prompt Used:** {bool(custom_prompt)}  
 
 {summary}
 
