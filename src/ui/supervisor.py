@@ -758,23 +758,23 @@ def general_form_analysis_section():
     **Focus:** Analyze any discovered Roompact form types without re-scanning every time. Use **Discover Forms** only when you need to pick up new form types; otherwise the cached list stays static until the next discovery run.
     """)
     
-    # Date range selection for general analysis
+    # Date range selection for discovery (find new form types)
     col1, col2 = st.columns(2)
     
     with col1:
-        general_start_date = st.date_input(
-            "📅 Start Date",
+        discovery_start_date = st.date_input(
+            "📅 Discover: Start Date",
             value=datetime.now().date() - timedelta(days=14),
-            help="Discover forms from this date forward",
-            key="general_start_date"
+            help="Scan forms from this date forward to discover form types",
+            key="general_discovery_start_date"
         )
     
     with col2:
-        general_end_date = st.date_input(
-            "📅 End Date", 
+        discovery_end_date = st.date_input(
+            "📅 Discover: End Date", 
             value=datetime.now().date(),
-            help="Discover forms up to this date",
-            key="general_end_date"
+            help="Scan forms up to this date for type discovery",
+            key="general_discovery_end_date"
         )
     
     # Form discovery section
@@ -782,7 +782,7 @@ def general_form_analysis_section():
 
     if st.button("🔄 Discover Forms", type="primary", key="discover_general_forms"):
         # Calculate page limit for general forms (more forms than just duty reports)
-        days_back = (datetime.now().date() - general_start_date).days
+        days_back = (datetime.now().date() - discovery_start_date).days
         
         # Use generous page limits to ensure we reach historical data
         if days_back > 90:
@@ -796,7 +796,7 @@ def general_form_analysis_section():
         else:
             max_pages = 200   # Recent data - conservative but adequate
         
-        st.info(f"🔍 Discovering forms (up to {max_pages} pages) going back {days_back} days to {general_start_date}")
+        st.info(f"🔍 Discovering forms (up to {max_pages} pages) going back {days_back} days to {discovery_start_date}")
         st.info(f"📈 **Estimate:** ~{days_back * 15} total forms expected (15 per day × {days_back} days)")
         
         # Show extended search warning for very old dates
@@ -811,13 +811,13 @@ def general_form_analysis_section():
             if oldest_date != "Unknown":
                 status += f" | Oldest: {oldest_date}" 
             if reached_target:
-                status += f" | ✅ Reached {general_start_date}"
+                status += f" | ✅ Reached {discovery_start_date}"
             progress_placeholder.info(status)
         
         # Discover available form types
         form_types_info, error = discover_form_types(
             max_pages=max_pages,
-            target_start_date=general_start_date,
+            target_start_date=discovery_start_date,
             progress_callback=show_general_progress
         )
         
@@ -827,7 +827,8 @@ def general_form_analysis_section():
         
         # Store discovered forms in session state
         st.session_state['general_form_types'] = form_types_info
-        st.session_state['general_discovery_date'] = general_start_date
+        st.session_state['general_discovery_date'] = discovery_start_date
+        st.session_state['general_discovery_end'] = discovery_end_date
         
         if form_types_info:
             st.success(f"✅ Discovered {len(form_types_info)} different form types")
@@ -838,8 +839,9 @@ def general_form_analysis_section():
     if 'general_form_types' in st.session_state:
         form_types_info = st.session_state['general_form_types']
         discovery_date = st.session_state.get('general_discovery_date')
+        discovery_end = st.session_state.get('general_discovery_end') or discovery_date
         
-        st.subheader(f"📋 Available Form Types (discovered {discovery_date})")
+        st.subheader(f"📋 Available Form Types (discovered {discovery_date}–{discovery_end})")
         
         if form_types_info:
             # Create multiselect for form type selection
@@ -866,10 +868,26 @@ def general_form_analysis_section():
                 st.info(f"📊 **Selected for analysis:** {', '.join(selected_form_types)}")
                 
                 # Fetch forms button
+                st.markdown("---")
+                st.markdown("**Fetch date range (applies to selected types):**")
+                colf1, colf2 = st.columns(2)
+                with colf1:
+                    fetch_start_date = st.date_input(
+                        "📅 Fetch: Start Date",
+                        value=discovery_start_date,
+                        key="general_fetch_start_date"
+                    )
+                with colf2:
+                    fetch_end_date = st.date_input(
+                        "📅 Fetch: End Date",
+                        value=discovery_end_date,
+                        key="general_fetch_end_date"
+                    )
+
                 if st.button("📥 Fetch Selected Forms", type="primary", key="fetch_general_forms"):
                     with st.spinner("Fetching selected forms from Roompact..."):
                         # Calculate page limit for fetching selected general forms
-                        days_back = (datetime.now().date() - general_start_date).days
+                        days_back = (datetime.now().date() - fetch_start_date).days
                         
                         # Use same generous limits as discovery phase
                         if days_back > 90:
@@ -894,12 +912,12 @@ def general_form_analysis_section():
                             if oldest_date != "Unknown":
                                 status += f" | Oldest: {oldest_date}"
                             if reached_target:
-                                status += f" | ✅ Reached {general_start_date}"
+                                status += f" | ✅ Reached {fetch_start_date}"
                             progress_placeholder.info(status)
                         
                         all_forms, error = fetch_roompact_forms(
                             max_pages=max_pages,
-                            target_start_date=general_start_date,
+                            target_start_date=fetch_start_date,
                             progress_callback=show_fetch_progress
                         )
                         
@@ -913,7 +931,7 @@ def general_form_analysis_section():
                         
                         # Filter for selected form types
                         filtered_forms, filter_error = filter_forms_by_date_and_type(
-                            all_forms, general_start_date, general_end_date, selected_form_types
+                            all_forms, fetch_start_date, fetch_end_date, selected_form_types
                         )
                         
                         if filter_error:
@@ -923,8 +941,8 @@ def general_form_analysis_section():
                         # Store filtered forms in session state (static form types; refresh only on new discovery)
                         st.session_state['general_filtered_forms'] = filtered_forms
                         st.session_state['general_filter_info'] = {
-                            'start_date': general_start_date,
-                            'end_date': general_end_date,
+                            'start_date': fetch_start_date,
+                            'end_date': fetch_end_date,
                             'form_types': selected_form_types,
                             'total_fetched': len(all_forms),
                             'filtered_count': len(filtered_forms),
@@ -934,7 +952,7 @@ def general_form_analysis_section():
                         if filtered_forms:
                             st.success(f"✅ Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)")
                         else:
-                            st.warning(f"No forms found matching your criteria in the date range {general_start_date} to {general_end_date}")
+                            st.warning(f"No forms found matching your criteria in the date range {fetch_start_date} to {fetch_end_date}")
         
         else:
             st.info("No forms discovered. Try expanding your date range or check your API connection.")
