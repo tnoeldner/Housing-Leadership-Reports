@@ -3,7 +3,7 @@ import time
 import json
 import pandas as pd
 from datetime import datetime, timedelta
-from src.database import supabase, get_admin_client
+from src.database import supabase, get_admin_client, log_user_activity
 from src.ai import summarize_form_submissions, create_duty_report_summary, clean_summary_response
 from src.config import CORE_SECTIONS
 from src.email_service import send_email
@@ -755,9 +755,7 @@ def general_form_analysis_section():
     """General form analysis section for any form type with automatic discovery"""
     st.subheader("📊 General Form Analysis - Custom Report Generation")
     st.markdown("""
-    **Focus:** Analyze ANY form type available in Roompact - automatically discover and select from available forms  
-    **Purpose:** Generate custom AI reports for any combination of form types and date ranges  
-    **Flexibility:** Choose specific forms, date ranges, and get tailored AI analysis
+    **Focus:** Analyze any discovered Roompact form types without re-scanning every time. Use **Discover Forms** only when you need to pick up new form types; otherwise the cached list stays static until the next discovery run.
     """)
     
     # Date range selection for general analysis
@@ -781,7 +779,7 @@ def general_form_analysis_section():
     
     # Form discovery section
     st.subheader("🔍 Discover Available Forms")
-    
+
     if st.button("🔄 Discover Forms", type="primary", key="discover_general_forms"):
         # Calculate page limit for general forms (more forms than just duty reports)
         days_back = (datetime.now().date() - general_start_date).days
@@ -841,7 +839,7 @@ def general_form_analysis_section():
         form_types_info = st.session_state['general_form_types']
         discovery_date = st.session_state.get('general_discovery_date')
         
-        st.subheader(f"📋 Available Form Types (since {discovery_date})")
+        st.subheader(f"📋 Available Form Types (discovered {discovery_date})")
         
         if form_types_info:
             # Create multiselect for form type selection
@@ -922,14 +920,15 @@ def general_form_analysis_section():
                             st.error(f"Error filtering forms: {filter_error}")
                             return
                         
-                        # Store filtered forms in session state
+                        # Store filtered forms in session state (static form types; refresh only on new discovery)
                         st.session_state['general_filtered_forms'] = filtered_forms
                         st.session_state['general_filter_info'] = {
                             'start_date': general_start_date,
                             'end_date': general_end_date,
                             'form_types': selected_form_types,
                             'total_fetched': len(all_forms),
-                            'filtered_count': len(filtered_forms)
+                            'filtered_count': len(filtered_forms),
+                            'discovered_on': st.session_state.get('general_discovery_date')
                         }
                         
                         if filtered_forms:
@@ -1027,6 +1026,22 @@ def general_form_analysis_section():
                         selected_general_forms[:max_general_forms], 
                         max_general_forms
                     )
+
+                    try:
+                        log_user_activity(
+                            event_type="analysis_run",
+                            context="roompact_general_form_analysis",
+                            metadata={
+                                "selected_forms": len(selected_general_forms),
+                                "analyzed_forms": min(len(selected_general_forms), max_general_forms),
+                                "form_types": filter_info.get('form_types', []),
+                                "date_range": [str(filter_info.get('start_date')), str(filter_info.get('end_date'))],
+                                "discovered_on": filter_info.get('discovered_on')
+                            },
+                            user=st.session_state.get("user")
+                        )
+                    except Exception:
+                        pass
                     
                     # Display results
                     st.subheader("📊 General Analysis Results")
