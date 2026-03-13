@@ -389,6 +389,20 @@ def submit_and_edit_page():
 
         if st.button("Cancel"):
             clear_form_state()
+            try:
+                log_user_activity(
+                    "weekly_report_cancel",
+                    context="submission",
+                    metadata={
+                        "week_ending_date": str(week_ending_date),
+                        "team_member": team_member_name,
+                    },
+                    user=st.session_state.get("user"),
+                    user_id=getattr(st.session_state.get("user"), "id", None),
+                    user_email=getattr(st.session_state.get("user"), "email", None),
+                )
+            except Exception:
+                pass
             st.rerun()
 
         clicked_button = None
@@ -456,6 +470,21 @@ def submit_and_edit_page():
                 try:
                     user_client.table("reports").upsert(draft_data, on_conflict="user_id, week_ending_date").execute()
                     st.success("Draft saved successfully!")
+                    try:
+                        log_user_activity(
+                            "weekly_report_save_draft",
+                            context="submission",
+                            metadata={
+                                "week_ending_date": str(week_ending_date),
+                                "team_member": team_member_name,
+                                "status": "draft",
+                            },
+                            user=st.session_state.get("user"),
+                            user_id=getattr(st.session_state.get("user"), "id", None),
+                            user_email=getattr(st.session_state.get("user"), "email", None),
+                        )
+                    except Exception:
+                        pass
                     clear_form_state()
                     time.sleep(1)
                     st.rerun()
@@ -464,6 +493,20 @@ def submit_and_edit_page():
 
         elif review_button:
             with st.spinner("Generating AI draft..."):
+                try:
+                    log_user_activity(
+                        "weekly_report_proceed_review",
+                        context="submission",
+                        metadata={
+                            "week_ending_date": str(week_ending_date),
+                            "team_member": team_member_name,
+                        },
+                        user=st.session_state.get("user"),
+                        user_id=getattr(st.session_state.get("user"), "id", None),
+                        user_email=getattr(st.session_state.get("user"), "email", None),
+                    )
+                except Exception:
+                    pass
                 items_to_process = []
                 item_id_counter = 0
                 for section_key in CORE_SECTIONS.keys():
