@@ -1,3 +1,4 @@
+-- DO NOT RUN: superseded by current RLS policies. Keep for reference only.
 -- Clean up ALL existing RLS policies on reports table
 DROP POLICY IF EXISTS "Admins can manage all reports" ON reports;
 DROP POLICY IF EXISTS "Admins can view all reports." ON reports;

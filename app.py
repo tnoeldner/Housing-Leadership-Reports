@@ -129,6 +129,15 @@ else:
         if effective_is_supervisor:
             st.sidebar.write("✓ Supervisor")
         if st.sidebar.button("Logout", key="sidebar_logout"):
+            try:
+                log_user_activity(
+                    event_type="logout",
+                    context="sidebar",
+                    metadata={"role": st.session_state.get("role"), "is_supervisor": st.session_state.get("is_supervisor", False)},
+                    user=st.session_state.get("user"),
+                )
+            except Exception:
+                pass
             st.session_state.clear()
             st.rerun()
 
@@ -151,6 +160,22 @@ else:
             pages["Form Analysis"] = supervisors_section_page
         
         selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
+        last_nav = st.session_state.get("_last_nav_page")
+        if last_nav != selected_page:
+            st.session_state["_last_nav_page"] = selected_page
+            try:
+                log_user_activity(
+                    event_type="page_view",
+                    context=f"nav:{selected_page}",
+                    metadata={
+                        "role": actual_role,
+                        "effective_role": effective_role,
+                        "is_supervisor": effective_is_supervisor,
+                    },
+                    user=st.session_state.get("user"),
+                )
+            except Exception:
+                pass
         pages[selected_page]()
 
 # --- Connections ---

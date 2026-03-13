@@ -6,7 +6,7 @@ import tempfile
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from src.database import supabase, get_admin_client, log_user_activity
+from src.database import supabase, get_admin_client, get_user_client, log_user_activity
 from src.utils import get_deadline_settings
 from src.email_service import send_email
 from src.config import ASCEND_VALUES, NORTH_VALUES, CORE_SECTIONS, get_secret
@@ -1234,12 +1234,37 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     }
                     admin_user_id = st.session_state["user"].id
                     with st.spinner("Saving settings to database..."):
-                        result = supabase.table("admin_settings").upsert({
+                        client = None
+                        client_source = "admin_client"
+                        try:
+                            client = get_admin_client()
+                        except Exception as admin_error:
+                            st.warning(f"Admin client unavailable, trying user session client: {admin_error}")
+                            try:
+                                client = get_user_client()
+                                client_source = "user_client"
+                            except Exception as user_error:
+                                raise Exception(f"Unable to obtain Supabase client for saving settings: {user_error}")
+
+                        result = client.table("admin_settings").upsert({
                             "setting_name": "report_deadline",
                             "setting_value": new_settings,
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
-                        st.write(f"Debug: Database response: {result}")
+                        st.write(f"Debug ({client_source}): Database response: {result}")
+                        try:
+                            log_user_activity(
+                                event_type="settings_update",
+                                context="admin_settings:deadline",
+                                metadata={
+                                    "setting_name": "report_deadline",
+                                    "new_settings": new_settings,
+                                    "client": client_source,
+                                },
+                                user=st.session_state.get("user"),
+                            )
+                        except Exception:
+                            pass
                     st.session_state["admin_deadline_settings"] = new_settings
                     st.success("✅ Deadline settings saved successfully to database!")
                     st.info(f"Saved: Reports due **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][deadline_day]}** at **{deadline_hour:02d}:{deadline_minute:02d}** with **{grace_period}** hour grace period")

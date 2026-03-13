@@ -1,3 +1,4 @@
+-- DO NOT RUN: superseded by current RLS policies. Keep for reference only.
 -- Quick fix for RLS policy issues on reports table
 -- Run this in your Supabase SQL editor to fix report creation permissions
 

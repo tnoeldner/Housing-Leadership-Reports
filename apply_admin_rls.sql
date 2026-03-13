@@ -1,3 +1,4 @@
+-- DO NOT RUN: superseded by current RLS policies. Keep for reference only.
 -- Fix RLS policies to allow admins to view all reports
 
 -- 1. Drop existing restrictive policies on the reports table
