@@ -26,6 +26,38 @@ from src.utils import calculate_deadline_info, clear_form_state
 from src.ai import clean_summary_response, call_gemini_ai
 
 def submit_and_edit_page():
+    def log_validation_error(field: str, message: str, context: str):
+        try:
+            log_user_activity(
+                "validation_error",
+                context=context,
+                metadata={
+                    "field": field,
+                    "message": message,
+                },
+                user=st.session_state.get("user"),
+                user_id=getattr(st.session_state.get("user"), "id", None),
+                user_email=getattr(st.session_state.get("user"), "email", None),
+            )
+        except Exception:
+            pass
+
+    def has_any_content():
+        for section_key in CORE_SECTIONS.keys():
+            if section_key == "events":
+                events_count = st.session_state.get("events_count", 1)
+                for i in range(events_count):
+                    if st.session_state.get(f"event_name_{i}") and st.session_state.get(f"event_date_{i}"):
+                        return True
+            else:
+                for i in range(st.session_state.get(f"{section_key}_success_count", 1)):
+                    if st.session_state.get(f"{section_key}_success_{i}"):
+                        return True
+                for i in range(st.session_state.get(f"{section_key}_challenge_count", 1)):
+                    if st.session_state.get(f"{section_key}_challenge_{i}"):
+                        return True
+        return False
+
     def dynamic_entry_section(section_key, section_label, report_data):
         st.subheader(section_label)
         # Special handling for events section
@@ -428,6 +460,15 @@ def submit_and_edit_page():
                 st.rerun()
 
         elif save_draft_button:
+            if not week_ending_date:
+                log_validation_error("week_ending_date", "Week ending date is required", "weekly_report_save_draft")
+                st.error("Please select a week ending date before saving a draft.")
+                st.stop()
+            if not has_any_content():
+                log_validation_error("report_body", "At least one entry (success/challenge/event) is required", "weekly_report_save_draft")
+                st.error("Add at least one success, challenge, or event before saving a draft.")
+                st.stop()
+
             with st.spinner("Saving draft..."):
                 report_body = {key: {"successes": [], "challenges": []} for key in CORE_SECTIONS.keys()}
                 for section_key in CORE_SECTIONS.keys():
@@ -492,6 +533,15 @@ def submit_and_edit_page():
                     st.error(f"An error occurred while saving the draft: {e}")
 
         elif review_button:
+            if not week_ending_date:
+                log_validation_error("week_ending_date", "Week ending date is required", "weekly_report_proceed_review")
+                st.error("Please select a week ending date before proceeding to review.")
+                st.stop()
+            if not has_any_content():
+                log_validation_error("report_body", "At least one entry (success/challenge/event) is required", "weekly_report_proceed_review")
+                st.error("Add at least one success, challenge, or event before proceeding to review.")
+                st.stop()
+
             with st.spinner("Generating AI draft..."):
                 try:
                     log_user_activity(
