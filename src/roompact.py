@@ -283,28 +283,28 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
             if not forms:
                 return [], "No forms found"
             
-            # Extract unique form template names with counts and date ranges
+            # Extract unique form template names; skip repeats after first sighting to avoid processing every submission
             form_type_info = {}
+            seen_templates = set()
             for form in forms:
                 template_name = form.get('form_template_name', 'Unknown Form')
-                if template_name and template_name != 'Unknown Form':
-                    if template_name not in form_type_info:
-                        form_type_info[template_name] = {
-                            'count': 0,
-                            'dates': []
-                        }
-                    
-                    form_type_info[template_name]['count'] += 1
-                    
-                    # Get submission date for date range info
-                    current_revision = form.get('current_revision', {})
-                    date_str = current_revision.get('date', '')
-                    if date_str:
-                        try:
-                            form_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                            form_type_info[template_name]['dates'].append(form_datetime)
-                        except:
-                            pass
+                if not template_name or template_name == 'Unknown Form':
+                    continue
+                if template_name in seen_templates:
+                    continue  # already recorded this form type
+                seen_templates.add(template_name)
+                current_revision = form.get('current_revision', {})
+                date_str = current_revision.get('date', '')
+                first_date = None
+                if date_str:
+                    try:
+                        first_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    except Exception:
+                        first_date = None
+                form_type_info[template_name] = {
+                    'count': 1,
+                    'dates': [first_date] if first_date else []
+                }
             
             # Create form type options with metadata
             form_type_options = []
@@ -313,14 +313,16 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
                 dates = info['dates']
                 
                 if dates:
+                    dates = [d for d in dates if d is not None]
+                if dates:
                     dates.sort()
                     oldest = dates[0].strftime('%Y-%m-%d')
                     newest = dates[-1].strftime('%Y-%m-%d')
-                    date_info = f"({oldest} to {newest})"
+                    date_info = f"(first seen {oldest}, newest {newest})"
                 else:
                     date_info = "(dates unknown)"
-                
-                display_name = f"{template_name} - {count} submissions {date_info}"
+
+                display_name = f"{template_name} - discovered {date_info}"
                 form_type_options.append({
                     'display_name': display_name,
                     'template_name': template_name,
