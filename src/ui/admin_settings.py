@@ -3,7 +3,7 @@ import os
 import json
 import pandas as pd
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from src.database import supabase, get_admin_client, get_user_client, log_user_activity
@@ -1286,97 +1286,114 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
     with tab2:
         st.subheader("Submission Tracking Dashboard")
-        st.write("Track when reports are submitted and identify late submissions.")
-        try:
-            recent_reports = supabase.table("reports").select("*").eq("status", "finalized").order("submitted_at", desc=True).limit(50).execute()
-            if recent_reports.data:
-                deadline_config = get_deadline_settings(supabase)
-                submission_data = []
-                for report in recent_reports.data:
-                    if not isinstance(report, dict):
-                        continue
-                    submitted_at = report.get("submitted_at") if isinstance(report.get, type(lambda: None)) else None
-                    week_ending_val = report.get("week_ending_date") if isinstance(report.get, type(lambda: None)) else None
-                    try:
-                        if isinstance(submitted_at, str):
-                            submission_time = pd.to_datetime(submitted_at)
-                            # Localize to Chicago for display
-                            local_tz = "America/Chicago"
-                            if submission_time.tzinfo is None:
-                                submission_time_local = submission_time.tz_localize("UTC").tz_convert(local_tz)
-                            else:
-                                submission_time_local = submission_time.tz_convert(local_tz)
-                        else:
-                            submission_time = None
-                            submission_time_local = None
-                    except Exception:
-                        submission_time = None
-                        submission_time_local = None
-                    try:
-                        if isinstance(week_ending_val, str):
-                            week_ending = pd.to_datetime(week_ending_val)
-                        else:
-                            week_ending = None
-                    except Exception:
-                        week_ending = None
-                    deadline_day = deadline_config.get("day_of_week", 0)
-                    deadline_hour = deadline_config.get("hour", 16)
-                    deadline_minute = deadline_config.get("minute", 0)
-                    days_after_saturday = (deadline_day - 5) % 7 + (1 if deadline_day <= 5 else 0)
-                    if week_ending:
-                        deadline_date = week_ending + timedelta(days=days_after_saturday)
-                        deadline_datetime = datetime.combine(deadline_date.date(), datetime.min.time().replace(hour=deadline_hour, minute=deadline_minute))
-                        deadline_datetime = deadline_datetime.replace(tzinfo=ZoneInfo("America/Chicago"))
-                    else:
-                        deadline_datetime = None
-                    was_on_time = submission_time and deadline_datetime and submission_time <= deadline_datetime
-                    was_in_grace = submission_time and deadline_datetime and submission_time <= (deadline_datetime + timedelta(hours=deadline_config.get("grace_hours", 16)))
-                    if was_on_time:
-                        status = "✅ On Time"
-                    elif was_in_grace:
-                        status = "⚠️ Grace Period"
-                    else:
-                        status = "❌ Late"
-                    staff_member = report.get("team_member", "Unknown") if isinstance(report.get, type(lambda: None)) else "Unknown"
-                    week_ending_str = week_ending_val if week_ending_val else "Unknown"
-                    submitted_str = submission_time_local.strftime("%Y-%m-%d %H:%M:%S %Z") if submission_time_local is not None else "Unknown"
-                    day_of_week_str = submission_time_local.strftime("%A") if submission_time_local is not None else "Unknown"
-                    time_str = submission_time_local.strftime("%H:%M") if submission_time_local is not None else "Unknown"
-                    deadline_str = deadline_datetime.strftime("%Y-%m-%d %H:%M") if deadline_datetime else "Unknown"
-                    admin_created = "Yes" if (isinstance(report.get, type(lambda: None)) and (report.get("status") == "admin_created" or report.get("created_by_admin"))) else "No"
-                    submission_data.append({
-                        "Staff Member": staff_member,
-                        "Week Ending": week_ending_str,
-                        "Submitted": submitted_str,
-                        "Day of Week": day_of_week_str,
-                        "Time": time_str,
-                        "Deadline": deadline_str,
-                        "Status": status,
-                        "Admin Created": admin_created
-                    })
-                if submission_data:
-                    df = pd.DataFrame(submission_data)
-                    st.dataframe(df, use_container_width=True)
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        on_time = len([s for s in submission_data if s["Status"] == "✅ On Time"])
-                        st.metric("On Time", on_time)
-                    with col2:
-                        grace = len([s for s in submission_data if s["Status"] == "⚠️ Grace Period"])
-                        st.metric("Grace Period", grace)
-                    with col3:
-                        late = len([s for s in submission_data if s["Status"] == "❌ Late"])
-                        st.metric("Late", late)
-                    with col4:
-                        if submission_data:
-                            rate = (on_time / len(submission_data)) * 100
-                            st.metric("On-Time Rate", f"{rate:.1f}%")
-                else:
-                    st.info("No submission data available yet.")
+        st.write("See who submitted each week and who missed, across the chosen date range.")
+
+        today = datetime.now().date()
+        default_start = today - timedelta(days=56)
+        col_r1, col_r2 = st.columns(2)
+        with col_r1:
+            start_date = st.date_input("Start week range", value=default_start, key="submission_start")
+        with col_r2:
+            end_date = st.date_input("End week range", value=today, key="submission_end")
+
+        if start_date > end_date:
+            st.error("Start date cannot be after end date.")
+        else:
+            # Normalize to Saturdays (assumed week ending).
+            def nearest_saturday(d: date) -> date:
+                return d + timedelta(days=(5 - d.weekday()) % 7)
+
+            start_week = nearest_saturday(start_date)
+            end_week = nearest_saturday(end_date)
+
+            weeks = []
+            cur = start_week
+            while cur <= end_week:
+                weeks.append(cur)
+                cur += timedelta(days=7)
+
+            try:
+                admin_client = get_admin_client()
+                profiles_resp = admin_client.table("profiles").select("id,full_name,email,role").execute()
+                profiles = [p for p in (profiles_resp.data or []) if isinstance(p, dict)]
+
+                reports_resp = admin_client.table("reports").select("id,user_id,week_ending_date,status").gte("week_ending_date", start_week.isoformat()).lte("week_ending_date", end_week.isoformat()).execute()
+                reports = [r for r in (reports_resp.data or []) if isinstance(r, dict)]
+            except Exception as e:
+                st.error(f"Failed to load submission data: {e}")
+                profiles, reports = [], []
+
+            if not profiles:
+                st.info("No profiles found.")
             else:
-                st.info("No reports found.")
-        except Exception as e:
-            st.error(f"Error loading submission data: {e}")
+                week_set = set(pd.to_datetime(w).date() for w in weeks)
+                # Build report lookup by user and week
+                rep_map = {}
+                for r in reports:
+                    uid = r.get("user_id")
+                    w = r.get("week_ending_date")
+                    if isinstance(w, str):
+                        try:
+                            w = pd.to_datetime(w).date()
+                        except Exception:
+                            continue
+                    if uid and w:
+                        if uid not in rep_map:
+                            rep_map[uid] = {}
+                        rep_map[uid][w] = r.get("status")
+
+                rows = []
+                completed_pairs = 0
+                total_pairs = len(profiles) * len(weeks)
+                for p in sorted(profiles, key=lambda x: x.get("full_name") or x.get("email") or ""):
+                    uid = p.get("id")
+                    name = p.get("full_name") or p.get("email") or "Unknown"
+                    role = p.get("role") or "user"
+                    user_weeks = rep_map.get(uid, {})
+                    completed = sum(1 for w in week_set if user_weeks.get(w) == "finalized")
+                    completed_pairs += completed
+                    missed = len(week_set) - completed
+                    last_submit = max([w for w, status in user_weeks.items() if status == "finalized"], default=None)
+                    rows.append({
+                        "User ID": uid,
+                        "Name": name,
+                        "Role": role.title() if isinstance(role, str) else role,
+                        "Completed": completed,
+                        "Missed": missed,
+                        "Completion %": round((completed / len(week_set)) * 100, 1) if week_set else 0,
+                        "Last Submitted": last_submit.isoformat() if last_submit else "—",
+                    })
+
+                if total_pairs == 0:
+                    st.info("No weeks in range.")
+                else:
+                    overall_rate = completed_pairs / total_pairs if total_pairs else 0
+                    col_s1, col_s2, col_s3 = st.columns(3)
+                    with col_s1:
+                        st.metric("Completion rate", f"{overall_rate*100:.1f}%")
+                    with col_s2:
+                        st.metric("Weeks per user", len(week_set))
+                    with col_s3:
+                        st.metric("Users", len(profiles))
+
+                df = pd.DataFrame(rows)
+                st.markdown("**Staff submission summary**")
+                st.dataframe(df.drop(columns=["User ID"]), use_container_width=True, hide_index=True)
+
+                # Per-week matrix
+                st.markdown("**Per-week status**")
+                matrix_rows = []
+                week_labels = [w.isoformat() for w in weeks]
+                for p in rows:
+                    uid = p.get("User ID")
+                    user_weeks = rep_map.get(uid, {}) if uid else {}
+                    entry = {"Name": p["Name"]}
+                    for w in weeks:
+                        status = user_weeks.get(pd.to_datetime(w).date())
+                        entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
+                    matrix_rows.append(entry)
+                matrix_df = pd.DataFrame(matrix_rows)
+                st.dataframe(matrix_df[["Name", *week_labels]], use_container_width=True, hide_index=True)
 
     with tab3:
         st.subheader("Email Configuration")
