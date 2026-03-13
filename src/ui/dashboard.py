@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 try:
     from zoneinfo import ZoneInfo as _ZoneInfo
     def get_central_tz():
@@ -81,6 +81,148 @@ def dashboard_page(supervisor_mode=False):
         if not direct_report_ids:
             st.info("You do not have any direct reports assigned in the system.")
             return
+
+        # Submission tracking for direct reports
+        st.divider()
+        st.subheader("Submission Tracking (Direct Reports)")
+        st.write("See who submitted each week and who missed, for your team only.")
+
+        today = datetime.now().date()
+        default_start = today - timedelta(days=56)
+        col_st1, col_st2 = st.columns(2)
+        with col_st1:
+            start_date = st.date_input("Start week range", value=default_start, key="sup_submission_start")
+        with col_st2:
+            end_date = st.date_input("End week range", value=today, key="sup_submission_end")
+
+        if start_date > end_date:
+            st.error("Start date cannot be after end date.")
+        else:
+            def nearest_saturday(d: date) -> date:
+                return d + timedelta(days=(5 - d.weekday()) % 7)
+
+            start_week = nearest_saturday(start_date)
+            end_week = nearest_saturday(end_date)
+
+            weeks = []
+            cur = start_week
+            while cur <= end_week:
+                weeks.append(cur)
+                cur += timedelta(days=7)
+
+            # Fetch reports for direct reports within range
+            try:
+                reports_resp = supabase.table("reports").select("id,user_id,week_ending_date,status").in_("user_id", direct_report_ids).gte("week_ending_date", start_week.isoformat()).lte("week_ending_date", end_week.isoformat()).execute()
+                reports = [r for r in (reports_resp.data or []) if isinstance(r, dict)]
+            except Exception as e:
+                st.error(f"Failed to load submission data: {e}")
+                reports = []
+
+            if not direct_reports:
+                st.info("No profiles found for your team.")
+            else:
+                week_set = set(pd.to_datetime(w).date() for w in weeks)
+
+                def parse_date(value):
+                    if isinstance(value, (datetime, date)):
+                        return value.date() if isinstance(value, datetime) else value
+                    if isinstance(value, str):
+                        try:
+                            return pd.to_datetime(value).date()
+                        except Exception:
+                            return None
+                    return None
+
+                # Build report lookup by user and week
+                rep_map = {}
+                for r in reports:
+                    uid = r.get("user_id")
+                    w = r.get("week_ending_date")
+                    if isinstance(w, str):
+                        try:
+                            w = pd.to_datetime(w).date()
+                        except Exception:
+                            continue
+                    if uid and w:
+                        rep_map.setdefault(uid, {})[w] = r.get("status")
+
+                rows = []
+                completed_pairs = 0
+                total_pairs = 0
+
+                # Map user id to profile info for naming
+                profile_map = {p.get("id"): p for p in direct_reports if isinstance(p, dict)}
+
+                for uid in direct_report_ids:
+                    profile = profile_map.get(uid, {})
+                    name = profile.get("full_name") or profile.get("title") or profile.get("id") or "Unknown"
+                    user_weeks = rep_map.get(uid, {})
+                    created_at = None
+                    if user_weeks:
+                        try:
+                            created_at = min(user_weeks.keys())
+                        except Exception:
+                            created_at = None
+                    creation_week = nearest_saturday(created_at) if created_at else start_week
+
+                    eligible_weeks = {w for w in week_set if w >= creation_week}
+                    completed = sum(1 for w in eligible_weeks if user_weeks.get(w) == "finalized")
+                    completed_pairs += completed
+                    total_pairs += len(eligible_weeks)
+                    missed = len(eligible_weeks) - completed
+                    last_submit = max([w for w, status in user_weeks.items() if status == "finalized"], default=None)
+                    completion_pct = (round((completed / len(eligible_weeks)) * 100, 1) if eligible_weeks else "N/A")
+                    rows.append({
+                        "User ID": uid,
+                        "Name": name,
+                        "Completed": completed,
+                        "Missed": missed,
+                        "Completion %": completion_pct,
+                        "Last Submitted": last_submit.isoformat() if last_submit else "—",
+                        "Eligible Weeks": len(eligible_weeks),
+                        "Creation Week": creation_week.isoformat() if creation_week else "—",
+                    })
+
+                if total_pairs == 0:
+                    st.info("No weeks in range.")
+                else:
+                    overall_rate = completed_pairs / total_pairs if total_pairs else 0
+                    col_s1, col_s2, col_s3 = st.columns(3)
+                    with col_s1:
+                        st.metric("Completion rate", f"{overall_rate*100:.1f}%")
+                    with col_s2:
+                        st.metric("Weeks per user", len(week_set))
+                    with col_s3:
+                        st.metric("Users", len(direct_report_ids))
+
+                df = pd.DataFrame(rows)
+                st.markdown("**Team submission summary**")
+                st.dataframe(df.drop(columns=["User ID"]), use_container_width=True, hide_index=True)
+
+                st.markdown("**Per-week status**")
+                matrix_rows = []
+                week_labels = [w.isoformat() for w in weeks]
+                for p in rows:
+                    uid = p.get("User ID")
+                    user_weeks = rep_map.get(uid, {}) if uid else {}
+                    created_at = None
+                    if user_weeks:
+                        try:
+                            created_at = min(user_weeks.keys())
+                        except Exception:
+                            created_at = None
+                    creation_week = nearest_saturday(created_at) if created_at else start_week
+                    entry = {"Name": p["Name"], "% Complete": f"{p['Completion %']}%" if isinstance(p.get("Completion %"), (int, float)) else p.get("Completion %")}
+                    for w in weeks:
+                        w_date = pd.to_datetime(w).date()
+                        if w_date < creation_week:
+                            entry[w.isoformat()] = "N/A"
+                        else:
+                            status = user_weeks.get(w_date)
+                            entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
+                    matrix_rows.append(entry)
+                matrix_df = pd.DataFrame(matrix_rows)
+                st.dataframe(matrix_df[["Name", "% Complete", *week_labels]], use_container_width=True, hide_index=True)
 
         # Use RPC to fetch finalized reports for this supervisor (works with RLS)
         rpc_resp = supabase.rpc('get_finalized_reports_for_supervisor', {'sup_id': current_user_id}).execute()
