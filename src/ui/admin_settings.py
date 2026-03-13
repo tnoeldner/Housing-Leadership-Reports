@@ -1314,14 +1314,27 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
             try:
                 admin_client = get_admin_client()
-                profiles_resp = admin_client.table("profiles").select("id,full_name,email,role,created_at").execute()
+                profiles_resp = admin_client.table("profiles").select("id,full_name,email,role").execute()
                 profiles = [p for p in (profiles_resp.data or []) if isinstance(p, dict)]
+
+                # Attempt to pull auth user creation timestamps for more accurate eligibility.
+                creation_map = {}
+                try:
+                    auth_users = admin_client.auth.admin.list_users()
+                    auth_user_list = getattr(auth_users, "users", None) or auth_users.get("users") if isinstance(auth_users, dict) else None
+                    for u in auth_user_list or []:
+                        if isinstance(u, dict):
+                            creation_map[u.get("id")] = u.get("created_at")
+                        else:
+                            creation_map[getattr(u, "id", None)] = getattr(u, "created_at", None)
+                except Exception:
+                    creation_map = {}
 
                 reports_resp = admin_client.table("reports").select("id,user_id,week_ending_date,status").gte("week_ending_date", start_week.isoformat()).lte("week_ending_date", end_week.isoformat()).execute()
                 reports = [r for r in (reports_resp.data or []) if isinstance(r, dict)]
             except Exception as e:
                 st.error(f"Failed to load submission data: {e}")
-                profiles, reports = [], []
+                profiles, reports, creation_map = [], [], {}
 
             if not profiles:
                 st.info("No profiles found.")
@@ -1359,10 +1372,17 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     uid = p.get("id")
                     name = p.get("full_name") or p.get("email") or "Unknown"
                     role = p.get("role") or "user"
-                    created_at = parse_date(p.get("created_at"))
+                    created_at = parse_date(creation_map.get(uid)) if 'creation_map' in locals() else None
+                    user_weeks = rep_map.get(uid, {})
+                    if not created_at and user_weeks:
+                        # fallback: earliest known report date
+                        try:
+                            earliest = min(user_weeks.keys())
+                            created_at = earliest
+                        except Exception:
+                            created_at = None
                     creation_week = nearest_saturday(created_at) if created_at else start_week
 
-                    user_weeks = rep_map.get(uid, {})
                     eligible_weeks = {w for w in week_set if w >= creation_week}
                     completed = sum(1 for w in eligible_weeks if user_weeks.get(w) == "finalized")
                     completed_pairs += completed
@@ -1405,7 +1425,13 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 for p in rows:
                     uid = p.get("User ID")
                     user_weeks = rep_map.get(uid, {}) if uid else {}
-                    created_at = parse_date(next((pr.get("created_at") for pr in profiles if pr.get("id") == uid), None))
+                    created_at_val = creation_map.get(uid) if 'creation_map' in locals() else None
+                    created_at = parse_date(created_at_val)
+                    if not created_at and user_weeks:
+                        try:
+                            created_at = min(user_weeks.keys())
+                        except Exception:
+                            created_at = None
                     creation_week = nearest_saturday(created_at) if created_at else start_week
                     entry = {"Name": p["Name"]}
                     for w in weeks:
