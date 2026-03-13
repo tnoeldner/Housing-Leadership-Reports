@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 from src.ai import clean_summary_response, create_duty_report_summary, summarize_form_submissions
-from src.database import log_user_activity, supabase
+from src.database import get_admin_client, log_user_activity, supabase
 from src.roompact import (
     discover_form_types,
     fetch_roompact_forms,
@@ -787,6 +787,122 @@ def individual_reports_viewer() -> None:
                 mime="text/markdown",
                 key=f"download_{idx}",
             )
+
+
+def weekly_reports_viewer(supervisor_id=None) -> None:
+    """View weekly reports with optional supervisor scoping and filters."""
+    st.markdown("Review finalized and draft weekly reports. Use filters to narrow the view.")
+
+    try:
+        admin_client = get_admin_client()
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Admin client unavailable: {exc}")
+        return
+
+    staff_filter_key = f"wrv_staff_{supervisor_id}" if supervisor_id else "wrv_staff_all"
+    start_key = f"wrv_start_{supervisor_id}" if supervisor_id else "wrv_start_all"
+    end_key = f"wrv_end_{supervisor_id}" if supervisor_id else "wrv_end_all"
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        start_date = st.date_input(
+            "Start date",
+            value=datetime.now().date() - timedelta(days=30),
+            key=start_key,
+        )
+    with col2:
+        end_date = st.date_input(
+            "End date",
+            value=datetime.now().date(),
+            key=end_key,
+        )
+    with col3:
+        st.write("")
+        st.write("")
+        refresh = st.button("🔄 Refresh", key=f"wrv_refresh_{supervisor_id}")
+
+    staff_options = []
+    staff_lookup = {}
+    try:
+        if supervisor_id:
+            profiles_resp = (
+                admin_client.table("profiles")
+                .select("id, full_name, email")
+                .eq("supervisor_id", supervisor_id)
+                .execute()
+            )
+            staff_options = profiles_resp.data or []
+        else:
+            profiles_resp = admin_client.table("profiles").select("id, full_name, email").execute()
+            staff_options = profiles_resp.data or []
+    except Exception as exc:  # noqa: BLE001
+        st.warning(f"Could not load staff list: {exc}")
+
+    for staff in staff_options:
+        label = staff.get("full_name") or staff.get("email") or staff.get("id")
+        staff_lookup[label] = staff.get("id")
+
+    selected_staff_labels = st.multiselect(
+        "Filter by staff",
+        options=sorted(list(staff_lookup.keys())),
+        key=staff_filter_key,
+    )
+    selected_staff_ids = [staff_lookup[label] for label in selected_staff_labels]
+
+    if refresh or True:
+        query = (
+            admin_client.table("reports")
+            .select("*")
+            .gte("week_ending_date", start_date.isoformat())
+            .lte("week_ending_date", end_date.isoformat())
+            .order("week_ending_date", desc=True)
+        )
+        try:
+            if supervisor_id and staff_options:
+                user_ids = [staff.get("id") for staff in staff_options if staff.get("id")]
+                if user_ids:
+                    query = query.in_("user_id", user_ids)
+            if selected_staff_ids:
+                query = query.in_("user_id", selected_staff_ids)
+
+            reports_resp = query.execute()
+            reports = reports_resp.data or []
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Failed to load reports: {exc}")
+            return
+
+        if not reports:
+            st.info("No reports found for the selected filters.")
+            return
+
+        st.info(f"Showing {len(reports)} reports")
+        for idx, report in enumerate(reports, 1):
+            week = report.get("week_ending_date", "Unknown")
+            status = report.get("status", "")
+            staff_name = report.get("team_member") or report.get("author") or report.get("user_name") or "Unknown"
+            well_being = report.get("well_being_rating")
+            title = f"{idx}. {staff_name} — Week Ending {week} ({status})"
+            with st.expander(title):
+                st.markdown(f"**Staff:** {staff_name}")
+                st.markdown(f"**Week Ending:** {week}")
+                st.markdown(f"**Status:** {status}")
+                if well_being is not None:
+                    st.markdown(f"**Well-being Rating:** {well_being}")
+                if report.get("report_body"):
+                    st.markdown("---")
+                    st.markdown("**Report Body:**")
+                    st.text_area(
+                        label="",
+                        value=str(report.get("report_body", "")),
+                        height=200,
+                        disabled=True,
+                        key=f"wrv_body_{idx}",
+                        label_visibility="collapsed",
+                    )
+                if report.get("ai_summary"):
+                    st.markdown("---")
+                    st.markdown("**AI Summary:**")
+                    st.markdown(clean_summary_response(report.get("ai_summary", "")))
 
 
 # Helper utilities
