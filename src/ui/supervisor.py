@@ -761,6 +761,7 @@ def save_general_discovery(payload):
     """Persist discovery payload in cache."""
     _store_general_discovery.clear()
     _store_general_discovery(payload)
+    persist_discovery_remote(payload)
 
 
 def load_general_discovery():
@@ -768,6 +769,70 @@ def load_general_discovery():
     try:
         return _store_general_discovery()
     except Exception:
+        # Fallback to remote store if cache is cold
+        return load_discovery_remote()
+
+
+def persist_discovery_remote(payload):
+    """Persist discovery payload to Supabase so it survives app restarts and logouts."""
+    try:
+        admin = get_admin_client()
+    except Exception as e:
+        print(f"[WARN] persist_discovery_remote: admin client unavailable: {e}")
+        return False
+
+    try:
+        admin.table("roompact_form_discoveries").upsert({
+            "id": "general_form_types",
+            "form_types": payload.get("form_types", []),
+            "discovery_start": payload.get("discovery_start"),
+            "discovery_end": payload.get("discovery_end"),
+            "updated_at": datetime.now().isoformat()
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"[WARN] persist_discovery_remote failed: {type(e).__name__}: {e}")
+        return False
+
+
+def load_discovery_remote():
+    """Load the most recent discovery payload from Supabase if available."""
+    try:
+        admin = get_admin_client()
+    except Exception as e:
+        print(f"[WARN] load_discovery_remote: admin client unavailable: {e}")
+        return None
+
+    try:
+        resp = admin.table("roompact_form_discoveries") \
+            .select("form_types, discovery_start, discovery_end") \
+            .eq("id", "general_form_types") \
+            .order("updated_at", desc=True) \
+            .limit(1) \
+            .execute()
+        rows = resp.data or []
+        if not rows:
+            return None
+        row = rows[0]
+        # Normalize dates back to date objects if strings
+        start_val = row.get("discovery_start")
+        end_val = row.get("discovery_end")
+        def _to_date(val):
+            if isinstance(val, datetime):
+                return val.date()
+            if isinstance(val, str):
+                try:
+                    return datetime.fromisoformat(val).date()
+                except Exception:
+                    return val
+            return val
+        return {
+            "form_types": row.get("form_types", []),
+            "discovery_start": _to_date(start_val),
+            "discovery_end": _to_date(end_val)
+        }
+    except Exception as e:
+        print(f"[WARN] load_discovery_remote failed: {type(e).__name__}: {e}")
         return None
 
 
