@@ -778,21 +778,31 @@ def persist_discovery_remote(payload):
     try:
         admin = get_admin_client()
     except Exception as e:
-        print(f"[WARN] persist_discovery_remote: admin client unavailable: {e}")
-        return False
+        msg = f"admin client unavailable: {e}"
+        print(f"[WARN] persist_discovery_remote: {msg}")
+        return False, msg
 
     try:
+        # Normalize dates to ISO strings to avoid type mismatches on date columns
+        start_val = payload.get("discovery_start")
+        end_val = payload.get("discovery_end")
+        if hasattr(start_val, "isoformat"):
+            start_val = start_val.isoformat()
+        if hasattr(end_val, "isoformat"):
+            end_val = end_val.isoformat()
+
         admin.table("roompact_form_discoveries").upsert({
             "id": "general_form_types",
             "form_types": payload.get("form_types", []),
-            "discovery_start": payload.get("discovery_start"),
-            "discovery_end": payload.get("discovery_end"),
+            "discovery_start": start_val,
+            "discovery_end": end_val,
             "updated_at": datetime.now().isoformat()
         }).execute()
-        return True
+        return True, None
     except Exception as e:
-        print(f"[WARN] persist_discovery_remote failed: {type(e).__name__}: {e}")
-        return False
+        msg = f"{type(e).__name__}: {e}"
+        print(f"[WARN] persist_discovery_remote failed: {msg}")
+        return False, msg
 
 
 def load_discovery_remote():
@@ -914,7 +924,7 @@ def general_form_analysis_section():
         st.session_state['general_form_types'] = form_types_info
         st.session_state['general_discovery_date'] = discovery_start_date
         st.session_state['general_discovery_end'] = discovery_end_date
-        persisted = save_general_discovery({
+        persisted, persist_error = save_general_discovery({
             "form_types": form_types_info,
             "discovery_start": discovery_start_date,
             "discovery_end": discovery_end_date,
@@ -922,7 +932,8 @@ def general_form_analysis_section():
         if persisted:
             st.success("💾 Saved discovery for future sessions (Supabase)")
         else:
-            st.warning("Cached locally but could not save to Supabase. You'll need to rediscover after logout unless service role credentials are configured.")
+            msg = persist_error or "Unknown error"
+            st.warning(f"Cached locally but could not save to Supabase. You'll need to rediscover after logout unless service role credentials are configured. Details: {msg}")
         
         if form_types_info:
             st.success(f"✅ Discovered {len(form_types_info)} different form types")
