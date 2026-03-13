@@ -123,9 +123,9 @@ def dashboard_page(supervisor_mode=False):
                     weeks.append(cur)
                     cur += timedelta(days=7)
 
-                # Fetch reports for direct reports within range
+                # Fetch reports for direct reports within range (service role to avoid any RLS gaps)
                 try:
-                    reports_resp = supabase.table("reports").select("id,user_id,week_ending_date,status").in_("user_id", direct_report_ids).gte("week_ending_date", start_week.isoformat()).lte("week_ending_date", end_week.isoformat()).execute()
+                    reports_resp = admin_supabase.table("reports").select("id,user_id,week_ending_date,status").in_("user_id", direct_report_ids).gte("week_ending_date", start_week.isoformat()).lte("week_ending_date", end_week.isoformat()).execute()
                     reports = [r for r in (reports_resp.data or []) if isinstance(r, dict)]
                 except Exception as e:
                     st.error(f"Failed to load submission data: {e}")
