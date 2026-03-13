@@ -761,7 +761,7 @@ def save_general_discovery(payload):
     """Persist discovery payload in cache."""
     _store_general_discovery.clear()
     _store_general_discovery(payload)
-    persist_discovery_remote(payload)
+    return persist_discovery_remote(payload)
 
 
 def load_general_discovery():
@@ -914,11 +914,15 @@ def general_form_analysis_section():
         st.session_state['general_form_types'] = form_types_info
         st.session_state['general_discovery_date'] = discovery_start_date
         st.session_state['general_discovery_end'] = discovery_end_date
-        save_general_discovery({
+        persisted = save_general_discovery({
             "form_types": form_types_info,
             "discovery_start": discovery_start_date,
             "discovery_end": discovery_end_date,
         })
+        if persisted:
+            st.success("💾 Saved discovery for future sessions (Supabase)")
+        else:
+            st.warning("Cached locally but could not save to Supabase. You'll need to rediscover after logout unless service role credentials are configured.")
         
         if form_types_info:
             st.success(f"✅ Discovered {len(form_types_info)} different form types")
