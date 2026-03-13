@@ -1314,7 +1314,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
             try:
                 admin_client = get_admin_client()
-                profiles_resp = admin_client.table("profiles").select("id,full_name,email,role").execute()
+                profiles_resp = admin_client.table("profiles").select("id,full_name,email,role,created_at").execute()
                 profiles = [p for p in (profiles_resp.data or []) if isinstance(p, dict)]
 
                 reports_resp = admin_client.table("reports").select("id,user_id,week_ending_date,status").gte("week_ending_date", start_week.isoformat()).lte("week_ending_date", end_week.isoformat()).execute()
@@ -1327,6 +1327,16 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 st.info("No profiles found.")
             else:
                 week_set = set(pd.to_datetime(w).date() for w in weeks)
+
+                def parse_date(value):
+                    if isinstance(value, (datetime, date)):
+                        return value.date() if isinstance(value, datetime) else value
+                    if isinstance(value, str):
+                        try:
+                            return pd.to_datetime(value).date()
+                        except Exception:
+                            return None
+                    return None
                 # Build report lookup by user and week
                 rep_map = {}
                 for r in reports:
@@ -1344,24 +1354,32 @@ You are writing a weekly staff recognition summary. From the following staff rep
 
                 rows = []
                 completed_pairs = 0
-                total_pairs = len(profiles) * len(weeks)
+                total_pairs = 0
                 for p in sorted(profiles, key=lambda x: x.get("full_name") or x.get("email") or ""):
                     uid = p.get("id")
                     name = p.get("full_name") or p.get("email") or "Unknown"
                     role = p.get("role") or "user"
+                    created_at = parse_date(p.get("created_at"))
+                    creation_week = nearest_saturday(created_at) if created_at else start_week
+
                     user_weeks = rep_map.get(uid, {})
-                    completed = sum(1 for w in week_set if user_weeks.get(w) == "finalized")
+                    eligible_weeks = {w for w in week_set if w >= creation_week}
+                    completed = sum(1 for w in eligible_weeks if user_weeks.get(w) == "finalized")
                     completed_pairs += completed
-                    missed = len(week_set) - completed
+                    total_pairs += len(eligible_weeks)
+                    missed = len(eligible_weeks) - completed
                     last_submit = max([w for w, status in user_weeks.items() if status == "finalized"], default=None)
+                    completion_pct = (round((completed / len(eligible_weeks)) * 100, 1) if eligible_weeks else "N/A")
                     rows.append({
                         "User ID": uid,
                         "Name": name,
                         "Role": role.title() if isinstance(role, str) else role,
                         "Completed": completed,
                         "Missed": missed,
-                        "Completion %": round((completed / len(week_set)) * 100, 1) if week_set else 0,
+                        "Completion %": completion_pct,
                         "Last Submitted": last_submit.isoformat() if last_submit else "—",
+                        "Eligible Weeks": len(eligible_weeks),
+                        "Creation Week": creation_week.isoformat() if creation_week else "—",
                     })
 
                 if total_pairs == 0:
@@ -1372,7 +1390,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     with col_s1:
                         st.metric("Completion rate", f"{overall_rate*100:.1f}%")
                     with col_s2:
-                        st.metric("Weeks per user", len(week_set))
+                        st.metric("Max weeks per user", len(week_set))
                     with col_s3:
                         st.metric("Users", len(profiles))
 
@@ -1387,10 +1405,16 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 for p in rows:
                     uid = p.get("User ID")
                     user_weeks = rep_map.get(uid, {}) if uid else {}
+                    created_at = parse_date(next((pr.get("created_at") for pr in profiles if pr.get("id") == uid), None))
+                    creation_week = nearest_saturday(created_at) if created_at else start_week
                     entry = {"Name": p["Name"]}
                     for w in weeks:
-                        status = user_weeks.get(pd.to_datetime(w).date())
-                        entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
+                        w_date = pd.to_datetime(w).date()
+                        if w_date < creation_week:
+                            entry[w.isoformat()] = "N/A"
+                        else:
+                            status = user_weeks.get(w_date)
+                            entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
                     matrix_rows.append(entry)
                 matrix_df = pd.DataFrame(matrix_rows)
                 st.dataframe(matrix_df[["Name", *week_labels]], use_container_width=True, hide_index=True)
