@@ -715,6 +715,31 @@ You are writing a weekly staff recognition summary. From the following staff rep
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
+            def friendly_cols(frame: pd.DataFrame) -> pd.DataFrame:
+                rename_map = {
+                    "date": "Date",
+                    "created_at": "Timestamp (UTC)",
+                    "created_local": "Local Time (CT)",
+                    "model": "Model",
+                    "context": "Context",
+                    "user_email": "User Email",
+                    "user_id": "User ID",
+                    "cost_usd": "Cost (USD)",
+                    "prompt_tokens": "Prompt Tokens",
+                    "response_tokens": "Response Tokens",
+                    "total_tokens": "Total Tokens",
+                    "id": "Record ID",
+                    "source": "Source",
+                    "bq_cost_usd_for_date": "BQ Cost (Day)",
+                    "match_status": "Match Status",
+                    "record_id": "Record ID",
+                    "app_cost_usd": "App Cost (Day)",
+                    "app_calls": "App Calls (Day)",
+                    "bq_cost_usd": "BQ Cost (Day)",
+                    "bq_error": "BigQuery Error",
+                }
+                return frame.rename(columns={k: v for k, v in rename_map.items() if k in frame.columns})
+
             models = sorted([m for m in df.get("model", pd.Series(dtype=str)).dropna().unique()])
             contexts = sorted([c for c in df.get("context", pd.Series(dtype=str)).dropna().unique()])
 
@@ -759,7 +784,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     calls=("id", "count") if "id" in filtered.columns else ("cost_usd", "count")
                 ).reset_index()
                 st.markdown("**Cost by day**")
-                st.dataframe(cost_by_day, use_container_width=True, hide_index=True)
+                st.dataframe(friendly_cols(cost_by_day), use_container_width=True, hide_index=True)
 
                 if "model" in filtered.columns:
                     by_model = filtered.groupby("model").agg(
@@ -770,7 +795,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         total_tokens=("total_tokens", "sum")
                     ).reset_index()
                     st.markdown("**Cost by model**")
-                    st.dataframe(by_model, use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(by_model), use_container_width=True, hide_index=True)
 
                 if "context" in filtered.columns:
                     by_context = filtered.groupby("context").agg(
@@ -781,7 +806,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         total_tokens=("total_tokens", "sum")
                     ).reset_index()
                     st.markdown("**Cost by context**")
-                    st.dataframe(by_context, use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(by_context), use_container_width=True, hide_index=True)
 
                 # Raw log table (user-friendly view)
                 st.markdown("**Raw usage records**")
@@ -802,7 +827,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     if col in filtered.columns
                 ]
                 raw_sorted = filtered.sort_values("created_at", ascending=False)
-                st.dataframe(raw_sorted[display_cols], use_container_width=True, hide_index=True)
+                st.dataframe(friendly_cols(raw_sorted[display_cols]), use_container_width=True, hide_index=True)
 
         # --- Reconciliation: BigQuery vs app logs ---
         with st.expander("Reconcile AI usage vs BigQuery and activity logs"):
@@ -988,7 +1013,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             "created_local",
                             "record_id",
                         ]
-                        st.dataframe(details[display_cols], use_container_width=True, hide_index=True)
+                        st.dataframe(friendly_cols(details[display_cols]), use_container_width=True, hide_index=True)
 
                 # App calls annotated with daily BigQuery cost (match/no match)
                 if ai_df.empty:
@@ -1021,7 +1046,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     ]
                     app_display_cols = [c for c in app_display_cols if c and c in app_with_match.columns]
                     st.markdown("**App AI calls with daily BigQuery match status**")
-                    st.dataframe(app_with_match[app_display_cols].sort_values(["date", "created_at"], ascending=[False, False]), use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(app_with_match[app_display_cols].sort_values(["date", "created_at"], ascending=[False, False])), use_container_width=True, hide_index=True)
 
                     # BigQuery rows annotated with app activity per day
                     app_cost_by_date = app_with_match.groupby("date")["cost_usd"].sum().to_dict()
@@ -1033,7 +1058,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     bq_match["app_calls"] = bq_match["date"].map(app_calls_by_date).fillna(0).astype(int)
                     bq_match["match_status"] = bq_match.apply(lambda r: "matched" if (r.get("app_cost_usd", 0) > 0 or r.get("app_calls", 0) > 0) else "no_app_match", axis=1)
                     st.markdown("**BigQuery daily rows with app activity summary**")
-                    st.dataframe(bq_match[["date", "cost_usd", "app_cost_usd", "app_calls", "match_status"]].sort_values("date", ascending=False), use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(bq_match[["date", "cost_usd", "app_cost_usd", "app_calls", "match_status"]].sort_values("date", ascending=False)), use_container_width=True, hide_index=True)
 
                     # Cost reconciliation (ai_usage_logs vs BigQuery)
                     daily_app = app_with_match.groupby("date")["cost_usd"].sum().reset_index(name="app_cost_usd")
@@ -1045,14 +1070,14 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     daily_cost["delta_usd"] = daily_cost["app_cost_usd"] - daily_cost["bq_cost_usd"]
                     mism = daily_cost[daily_cost["delta_usd"].abs() > tol]
                     st.markdown("**Cost reconciliation (per day)**")
-                    st.dataframe(daily_cost.sort_values("date"), use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(daily_cost.sort_values("date")), use_container_width=True, hide_index=True)
                     if bq_error:
                         st.warning(f"BigQuery not compared: {bq_error}")
                     if mism.empty:
                         st.success(f"No cost mismatches above ${tol:.2f}.")
                     else:
                         st.error(f"Mismatches above ${tol:.2f} (rows below):")
-                        st.dataframe(mism.sort_values("date"), use_container_width=True, hide_index=True)
+                        st.dataframe(friendly_cols(mism.sort_values("date")), use_container_width=True, hide_index=True)
 
                 # Activity reconciliation (ai_usage_logs vs user_activity_logs ai_call)
                 if ai_df.empty and act_df.empty:
@@ -1063,13 +1088,13 @@ You are writing a weekly staff recognition summary. From the following staff rep
                     daily_counts = app_counts.merge(act_counts, on="date", how="outer").fillna({"ai_usage_count": 0, "activity_count": 0})
                     daily_counts["delta_count"] = daily_counts["ai_usage_count"] - daily_counts["activity_count"]
                     st.markdown("**AI call count reconciliation (per day)**")
-                    st.dataframe(daily_counts.sort_values("date"), use_container_width=True, hide_index=True)
+                    st.dataframe(friendly_cols(daily_counts.sort_values("date")), use_container_width=True, hide_index=True)
                     mism_counts = daily_counts[daily_counts["delta_count"] != 0]
                     if mism_counts.empty:
                         st.success("AI usage rows and activity logs align by day.")
                     else:
                         st.error("Mismatched counts (rows below):")
-                        st.dataframe(mism_counts.sort_values("date"), use_container_width=True, hide_index=True)
+                        st.dataframe(friendly_cols(mism_counts.sort_values("date")), use_container_width=True, hide_index=True)
 
         # --- User Activity Logs ---
         st.markdown("---")
