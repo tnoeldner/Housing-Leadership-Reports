@@ -38,6 +38,7 @@ from src.ui.admin_settings import admin_settings_page
 from src.ui.submission import submit_and_edit_page
 from src.ui.staff_recognition import staff_recognition_page
 from src.ui.quarterly_recognition import quarterly_recognition_page
+from src.ui.yearly_summaries import yearly_summaries_page
 
 
 
@@ -157,6 +158,7 @@ else:
             pages["Staff Recognition"] = staff_recognition_page
             pages["Quarterly Recognition"] = quarterly_recognition_page
             pages["Admin Dashboard"] = admin_settings_page
+            pages["Yearly Summaries"] = yearly_summaries_page
             pages["Form Analysis"] = supervisors_section_page
         
         selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
