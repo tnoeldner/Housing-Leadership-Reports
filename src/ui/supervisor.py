@@ -335,7 +335,8 @@ def duty_analysis_section() -> None:
                                 "updated_at": datetime.now().isoformat(),
                             }
                             admin_client.table("saved_duty_analyses").upsert(
-                                save_payload, on_conflict=["week_ending_date", "report_type"]
+                                save_payload,
+                                on_conflict=["week_ending_date", "created_by", "report_type"],
                             ).execute()
                             st.success("✅ Weekly duty summary saved to database.")
                         except Exception as exc:  # noqa: BLE001
