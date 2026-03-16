@@ -289,6 +289,28 @@ def duty_analysis_section() -> None:
                     key="download_duty_analysis",
                 )
 
+                # Save to database (service role) when Weekly Summary is selected
+                if report_type == "📅 Weekly Summary":
+                    if st.button("💾 Save Weekly Duty Summary", type="secondary", key="save_weekly_duty_summary"):
+                        try:
+                            admin_client = get_admin_client()
+                            save_payload = {
+                                "week_ending_date": filter_info.get("end_date"),
+                                "report_type": "weekly_summary",
+                                "date_range_start": filter_info.get("start_date"),
+                                "date_range_end": filter_info.get("end_date"),
+                                "reports_analyzed": min(len(selected), max_forms),
+                                "total_selected": len(selected),
+                                "analysis_text": summary,
+                                "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
+                                "created_at": datetime.now().isoformat(),
+                                "updated_at": datetime.now().isoformat(),
+                            }
+                            admin_client.table("saved_duty_analyses").upsert(save_payload, on_conflict=["week_ending_date", "report_type"]).execute()
+                            st.success("✅ Weekly duty summary saved to database.")
+                        except Exception as exc:
+                            st.error(f"Failed to save weekly duty summary: {exc}")
+
 
 def general_form_analysis_section() -> None:
     """General Roompact form discovery, fetching, and AI analysis."""
