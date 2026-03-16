@@ -336,7 +336,10 @@ def dashboard_page(supervisor_mode=False):
                 if st.session_state.get('trigger_generate_summary'):
                     with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
                         try:
-                            weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
+                            # Use normalized week value to avoid mismatches between date/datetime strings
+                            weekly_reports = [
+                                r for r in normalized_reports if r.get("_normalized_week") == selected_date_for_summary
+                            ]
                             st.session_state['debug_after_weekly_reports'] = True
                             st.session_state['debug_after_draft_reports'] = True
 
