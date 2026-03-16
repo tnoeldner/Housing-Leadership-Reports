@@ -146,7 +146,7 @@ def dashboard_page(supervisor_mode=False):
                                 return None
                         return None
 
-                    # Build report lookup by user and week
+                    # Build report lookup by user and normalized week (nearest Saturday) so off-by-few-days submissions still count
                     rep_map = {}
                     for r in reports:
                         uid = r.get("user_id")
@@ -156,8 +156,11 @@ def dashboard_page(supervisor_mode=False):
                                 w = pd.to_datetime(w).date()
                             except Exception:
                                 continue
+                        if isinstance(w, datetime):
+                            w = w.date()
                         if uid and w:
-                            rep_map.setdefault(uid, {})[w] = r.get("status")
+                            week_key = nearest_saturday(w)
+                            rep_map.setdefault(uid, {})[week_key] = r.get("status")
 
                     rows = []
                     completed_pairs = 0
