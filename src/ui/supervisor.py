@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 from src.ai import clean_summary_response, create_duty_report_summary, summarize_form_submissions
+from src.weekly_report import create_weekly_duty_report_summary
 from src.database import get_admin_client, log_user_activity, supabase
 from src.roompact import (
     discover_form_types,
@@ -193,6 +194,12 @@ def duty_analysis_section() -> None:
 
     with col_analyze:
         st.markdown("**Analysis Options:**")
+        report_type = st.radio(
+            "Report Type",
+            ["📊 Standard Analysis", "📅 Weekly Summary"],
+            help="Choose a detailed analysis or a weekly summary format",
+            key="duty_report_type",
+        )
         max_forms = st.slider(
             "Max reports to analyze",
             min_value=1,
@@ -214,11 +221,22 @@ def duty_analysis_section() -> None:
         if selected:
             st.success(f"✅ {len(selected)} duty reports selected")
             if st.button("🤖 Generate Duty Analysis", type="primary", key="run_duty_analysis"):
-                summary = create_duty_report_summary(
-                    selected[:max_forms],
-                    filter_info.get("start_date"),
-                    filter_info.get("end_date"),
-                )
+                if report_type == "📅 Weekly Summary":
+                    summary = create_weekly_duty_report_summary(
+                        selected[:max_forms],
+                        filter_info.get("start_date"),
+                        filter_info.get("end_date"),
+                    )
+                    report_label = "Weekly Duty Summary"
+                    file_prefix = "weekly_duty_summary"
+                else:
+                    summary = create_duty_report_summary(
+                        selected[:max_forms],
+                        filter_info.get("start_date"),
+                        filter_info.get("end_date"),
+                    )
+                    report_label = "Duty Analysis"
+                    file_prefix = "duty_analysis"
                 # Log activity (best effort)
                 try:
                     log_user_activity(
@@ -238,11 +256,11 @@ def duty_analysis_section() -> None:
                 except Exception:
                     pass
 
-                st.subheader("📊 Duty Analysis Results")
+                st.subheader(f"📊 {report_label} Results")
                 st.markdown(summary)
 
                 download_data = _build_download(
-                    title="Duty Reports Analysis Summary",
+                    title=report_label,
                     form_types=DUTY_FORM_TYPES,
                     date_range=(filter_info.get("start_date"), filter_info.get("end_date")),
                     analyzed=min(len(selected), max_forms),
@@ -253,7 +271,7 @@ def duty_analysis_section() -> None:
                 st.download_button(
                     label="📄 Download Analysis Report",
                     data=download_data,
-                    file_name=f"duty_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                    file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                     mime="text/markdown",
                     key="download_duty_analysis",
                 )
