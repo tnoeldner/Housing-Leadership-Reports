@@ -148,6 +148,8 @@ def duty_analysis_section() -> None:
             "total_fetched": len(all_forms),
             "filtered_count": len(duty_forms),
         }
+        # Clear any previously generated analysis when new data is fetched to avoid stale results
+        st.session_state.pop("duty_analysis_result", None)
 
         if duty_forms:
             st.success(f"✅ Found {len(duty_forms)} duty reports (from {len(all_forms)} total forms)")
@@ -221,11 +223,15 @@ def duty_analysis_section() -> None:
         if selected:
             st.success(f"✅ {len(selected)} duty reports selected")
             if st.button("🤖 Generate Duty Analysis", type="primary", key="run_duty_analysis"):
+                start_date = filter_info.get("start_date")
+                end_date = filter_info.get("end_date")
+                start_date_str = start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date)
+                end_date_str = end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date)
                 if report_type == "📅 Weekly Summary":
                     summary_result = create_weekly_duty_report_summary(
                         selected[:max_forms],
-                        filter_info.get("start_date"),
-                        filter_info.get("end_date"),
+                        start_date,
+                        end_date,
                     )
                     summary = summary_result.get("summary") if isinstance(summary_result, dict) else summary_result
                     report_label = "Weekly Duty Summary"
@@ -233,7 +239,7 @@ def duty_analysis_section() -> None:
                     # Persist weekly duty summary for later integration (admin dashboard)
                     weekly_report_data = {
                         "date_generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "date_range": f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}",
+                        "date_range": f"{start_date_str} to {end_date_str}",
                         "reports_analyzed": min(len(selected), max_forms),
                         "total_selected": len(selected),
                         "summary": summary,
@@ -242,11 +248,25 @@ def duty_analysis_section() -> None:
                 else:
                     summary = create_duty_report_summary(
                         selected[:max_forms],
-                        filter_info.get("start_date"),
-                        filter_info.get("end_date"),
+                        start_date,
+                        end_date,
                     )
                     report_label = "Duty Analysis"
                     file_prefix = "duty_analysis"
+                # Cache the result for reuse on rerun (keeps save/download buttons visible)
+                st.session_state["duty_analysis_result"] = {
+                    "variant": "weekly_summary" if report_type == "📅 Weekly Summary" else "standard",
+                    "label": report_label,
+                    "file_prefix": file_prefix,
+                    "summary": summary,
+                    "filter_info": {
+                        "start_date": start_date_str,
+                        "end_date": end_date_str,
+                    },
+                    "analyzed": min(len(selected), max_forms),
+                    "selected": len(selected),
+                    "custom_prompt": custom_prompt,
+                }
                 # Log activity (best effort)
                 try:
                     log_user_activity(
@@ -266,6 +286,15 @@ def duty_analysis_section() -> None:
                 except Exception:
                     pass
 
+            analysis_result = st.session_state.get("duty_analysis_result")
+            if analysis_result:
+                report_label = analysis_result.get("label", "Duty Analysis")
+                file_prefix = analysis_result.get("file_prefix", "duty_analysis")
+                summary = analysis_result.get("summary")
+                filter_start = analysis_result.get("filter_info", {}).get("start_date")
+                filter_end = analysis_result.get("filter_info", {}).get("end_date")
+                analyzed_count = analysis_result.get("analyzed", len(selected))
+                selected_count = analysis_result.get("selected", len(selected))
                 st.subheader(f"📊 {report_label} Results")
                 if summary:
                     st.markdown(summary)
@@ -275,11 +304,11 @@ def duty_analysis_section() -> None:
                 download_data = _build_download(
                     title=report_label,
                     form_types=DUTY_FORM_TYPES,
-                    date_range=(filter_info.get("start_date"), filter_info.get("end_date")),
-                    analyzed=min(len(selected), max_forms),
-                    selected=len(selected),
+                    date_range=(filter_start, filter_end),
+                    analyzed=analyzed_count,
+                    selected=selected_count,
                     summary=summary,
-                    custom_prompt=custom_prompt,
+                    custom_prompt=analysis_result.get("custom_prompt", ""),
                 )
                 st.download_button(
                     label="📄 Download Analysis Report",
@@ -289,26 +318,27 @@ def duty_analysis_section() -> None:
                     key="download_duty_analysis",
                 )
 
-                # Save to database (service role) when Weekly Summary is selected
-                if report_type == "📅 Weekly Summary":
+                if analysis_result.get("variant") == "weekly_summary":
                     if st.button("💾 Save Weekly Duty Summary", type="secondary", key="save_weekly_duty_summary"):
                         try:
                             admin_client = get_admin_client()
                             save_payload = {
-                                "week_ending_date": filter_info.get("end_date"),
+                                "week_ending_date": filter_end,
                                 "report_type": "weekly_summary",
-                                "date_range_start": filter_info.get("start_date"),
-                                "date_range_end": filter_info.get("end_date"),
-                                "reports_analyzed": min(len(selected), max_forms),
-                                "total_selected": len(selected),
+                                "date_range_start": filter_start,
+                                "date_range_end": filter_end,
+                                "reports_analyzed": analyzed_count,
+                                "total_selected": selected_count,
                                 "analysis_text": summary,
                                 "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
                                 "created_at": datetime.now().isoformat(),
                                 "updated_at": datetime.now().isoformat(),
                             }
-                            admin_client.table("saved_duty_analyses").upsert(save_payload, on_conflict=["week_ending_date", "report_type"]).execute()
+                            admin_client.table("saved_duty_analyses").upsert(
+                                save_payload, on_conflict=["week_ending_date", "report_type"]
+                            ).execute()
                             st.success("✅ Weekly duty summary saved to database.")
-                        except Exception as exc:
+                        except Exception as exc:  # noqa: BLE001
                             st.error(f"Failed to save weekly duty summary: {exc}")
 
 
