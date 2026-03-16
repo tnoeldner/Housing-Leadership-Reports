@@ -4661,22 +4661,27 @@ def submit_and_edit_page():
                 team_member_name = st.session_state.get("full_name") or st.session_state.get("title") or st.session_state["user"].email
                 st.text_input("Submitted By", value=team_member_name, disabled=True)
             with col2:
-                default_date = pd.to_datetime(report_data.get("week_ending_date")).date()
-                
-                # Show some recent Saturday options as help
                 today = datetime.now().date()
+                raw_week_ending = report_data.get("week_ending_date")
+                try:
+                    default_date = pd.to_datetime(raw_week_ending).date() if raw_week_ending else None
+                except Exception:
+                    default_date = None
+
+                # Saturdays only: last 12 weeks
                 last_saturday = today - timedelta(days=(today.weekday() + 2) % 7)
-                recent_saturdays = [
-                    last_saturday - timedelta(days=7*i) for i in range(4)
-                ]
-                saturday_options = ", ".join([d.strftime("%m/%d") for d in recent_saturdays[:3]])
-                
-                week_ending_date = st.date_input(
-                    "For the Week Ending", 
-                    value=default_date, 
-                    format="MM/DD/YYYY",
-                    help=f"💡 Recent Saturdays: {saturday_options}... (Reports are for weeks ending on Saturdays)"
+                recent_saturdays = [last_saturday - timedelta(days=7 * i) for i in range(12)]
+
+                # Pick a sensible default (existing week if valid, otherwise current active Saturday)
+                default_week_option = default_date if default_date in recent_saturdays else last_saturday
+                week_ending_date = st.selectbox(
+                    "For the Week Ending",
+                    options=recent_saturdays,
+                    index=recent_saturdays.index(default_week_option) if default_week_option in recent_saturdays else 0,
+                    format_func=lambda d: d.strftime("Saturday, %m/%d/%Y"),
+                    help="Reports are for the week ending on Saturday. Choose from the available week-ending dates."
                 )
+                week_ending_date_str = week_ending_date.strftime("%Y-%m-%d")
             st.divider()
             core_activities_tab, general_updates_tab = st.tabs(["📊 Core Activities", "📝 General Updates"])
             with core_activities_tab:
@@ -4772,7 +4777,7 @@ def submit_and_edit_page():
                 draft_data = {
                     "user_id": st.session_state["user"].id,
                     "team_member": team_member_name,
-                    "week_ending_date": str(week_ending_date),
+                    "week_ending_date": week_ending_date_str,
                     "report_body": report_body,
                     "professional_development": st.session_state.get("prof_dev", ""),
                     "key_topics_lookahead": st.session_state.get("lookahead", ""),
@@ -4857,7 +4862,7 @@ def submit_and_edit_page():
                         st.session_state["draft_report"] = {
                             "report_id": report_data.get("id"),
                             "team_member_name": team_member_name,
-                            "week_ending_date": str(week_ending_date),
+                            "week_ending_date": week_ending_date_str,
                             "report_body": report_body,
                             "professional_development": st.session_state.get("prof_dev", ""),
                             "key_topics_lookahead": st.session_state.get("lookahead", ""),
