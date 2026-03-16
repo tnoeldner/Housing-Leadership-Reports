@@ -1513,7 +1513,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
             except Exception as e:
                 st.write(f"Error accessing secrets keys: {e}")
             try:
-                email_address = st.secrets["EMAIL_ADDRESS"]
+                email_address = get_secret("EMAIL_ADDRESS")
                 if email_address.startswith("your-") or "placeholder" in email_address.lower():
                     st.error(f"❌ EMAIL_ADDRESS still contains placeholder: {email_address}")
                     st.warning("Please update your .streamlit/secrets.toml with your real Gmail address")
@@ -1525,7 +1525,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
             except Exception as e:
                 st.error(f"❌ Error accessing EMAIL_ADDRESS: {e}")
             try:
-                email_password = st.secrets["EMAIL_PASSWORD"]
+                email_password = get_secret("EMAIL_PASSWORD")
                 if email_password.startswith("your-") or "placeholder" in email_password.lower() or len(email_password) != 16:
                     st.error(f"❌ EMAIL_PASSWORD appears to be placeholder or wrong length (should be 16 chars)")
                     st.warning("Please update your .streamlit/secrets.toml with your real Gmail App Password")

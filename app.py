@@ -1330,31 +1330,11 @@ def send_email(to_email, subject, body, from_email=None, smtp_server=None, smtp_
     try:
         # Use environment variables or Streamlit secrets for email configuration
         if not from_email:
-            try:
-                from_email = st.secrets["EMAIL_ADDRESS"]
-            except KeyError:
-                st.error("EMAIL_ADDRESS not found in secrets configuration.")
-                return False
-            except Exception as e:
-                st.error(f"Error accessing EMAIL_ADDRESS from secrets: {e}")
-                return False
-                
+            from_email = get_secret("EMAIL_ADDRESS")
         if not email_password:
-            try:
-                email_password = st.secrets["EMAIL_PASSWORD"]
-            except KeyError:
-                st.error("EMAIL_PASSWORD not found in secrets configuration.")
-                return False
-            except Exception as e:
-                st.error(f"Error accessing EMAIL_PASSWORD from secrets: {e}")
-                return False
-                
+            email_password = get_secret("EMAIL_PASSWORD")
         if not smtp_server:
-            try:
-                smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
-            except Exception as e:
-                st.error(f"Error accessing SMTP_SERVER from secrets: {e}")
-                smtp_server = "smtp.gmail.com"  # Default fallback
+            smtp_server = get_secret("SMTP_SERVER", "smtp.gmail.com") or "smtp.gmail.com"
         
         # Debug information
         st.write(f"🔧 Debug - Using SMTP server: {smtp_server}")
