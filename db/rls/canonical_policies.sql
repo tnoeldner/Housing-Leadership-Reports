@@ -43,6 +43,7 @@ CREATE POLICY "users_can_update_own_profile" ON profiles
 -- REPORTS: admins all; users own; supervisors see/unlock team; admins create for others
 DROP POLICY IF EXISTS "admins_all_access" ON reports;
 DROP POLICY IF EXISTS "admins_all_access_claim" ON reports;
+DROP POLICY IF EXISTS "service_role_all_reports" ON reports;
 DROP POLICY IF EXISTS "admins_can_manage_all_reports" ON reports;
 DROP POLICY IF EXISTS "users_view_own" ON reports;
 DROP POLICY IF EXISTS "users_insert_own" ON reports;
@@ -61,6 +62,11 @@ CREATE POLICY "admins_all_access" ON reports
   FOR ALL
   USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'))
   WITH CHECK (TRUE);
+
+CREATE POLICY "service_role_all_reports" ON reports
+  FOR ALL
+  USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
 
 -- Fallback for admins when profile lookup is missing; relies on JWT claim role='admin'
 CREATE POLICY "admins_all_access_claim" ON reports
