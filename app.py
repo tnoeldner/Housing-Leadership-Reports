@@ -4666,6 +4666,8 @@ def submit_and_edit_page():
     def show_submission_form():
         report_data = st.session_state["report_to_edit"]
         is_new_report = not bool(report_data.get("id"))
+        # Use authenticated client so RLS sees the user as "authenticated" instead of "anon"
+        user_client = get_user_client()
         st.subheader("Editing Report" if not is_new_report else "Creating New Report")
         with st.form(key="weekly_report_form"):
             col1, col2 = st.columns(2)
@@ -4794,7 +4796,7 @@ def submit_and_edit_page():
                     "status": "draft",
                 }
                 try:
-                    supabase.table("reports").upsert(draft_data, on_conflict="user_id, week_ending_date").execute()
+                    user_client.table("reports").upsert(draft_data, on_conflict="user_id, week_ending_date").execute()
                     st.success("Draft saved successfully!")
                     clear_form_state()
                     time.sleep(1)
@@ -4875,6 +4877,8 @@ def submit_and_edit_page():
                     st.info("💡 **If this persists:**\n- Check your internet connection\n- Try refreshing the page\n- Contact your administrator if the issue continues")
 
     def show_review_form():
+        # Use authenticated client so RLS permits report saves
+        user_client = get_user_client()
         st.subheader("Review Your AI-Generated Report")
         st.info("The AI has categorized your entries and generated a summary. Please review, edit if necessary, and then finalize your submission.")
         draft = st.session_state["draft_report"]
@@ -4971,7 +4975,7 @@ def submit_and_edit_page():
                 }
 
                 try:
-                    supabase.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
+                    user_client.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
                     st.success("✅ Your final report has been saved successfully!")
                     is_update = bool(draft.get("report_id"))
                     if is_update:

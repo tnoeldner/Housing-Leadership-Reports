@@ -13,7 +13,7 @@ This folder holds the authoritative RLS definitions to apply in Supabase.
    ```
 
 ## Coverage
-- `profiles`: admins read/update all; users read/update own.
+- `profiles`: admins read/update all; users read/insert/update own (first-login create allowed).
 - `reports`: admins all access; users own view/insert/update (not finalized unless unlocked); supervisors view/unlock team; admins can create for others.
 - `engagement_report_data`: authenticated + service-role can read/modify.
 

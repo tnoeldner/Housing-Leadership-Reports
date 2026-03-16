@@ -8,6 +8,7 @@ DROP POLICY IF EXISTS "users_can_update_own_profile" ON profiles;
 DROP POLICY IF EXISTS "admins_can_read_all_profiles" ON profiles;
 DROP POLICY IF EXISTS "users_can_read_own_profile" ON profiles;
 DROP POLICY IF EXISTS "service_role_all_profiles" ON profiles;
+DROP POLICY IF EXISTS "users_can_insert_own_profile" ON profiles;
 
 -- Helper claim check for admin: assumes JWT has claim role='admin'. Adjust if your claim key differs.
 -- This avoids selecting from profiles inside the policy (which triggers recursion).
@@ -29,6 +30,10 @@ CREATE POLICY "admins_can_update_any_profile" ON profiles
 CREATE POLICY "users_can_read_own_profile" ON profiles
   FOR SELECT
   USING (id = auth.uid());
+
+CREATE POLICY "users_can_insert_own_profile" ON profiles
+  FOR INSERT
+  WITH CHECK (id = auth.uid());
 
 CREATE POLICY "users_can_update_own_profile" ON profiles
   FOR UPDATE
