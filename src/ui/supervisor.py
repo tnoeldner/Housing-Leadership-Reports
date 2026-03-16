@@ -222,13 +222,23 @@ def duty_analysis_section() -> None:
             st.success(f"✅ {len(selected)} duty reports selected")
             if st.button("🤖 Generate Duty Analysis", type="primary", key="run_duty_analysis"):
                 if report_type == "📅 Weekly Summary":
-                    summary = create_weekly_duty_report_summary(
+                    summary_result = create_weekly_duty_report_summary(
                         selected[:max_forms],
                         filter_info.get("start_date"),
                         filter_info.get("end_date"),
                     )
+                    summary = summary_result.get("summary") if isinstance(summary_result, dict) else summary_result
                     report_label = "Weekly Duty Summary"
                     file_prefix = "weekly_duty_summary"
+                    # Persist weekly duty summary for later integration (admin dashboard)
+                    weekly_report_data = {
+                        "date_generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "date_range": f"{filter_info.get('start_date', 'N/A')} to {filter_info.get('end_date', 'N/A')}",
+                        "reports_analyzed": min(len(selected), max_forms),
+                        "total_selected": len(selected),
+                        "summary": summary,
+                    }
+                    st.session_state.setdefault("weekly_duty_reports", []).append(weekly_report_data)
                 else:
                     summary = create_duty_report_summary(
                         selected[:max_forms],
@@ -257,7 +267,10 @@ def duty_analysis_section() -> None:
                     pass
 
                 st.subheader(f"📊 {report_label} Results")
-                st.markdown(summary)
+                if summary:
+                    st.markdown(summary)
+                else:
+                    st.warning("No summary text returned.")
 
                 download_data = _build_download(
                     title=report_label,
