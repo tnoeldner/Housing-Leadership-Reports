@@ -21,6 +21,21 @@ from src.config import CORE_SECTIONS
 from src.ai import clean_summary_response
 from src.utils import get_deadline_settings, calculate_deadline_info
 
+
+def align_to_week_ending(raw_date_value):
+    """Normalize any date-like value to the prior (or same) Saturday ISO string.
+    This buckets accidental mid-week entries (e.g., Monday 2026-03-16) into the
+    correct week-ending date (2026-03-14), preventing them from being omitted
+    in status views.
+    """
+    try:
+        parsed_date = pd.to_datetime(str(raw_date_value)).date()
+    except Exception:
+        return str(raw_date_value)
+    days_since_saturday = (parsed_date.weekday() - 5) % 7
+    aligned_date = parsed_date - timedelta(days=days_since_saturday)
+    return aligned_date.isoformat()
+
 def dashboard_page(supervisor_mode=False):
     # Persistent debug: show if about to call AI summary function
     if st.session_state.get('debug_about_to_call_ai_summary'):
@@ -246,13 +261,7 @@ def dashboard_page(supervisor_mode=False):
             if not isinstance(r, dict):
                 continue
             raw_week = r.get('week_ending_date')
-            try:
-                if raw_week:
-                    norm_week = pd.to_datetime(str(raw_week)).date().isoformat()
-                else:
-                    norm_week = ''
-            except Exception:
-                norm_week = str(raw_week)
+            norm_week = align_to_week_ending(raw_week)
             r['_normalized_week'] = norm_week
             normalized_reports.append(r)
 
@@ -466,13 +475,7 @@ Weekly staff reports:\n{reports_text}
         if not isinstance(r, dict):
             continue
         raw_week = r.get('week_ending_date')
-        try:
-            if raw_week:
-                norm_week = pd.to_datetime(str(raw_week)).date().isoformat()
-            else:
-                norm_week = ''
-        except Exception:
-            norm_week = str(raw_week)
+        norm_week = align_to_week_ending(raw_week)
         r['_normalized_week'] = norm_week
         normalized_reports.append(r)
 
