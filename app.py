@@ -80,114 +80,98 @@ else:
         if "is_supervisor" not in st.session_state:
             try:
                 from src.database import supabase as db
-                current_user_id = st.session_state["user"].id
-                supervised_response = db.table("profiles").select("id").eq("supervisor_id", current_user_id).execute()
-                st.session_state["is_supervisor"] = bool(supervised_response.data and len(supervised_response.data) > 0)
-            except Exception as e:
-                print(f"Error checking supervisor status: {e}")
-                st.session_state["is_supervisor"] = False
-        
-        # --- Sidebar Navigation (single instance, after login) ---
-        st.sidebar.title("Navigation")
-        st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
-
-        actual_role = st.session_state.get("role", "user")
-        actual_is_supervisor = st.session_state.get("is_supervisor", False)
-
-        # Admin-only preview lets you see user/supervisor navigation without changing data access
-        effective_role = actual_role
-        effective_is_supervisor = actual_is_supervisor
-        if actual_role == "admin":
-            preview_label_map = {
-                "Admin (default)": "admin",
-                "Supervisor": "supervisor",
-                "User": "user",
-            }
-            selected_preview = st.sidebar.selectbox(
-                "View as",
-                list(preview_label_map.keys()),
-                index=list(preview_label_map.keys()).index("Admin (default)"),
-                key="role_preview",
-                help="Preview navigation as a supervisor or user while keeping your admin session active.",
-            )
-            preview_value = preview_label_map.get(selected_preview, "admin")
-            if preview_value == "supervisor":
-                effective_role = "supervisor"
-                effective_is_supervisor = True
-            elif preview_value == "user":
-                effective_role = "user"
-                effective_is_supervisor = False
-            else:
-                effective_role = actual_role
-                effective_is_supervisor = actual_is_supervisor
-        else:
-            # Clear stale preview selection when not admin
-            st.session_state.pop("role_preview", None)
-
-        st.sidebar.write(f"Role: {actual_role.title()}")
-        if effective_role != actual_role:
-            st.sidebar.write(f"Viewing as: {effective_role.title()}")
-        if effective_is_supervisor:
-            st.sidebar.write("✓ Supervisor")
-        if st.sidebar.button("Logout", key="sidebar_logout"):
-            try:
-                log_user_activity(
-                    event_type="logout",
-                    context="sidebar",
-                    metadata={"role": st.session_state.get("role"), "is_supervisor": st.session_state.get("is_supervisor", False)},
-                    user=st.session_state.get("user"),
-                )
-            except Exception:
-                pass
-            st.session_state.clear()
-            st.rerun()
-
-        # Build pages based on effective role
-        pages = {
-            "My Profile": profile_page,
-            "Submit / Edit Report": submit_and_edit_page,
-            "User Manual": user_manual_page,
-        }
-        
-        if effective_is_supervisor:
-            pages["Supervisor Summaries"] = supervisor_summaries_page
-            pages["Supervisor Dashboard"] = lambda: dashboard_page(supervisor_mode=True)
-        
-        if effective_role == "admin":
-            pages["Saved Reports"] = saved_reports_page
-            pages["Staff Recognition"] = staff_recognition_page
-            pages["Quarterly Recognition"] = quarterly_recognition_page
-            pages["Admin Dashboard"] = admin_settings_page
-            pages["Yearly Summaries"] = yearly_summaries_page
-            pages["Form Analysis"] = supervisors_section_page
-        
-        selected_page = st.sidebar.selectbox("Choose a page:", list(pages.keys()))
-        last_nav = st.session_state.get("_last_nav_page")
-        if last_nav != selected_page:
-            st.session_state["_last_nav_page"] = selected_page
-            try:
-                log_user_activity(
-                    event_type="page_view",
-                    context=f"nav:{selected_page}",
-                    metadata={
-                        "role": actual_role,
-                        "effective_role": effective_role,
-                        "is_supervisor": effective_is_supervisor,
-                    },
-                    user=st.session_state.get("user"),
-                )
-            except Exception:
-                pass
-        pages[selected_page]()
-
-# --- Connections ---
-@st.cache_resource
-def init_connection():
-    url = os.getenv("SUPABASE_URL") or st.secrets.get("supabase_url")
-    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or st.secrets.get("supabase_service_role_key")
-    key = service_role_key or os.getenv("SUPABASE_KEY") or st.secrets.get("supabase_key")
-    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("google_api_key")
-    # Validate required keys exist
+                summary_triggered = False
+                if st.button(button_text):
+                    summary_triggered = True
+                if summary_triggered:
+                    with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+                        try:
+                            weekly_reports = [r for r in all_reports if r.get("week_ending_date") == selected_date_for_summary]
+                            if not weekly_reports:
+                                st.warning("No reports found for the selected week.")
+                            else:
+                                well_being_scores = [r.get("well_being_rating") for r in weekly_reports if r.get("well_being_rating") is not None]
+                                average_score = round(sum(well_being_scores) / len(well_being_scores), 1) if well_being_scores else "N/A"
+                                reports_text = ""
+                                all_events_summary = []  # Collect all events for admin summary
+                                for r in weekly_reports:
+                                    reports_text += f"\n---\n**Report from: {r.get('team_member','Unknown')}**\n"
+                                    reports_text += f"Well-being Score: {r.get('well_being_rating')}/5\n"
+                                    reports_text += f"Personal Check-in: {r.get('personal_check_in')}\n"
+                                    reports_text += f"Lookahead: {r.get('key_topics_lookahead')}\n"
+                                    if not supervisor_mode:
+                                        reports_text += f"Concerns for Director: {r.get('director_concerns')}\n"
+                                    report_body = r.get("report_body") or {}
+                                    for sk, sn in CORE_SECTIONS.items():
+                                        section_data = report_body.get(sk)
+                                        if section_data and (section_data.get("successes") or section_data.get("challenges")):
+                                            reports_text += f"\n*{sn}*:\n"
+                                            if section_data.get("successes"):
+                                                for success in section_data["successes"]:
+                                                    reports_text += f"- Success: {success.get('text')} `(ASCEND: {success.get('ascend_category','N/A')}, NORTH: {success.get('north_category','N/A')})`\n"
+                                                    if sk == "events":
+                                                        event_text = success.get('text', '')
+                                                        event_name = event_text
+                                                        event_date = ""
+                                                        if " on " in event_text:
+                                                            parts = event_text.rsplit(" on ", 1)
+                                                            if len(parts) == 2:
+                                                                event_name = parts[0]
+                                                                event_date = parts[1]
+                                                        all_events_summary.append({
+                                                            "event_name": event_name,
+                                                            "event_date": event_date,
+                                                            "attendee": r.get('team_member', 'Unknown'),
+                                                            "ascend_category": success.get('ascend_category', 'N/A'),
+                                                            "north_category": success.get('north_category', 'N/A'),
+                                                            "alignment": f"ASCEND: {success.get('ascend_category', 'N/A')}, NORTH: {success.get('north_category', 'N/A')}"
+                                                        })
+                                            if section_data.get("challenges"):
+                                                for challenge in section_data["challenges"]:
+                                                    reports_text += f"- Challenge: {challenge.get('text')} `(ASCEND: {challenge.get('ascend_category','N/A')}, NORTH: {challenge.get('north_category','N/A')})`\n"
+                                director_section = ""
+                                if not supervisor_mode:
+                                    director_section = """
+            **### For the Director's Attention:** Create this section. List any items specifically noted under "Concerns for Director," making sure to mention which staff member raised the concern. If no concerns were raised, state "No specific concerns were raised for the Director this week."
+            """
+                                duty_analyses_response = supabase.table('saved_duty_analyses').select('*').execute()
+                                st.info(f"[DEBUG] Raw saved_duty_analyses response: {type(duty_analyses_response.data)}")
+                                st.write("[DEBUG] saved_duty_analyses data:")
+                                st.json(duty_analyses_response.data)
+                                duty_reports_section = ""
+                                if 'weekly_duty_reports' in st.session_state and st.session_state['weekly_duty_reports']:
+                                    st.info("🛡️ **Including Weekly Duty Reports:** Found saved duty analysis reports to integrate into this summary.")
+                                    duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
+                                    for i, duty_report in enumerate(st.session_state['weekly_duty_reports'], 1):
+                                        duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
+                                        duty_reports_section += f"Generated: {duty_report['date_generated']}\n"
+                                        duty_reports_section += f"Date Range: {duty_report['date_range']}\n"
+                                        duty_reports_section += f"Reports Analyzed: {duty_report['reports_analyzed']}\n\n"
+                                        duty_reports_section += duty_report['summary']
+                                        duty_reports_section += "\n" + "="*50 + "\n"
+                                engagement_reports_section = ""
+                                if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
+                                    st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
+                                    engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
+                                    for i, engagement_report in enumerate(st.session_state['weekly_engagement_reports'], 1):
+                                        engagement_reports_section += f"\n--- ENGAGEMENT REPORT {i} ---\n"
+                                        engagement_reports_section += f"Generated: {engagement_report['date_generated']}\n"
+                                        engagement_reports_section += f"Date Range: {engagement_report['date_range']}\n"
+                                        engagement_reports_section += f"Events Analyzed: {engagement_report['events_analyzed']}\n\n"
+                                        engagement_reports_section += engagement_report['summary']
+                                        if engagement_report.get('upcoming_events'):
+                                            engagement_reports_section += f"\n\n--- UPCOMING EVENTS ---\n"
+                                            engagement_reports_section += engagement_report['upcoming_events']
+                                        engagement_reports_section += "\n" + "="*50 + "\n"
+                                cleaned_text = generate_admin_dashboard_summary(
+                                    selected_date_for_summary,
+                                    reports_text,
+                                    duty_reports_section,
+                                    engagement_reports_section,
+                                    average_score,
+                                    current_user_id,
+                                )
+                                st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}; st.rerun()
     if not url or not key:
         st.error("❌ Missing Supabase configuration. Please check your secrets or environment variables.")
         st.stop()
