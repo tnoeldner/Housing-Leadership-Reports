@@ -61,7 +61,7 @@ Guiding NORTH is our core communication standard for UND Housing & Residence Lif
 - Help Proactively: bullets with staff names/dates.
 
 ## UND LEADS Summary
-Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Then list bullets for Learning, Equity, Affinity, Discovery, Service.
+Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." For each pillar (Learning, Equity, Affinity, Discovery, Service) include bullets that name the staff member and the date of the activity, using dates from the source reports. If no date is present, add "(date not provided)" after the staff name.
 
 ## Overall Staff Well-being
 The average well-being score for the week was {{average_score}} out of 5. Provide a brief qualitative summary.
