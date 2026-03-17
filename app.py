@@ -5531,6 +5531,7 @@ def dashboard_page(supervisor_mode=False):
                         duty_reports_section,
                         engagement_reports_section,
                         average_score,
+                        current_user_id,
                     )
 
                     st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}; st.rerun()

@@ -1,13 +1,14 @@
 # --- Admin Dashboard Summary Generation ---
-def generate_admin_dashboard_summary(selected_date_for_summary, staff_reports_text, duty_reports_section, engagement_reports_section, average_score=0):
+def generate_admin_dashboard_summary(selected_date_for_summary, staff_reports_text, duty_reports_section, engagement_reports_section, average_score=0, created_by=None):
     """
-    Generate the admin dashboard summary using Gemini AI.
+    Generate the admin dashboard summary using Gemini AI with a rigid template.
     Args:
         selected_date_for_summary: str, week ending date
         staff_reports_text: str, markdown/text of all staff reports
         duty_reports_section: str, markdown/text of duty reports
         engagement_reports_section: str, markdown/text of engagement reports
         average_score: float, average well-being score
+        created_by: optional str user id to stamp the summary
     Returns:
         str: Cleaned summary response
     """
@@ -29,79 +30,83 @@ def generate_admin_dashboard_summary(selected_date_for_summary, staff_reports_te
     ascend_rubric = escape_braces(load_rubric_text("ascend_rubric.md"))
     north_rubric = escape_braces(load_rubric_text("north_rubric.md"))
 
+    created_by_line = created_by if created_by else "unknown"
+
     default_dashboard_prompt = f"""
 You are an executive assistant for the Director of Housing & Residence Life at UND. Your task is to synthesize multiple team reports from the week ending {{selected_date_for_summary}} into a single, comprehensive summary report.
 
-IMPORTANT: Start your response immediately with the first section heading. Do not include any introductory text, cover page text, or phrases like "Here is the comprehensive summary report" or "Weekly Summary Report: Housing & Residence Life". Begin directly with the Executive Summary section.
-
-DATA SOURCES AVAILABLE:
-1. Weekly staff reports from residence life team members
-2. Weekly duty reports analysis (if available) - quantitative data on incidents, safety, maintenance, and operations
-3. Weekly engagement analysis (if available) - event programming, attendance data, community engagement activities
-
-The report MUST contain the following sections, in this order, using markdown headings exactly as shown:
+STRICT OUTPUT ORDER AND TEMPLATE:
+1) Output MUST start with: Created By: {{created_by_line}}
+2) Blank line
+3) Then exactly the sections below, in order, using the shown markdown headings. Do not add or remove sections. If data is missing, keep the heading and add a single bullet: "No data provided." Do NOT invent a different format.
 
 ## Executive Summary
-A 2-3 sentence high-level overview of the week's key takeaways.
+- 2-3 sentence overview of the week's key takeaways.
 
 ## ASCEND Framework Summary
-ASCEND pillars (use EXACT values): {ASCEND_VALUES}. Start with: "ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department." Use the ASCEND rubric below to choose the best-fit pillar for each activity. For each pillar include bullet points that reference staff by name and date.
-
-ASCEND rubric:
-{ascend_rubric}
+ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department.
+- Affinity & Community Building: bullets with staff names/dates.
+- Service Excellence & Support: bullets with staff names/dates.
+- Cultivating Equity & Inclusion: bullets with staff names/dates.
+- Empowering Learning & Growth: bullets with staff names/dates.
+- Navigating Discovery & Innovation: bullets with staff names/dates.
+- Dedicated & Driven: bullets with staff names/dates.
 
 ## Guiding NORTH Pillars Summary
-Guiding NORTH pillars (use EXACT values): {NORTH_VALUES}. Start with: "Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey." Use the NORTH rubric below to choose the best-fit pillar for each activity. For each pillar include bullet points that reference staff by name and date.
-
-NORTH rubric:
-{north_rubric}
+Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey.
+- Navigate Needs: bullets with staff names/dates.
+- Own the Outcome: bullets with staff names/dates.
+- Respond Respectfully: bullets with staff names/dates.
+- Timely & Truthful: bullets with staff names/dates.
+- Help Proactively: bullets with staff names/dates.
 
 ## UND LEADS Summary
-Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Analyze activities under these pillars with staff names and dates where applicable: Learning, Equity, Affinity, Discovery, Service.
+Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." Then list bullets for Learning, Equity, Affinity, Discovery, Service.
 
 ## Overall Staff Well-being
-Start with "The average well-being score for the week was {{average_score}} out of 5." Provide a short qualitative summary and include a "Staff to Connect With" subsection listing low scores or concerning comments.
+The average well-being score for the week was {{average_score}} out of 5. Provide a brief qualitative summary.
+
+### Staff to Connect With
+- bullets naming staff with low scores or concerns.
 
 ## Campus Events Summary
-Create a markdown table with this exact format:
-
+Create a markdown table exactly like:
 | Event/Committee | Date | Attendees | Alignment |
 |-----------------|------|-----------|-----------|
 | Event Name | YYYY-MM-DD | Staff Member Name | ASCEND: Category, NORTH: Category |
 
-Include all campus events and committee meetings attended by staff this week. Group multiple attendees for the same event in one row.
-
 ## For the Director's Attention
-List items needing director-level attention; if none, state "No specific concerns were raised for the Director this week."
+- bullets needing director-level attention; if none, state "No specific concerns were raised for the Director this week."
 
 ## Key Challenges
-Bullet-point significant or recurring challenges, noting who reported them.
+- bullets of significant or recurring challenges with staff names where relevant.
 
 ## Operational & Safety Summary
-If duty reports exist, include:
 
 ### Quantitative Metrics
-Hall-by-hall table (keep columns exactly):
-
+Use this exact table schema:
 | Hall/Building | Total Reports | Lockouts | Maintenance | Policy Violations | Safety Concerns | Staff Responses |
 |---------------|---------------|----------|-------------|-------------------|-----------------|-----------------|
 | Hall Name | # | # | # | # | # | # |
-
-Add a totals row at the bottom.
+Include a totals row.
 
 ### Trending Issues
-Patterns in lockouts, maintenance, policy violations.
+- bullets on patterns from duty data.
 
 ### Staff Response Effectiveness
-Assessment of duty staff performance and response times.
+- bullets assessing duty staff performance.
 
 ### Safety & Security Highlights
-Critical incidents and follow-up actions needed.
+- bullets on critical incidents and needed follow-up.
 
 ## Upcoming Projects & Initiatives
-Bullet key upcoming projects based on the 'Lookahead' sections.
+- bullets drawn from lookahead sections.
 
-CRITICAL FORMATTING REQUIREMENTS:
+CRITICAL RULES:
+- Do NOT add new sections or headings.
+- Keep headings exactly as written (## or ### as shown).
+- Always include the tables with correct columns, even if values are "N/A".
+- Use data from STAFF REPORTS DATA, DUTY REPORTS DATA, ENGAGEMENT REPORTS DATA below.
 
 STAFF REPORTS DATA:
 {{staff_reports_text}}
@@ -112,13 +117,15 @@ DUTY REPORTS DATA:
 ENGAGEMENT REPORTS DATA:
 {{engagement_reports_section}}
 """
-    prompt_template = get_admin_prompt("dashboard_prompt", default_dashboard_prompt)
+    # Use the canonical template (ignore admin_settings overrides to ensure stable formatting)
+    prompt_template = default_dashboard_prompt
     prompt = prompt_template.format(
         selected_date_for_summary=selected_date_for_summary,
         staff_reports_text=(staff_reports_text or "").replace("{", "{{").replace("}", "}}"),
         duty_reports_section=(duty_reports_section or "").replace("{", "{{").replace("}", "}}"),
         engagement_reports_section=(engagement_reports_section or "").replace("{", "{{").replace("}", "}}"),
-        average_score=average_score
+        average_score=average_score,
+        created_by_line=created_by_line,
     )
     import streamlit as st
     try:
