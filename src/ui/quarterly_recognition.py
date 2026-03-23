@@ -261,6 +261,9 @@ def quarterly_recognition_page():
                     except Exception:
                         pass
                     
+                    # Debug output for backend result
+                    with st.expander("🛠️ Debug: Backend Result Data"):
+                        st.json(result)
                     col1, col2 = st.columns(2)
                     # ASCEND block
                     with col1:
