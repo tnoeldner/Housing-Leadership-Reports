@@ -1329,29 +1329,37 @@ def select_quarterly_winners(quarter, fiscal_year):
         # --- Scoring ---
         scoring = {}
         for staff_member in all_candidates:
-            # Base: average weekly ASCEND score for the quarter
+            # Base: average weekly ASCEND score for the quarter (max 4)
             scores = ascend_scores.get(staff_member, [])
             base = sum(scores) / len(scores) if scores else 0
-            # Bonus: only if not previous quarter winner
-            prev_quarter = staff_member not in prev_quarter_winners
-            prev_win = 0 if staff_member in prev_winners else 1
-            completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
-            completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
-            completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
-            # Only give bonuses if not previous quarter winner
-            bonus = (prev_win + completion_bonus) if prev_quarter else 0
-            score = base + bonus
+            # If previous quarter winner, no bonus, score is just the average (max 4)
+            if staff_member in prev_quarter_winners:
+                score = base
+                eligible_for_bonus = False
+                applied_bonus = 0
+            else:
+                # Bonus: +1 if never won, +1 if 90%+ completion
+                prev_win = 0 if staff_member in prev_winners else 1
+                completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
+                completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
+                completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
+                applied_bonus = prev_win + completion_bonus
+                score = base + applied_bonus
+                eligible_for_bonus = True
+            # Cap score at 4
+            score = min(score, 4)
             scoring[staff_member] = {
                 "score": score,
                 "average_weekly_score": base,
                 "weekly_scores": scores,
-                "never_won_quarterly": bool(prev_win),
-                "report_completion_rate": completion_rate,
-                "completion_bonus": completion_bonus,
-                "eligible_for_bonus": prev_quarter,
+                "applied_bonus": applied_bonus if eligible_for_bonus else 0,
+                "eligible_for_bonus": eligible_for_bonus,
+                "never_won_quarterly": bool(prev_win) if eligible_for_bonus else False,
+                "report_completion_rate": completion_rate if eligible_for_bonus else None,
+                "completion_bonus": completion_bonus if eligible_for_bonus else 0,
                 "details": {
-                    "completed": completion["completed"],
-                    "total": completion["total"]
+                    "completed": completion["completed"] if eligible_for_bonus else None,
+                    "total": completion["total"] if eligible_for_bonus else None
                 }
             }
 
