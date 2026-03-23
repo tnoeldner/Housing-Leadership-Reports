@@ -1216,6 +1216,7 @@ def select_quarterly_winners(quarter, fiscal_year):
 
         # --- Enhanced candidate scoring: average weekly ASCEND score, previous quarter winner check, report completion ---
         ascend_scores = {}  # staff_member -> list of weekly scores
+        ascend_counts = {}  # staff_member -> count of recognitions (for tie/debug)
         north_counts = {}
         ascend_details = {}
         north_details = {}
@@ -1247,6 +1248,7 @@ def select_quarterly_winners(quarter, fiscal_year):
                             if staff_member not in ascend_scores:
                                 ascend_scores[staff_member] = []
                             ascend_scores[staff_member].append(score)
+                            ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
                             if staff_member not in ascend_details:
                                 ascend_details[staff_member] = []
                             ascend_details[staff_member].append(ascend_rec)
