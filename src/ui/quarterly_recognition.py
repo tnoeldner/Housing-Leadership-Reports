@@ -262,21 +262,48 @@ def quarterly_recognition_page():
                         pass
                     
                     col1, col2 = st.columns(2)
+                    # ASCEND block
                     with col1:
                         if ascend_winner:
                             st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner}")
                             if result.get('ascend_summary'):
                                 with st.expander("📊 Why this winner?"):
                                     st.write(result.get('ascend_summary'))
+                            # Show 2nd and 3rd place
+                            ascend_second = result.get('ascend_second')
+                            ascend_third = result.get('ascend_third')
+                            ascend_second_reason = result.get('ascend_second_reason')
+                            ascend_third_reason = result.get('ascend_third_reason')
+                            if ascend_second:
+                                st.markdown(f"#### 🥈 2nd Place: {ascend_second}")
+                                if ascend_second_reason:
+                                    st.caption(f"Why not selected: {ascend_second_reason}")
+                            if ascend_third:
+                                st.markdown(f"#### 🥉 3rd Place: {ascend_third}")
+                                if ascend_third_reason:
+                                    st.caption(f"Why not selected: {ascend_third_reason}")
                         else:
                             st.metric("🌟 ASCEND Winner", "Not awarded")
-                    
+                    # NORTH block
                     with col2:
+                        north_winner = result.get('north_winner')
+                        north_second = result.get('north_second')
+                        north_third = result.get('north_third')
+                        north_second_reason = result.get('north_second_reason')
+                        north_third_reason = result.get('north_third_reason')
                         if north_winner:
                             st.markdown(f"### 🧭 NORTH Winner: {north_winner}")
                             if result.get('north_summary'):
                                 with st.expander("📊 Why this winner?"):
                                     st.write(result.get('north_summary'))
+                            if north_second:
+                                st.markdown(f"#### 🥈 2nd Place: {north_second}")
+                                if north_second_reason:
+                                    st.caption(f"Why not selected: {north_second_reason}")
+                            if north_third:
+                                st.markdown(f"#### 🥉 3rd Place: {north_third}")
+                                if north_third_reason:
+                                    st.caption(f"Why not selected: {north_third_reason}")
                         else:
                             st.metric("🧭 NORTH Winner", "Not awarded")
 

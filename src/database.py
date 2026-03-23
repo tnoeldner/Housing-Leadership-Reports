@@ -1332,11 +1332,67 @@ def select_quarterly_winners(quarter, fiscal_year):
                 }
             }
 
-        # Pick winner by highest score (ASCEND)
+        # Pick top 3 by score (ASCEND)
         ascend_winner = None
+        ascend_ranking = []
         if scoring:
-            ascend_winner = max(scoring, key=lambda k: scoring[k]["score"])
-        north_winner = max(north_counts, key=north_counts.get) if north_counts else None
+            sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
+            ascend_ranking = [k for k, v in sorted_ascend]
+            ascend_winner = ascend_ranking[0] if ascend_ranking else None
+
+        # NORTH: Use same scoring logic as ASCEND, but for north_counts
+        north_ranking = []
+        north_scoring = {}
+        if north_counts:
+            # Only consider candidates who received NORTH recognitions
+            for staff_member in north_counts:
+                base = north_counts.get(staff_member, 0)
+                prev_win = 0 if staff_member in prev_winners else 1
+                completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
+                completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
+                completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
+                score = base + prev_win + completion_bonus
+                north_scoring[staff_member] = {
+                    "score": score,
+                    "weekly_recognitions": base,
+                    "never_won_quarterly": bool(prev_win),
+                    "report_completion_rate": completion_rate,
+                    "completion_bonus": completion_bonus,
+                    "details": {
+                        "completed": completion["completed"],
+                        "total": completion["total"]
+                    }
+                }
+            sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
+            north_ranking = [k for k, v in sorted_north]
+            north_winner = north_ranking[0] if north_ranking else None
+        else:
+            north_winner = None
+
+        north_second = north_ranking[1] if len(north_ranking) > 1 else None
+        north_third = north_ranking[2] if len(north_ranking) > 2 else None
+
+        def explain_not_selected(candidate, winner, scoring):
+            if not candidate or not winner or candidate not in scoring or winner not in scoring:
+                return "No data available."
+            reasons = []
+            if scoring[candidate]["score"] < scoring[winner]["score"]:
+                reasons.append(f"Lower total score ({scoring[candidate]['score']}) than winner ({scoring[winner]['score']}).")
+            if scoring[candidate]["weekly_recognitions"] < scoring[winner]["weekly_recognitions"]:
+                reasons.append(f"Fewer weekly recognitions ({scoring[candidate]['weekly_recognitions']}) than winner ({scoring[winner]['weekly_recognitions']}).")
+            if scoring[candidate]["never_won_quarterly"] != scoring[winner]["never_won_quarterly"]:
+                if not scoring[candidate]["never_won_quarterly"]:
+                    reasons.append("Already received a quarterly recognition before.")
+            if scoring[candidate]["completion_bonus"] < scoring[winner]["completion_bonus"]:
+                reasons.append("Lower report completion rate.")
+            if not reasons:
+                reasons.append("Very close in score, but not selected due to tiebreaker.")
+            return " ".join(reasons)
+
+        ascend_second_reason = explain_not_selected(ascend_second, ascend_winner, scoring) if ascend_second else None
+        ascend_third_reason = explain_not_selected(ascend_third, ascend_winner, scoring) if ascend_third else None
+        north_second_reason = explain_not_selected(north_second, north_winner, north_scoring) if north_second else None
+        north_third_reason = explain_not_selected(north_third, north_winner, north_scoring) if north_third else None
 
         print(f"[DEBUG] Enhanced scoring breakdown: {scoring}")
         print(f"[DEBUG] Determined winners - ASCEND: {ascend_winner}, NORTH: {north_winner}")
@@ -1349,6 +1405,10 @@ def select_quarterly_winners(quarter, fiscal_year):
                 "status": "success",
                 "ascend_winner": None,
                 "north_winner": None,
+                "ascend_second": None,
+                "ascend_third": None,
+                "ascend_second_reason": None,
+                "ascend_third_reason": None,
                 "debug": {
                     "records_found": len(data) if data else 0,
                     "ascend_count": len(ascend_counts),
