@@ -1335,10 +1335,14 @@ def select_quarterly_winners(quarter, fiscal_year):
         # Pick top 3 by score (ASCEND)
         ascend_winner = None
         ascend_ranking = []
+        ascend_second = None
+        ascend_third = None
         if scoring:
             sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
             ascend_ranking = [k for k, v in sorted_ascend]
             ascend_winner = ascend_ranking[0] if ascend_ranking else None
+            ascend_second = ascend_ranking[1] if len(ascend_ranking) > 1 else None
+            ascend_third = ascend_ranking[2] if len(ascend_ranking) > 2 else None
 
         # NORTH: Use same scoring logic as ASCEND, but for north_counts
         north_ranking = []
