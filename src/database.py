@@ -1287,8 +1287,23 @@ def select_quarterly_winners(quarter, fiscal_year):
         except Exception as e:
             print(f"[DEBUG] Could not fetch report completion: {e}")
 
-        # All candidates are everyone who submitted a report
-        all_candidates = set(report_completion.keys())
+        # --- NEW: Pull all ASCEND/NORTH scores for the quarter ---
+        admin = get_admin_client()
+        scores_resp = admin.table("staff_recognition_scores").select("staff_member_name, category_type, score, week_ending_date").gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
+        scores_data = scores_resp.data or []
+        # Build: staff -> list of ASCEND scores, list of NORTH scores
+        ascend_scores = {}
+        north_scores = {}
+        for row in scores_data:
+            name = row.get("staff_member_name")
+            if not name:
+                continue
+            if row.get("category_type") == "ASCEND":
+                ascend_scores.setdefault(name, []).append(row.get("score", 0))
+            elif row.get("category_type") == "NORTH":
+                north_scores.setdefault(name, []).append(row.get("score", 0))
+        # All candidates are everyone who submitted a report or has a score
+        all_candidates = set(report_completion.keys()) | set(ascend_scores.keys()) | set(north_scores.keys())
 
         admin = get_admin_client()
         # Get previous quarterly winners (all years/quarters before this one)
@@ -1350,12 +1365,14 @@ def select_quarterly_winners(quarter, fiscal_year):
         # --- Scoring ---
         scoring = {}
         for staff_member in all_candidates:
-            # Base: average weekly ASCEND score for the quarter (max 4)
-            scores = ascend_scores.get(staff_member, [])
-            base = sum(scores) / len(scores) if scores else 0
-            # If previous quarter winner, no bonus, score is just the average (max 4)
+            # NEW: Use average ASCEND and NORTH scores as base
+            ascend_list = ascend_scores.get(staff_member, [])
+            north_list = north_scores.get(staff_member, [])
+            avg_ascend = sum(ascend_list) / len(ascend_list) if ascend_list else 0
+            avg_north = sum(north_list) / len(north_list) if north_list else 0
+            # If previous quarter winner, no bonus, score is just the average ASCEND (max 4)
             if staff_member in prev_quarter_winners:
-                score = base
+                score = avg_ascend
                 eligible_for_bonus = False
                 applied_bonus = 0
                 prev_win = 0
@@ -1369,14 +1386,15 @@ def select_quarterly_winners(quarter, fiscal_year):
                 completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
                 completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
                 applied_bonus = prev_win + completion_bonus
-                score = base + applied_bonus
+                score = avg_ascend + applied_bonus
                 eligible_for_bonus = True
             # Cap score at 4
             score = min(score, 4)
             scoring[staff_member] = {
                 "score": score,
-                "average_weekly_score": base,
-                "weekly_scores": scores,
+                "average_weekly_score": avg_ascend,
+                "average_north_score": avg_north,
+                "weekly_scores": ascend_list,
                 "applied_bonus": applied_bonus if eligible_for_bonus else 0,
                 "eligible_for_bonus": eligible_for_bonus,
                 "never_won_quarterly": bool(prev_win) if eligible_for_bonus else False,
