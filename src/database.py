@@ -1212,35 +1212,31 @@ def select_quarterly_winners(quarter, fiscal_year):
             print(f"[DEBUG] No records in date range {start_date} to {end_date}")
             print(f"[DEBUG] Total records in DB: {len(data_all_records)}")
 
+
+        # --- Enhanced candidate scoring ---
         ascend_counts = {}
         north_counts = {}
-        ascend_details = {}  # Maps staff_member -> list of recognition objects
-        north_details = {}   # Maps staff_member -> list of recognition objects
+        ascend_details = {}
+        north_details = {}
+        all_candidates = set()
 
+        def parse_json_value(value):
+            if isinstance(value, dict):
+                return value
+            if not isinstance(value, str):
+                return None
+            value = value.strip()
+            while value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            value = value.replace('\\"', '"')
+            value = value.replace('\\\\', '\\')
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                return None
+
+        # Collect recognitions for the quarter
         for record in data or []:
-            # Helper function to safely parse JSON with multiple levels of escaping
-            def parse_json_value(value):
-                """Parse JSON handling multiple levels of escaping"""
-                if isinstance(value, dict):
-                    return value
-                if not isinstance(value, str):
-                    return None
-                
-                # Remove surrounding quotes if present
-                value = value.strip()
-                while value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                
-                # Handle escaped quotes
-                value = value.replace('\\"', '"')
-                value = value.replace('\\\\', '\\')
-                
-                try:
-                    return json.loads(value)
-                except (json.JSONDecodeError, TypeError):
-                    return None
-            
-            # Process ASCEND recognition
             if record.get('ascend_recognition'):
                 try:
                     ascend_rec = parse_json_value(record['ascend_recognition'])
@@ -1248,18 +1244,12 @@ def select_quarterly_winners(quarter, fiscal_year):
                         staff_member = ascend_rec.get('staff_member')
                         if staff_member:
                             ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
-                            # Collect full recognition details for AI analysis
                             if staff_member not in ascend_details:
                                 ascend_details[staff_member] = []
                             ascend_details[staff_member].append(ascend_rec)
-                            print(f"[DEBUG] ASCEND: {staff_member} count = {ascend_counts[staff_member]}")
-                    else:
-                        print(f"[DEBUG] Could not parse ASCEND data: {record.get('ascend_recognition')[:100]}")
-                except Exception as e:
-                    print(f"[DEBUG] Error parsing ASCEND: {str(e)}")
+                            all_candidates.add(staff_member)
+                except Exception:
                     pass
-
-            # Process NORTH recognition
             if record.get('north_recognition'):
                 try:
                     north_rec = parse_json_value(record['north_recognition'])
@@ -1267,24 +1257,88 @@ def select_quarterly_winners(quarter, fiscal_year):
                         staff_member = north_rec.get('staff_member')
                         if staff_member:
                             north_counts[staff_member] = north_counts.get(staff_member, 0) + 1
-                            # Collect full recognition details for AI analysis
                             if staff_member not in north_details:
                                 north_details[staff_member] = []
                             north_details[staff_member].append(north_rec)
-                            print(f"[DEBUG] NORTH: {staff_member} count = {north_counts[staff_member]}")
-                    else:
-                        print(f"[DEBUG] Could not parse NORTH data: {record.get('north_recognition')[:100]}")
-                except Exception as e:
-                    print(f"[DEBUG] Error parsing NORTH: {str(e)}")
+                            all_candidates.add(staff_member)
+                except Exception:
                     pass
-        
-        print(f"[DEBUG] ASCEND counts: {ascend_counts}")
-        print(f"[DEBUG] NORTH counts: {north_counts}")
-        
-        # Determine winners
-        ascend_winner = max(ascend_counts, key=ascend_counts.get) if ascend_counts else None
+
+        # --- Enhanced scoring: previous quarterly wins, report completion, weekly recognitions ---
+        admin = get_admin_client()
+        # Get previous quarterly winners (all years/quarters before this one)
+        prev_winners = set()
+        try:
+            prev_resp = admin.table("quarterly_staff_recognition").select("ascend_winner, north_winner, fiscal_year, quarter").lt("fiscal_year", fiscal_year).execute()
+            for rec in prev_resp.data or []:
+                for k in ["ascend_winner", "north_winner"]:
+                    winner = rec.get(k)
+                    if winner:
+                        if isinstance(winner, dict):
+                            name = winner.get("staff_member")
+                        else:
+                            try:
+                                winner_obj = json.loads(winner)
+                                name = winner_obj.get("staff_member")
+                            except Exception:
+                                name = None
+                        if name:
+                            prev_winners.add(name)
+        except Exception as e:
+            print(f"[DEBUG] Could not fetch previous quarterly winners: {e}")
+
+        # Get all finalized reports for the quarter
+        report_completion = {}  # staff_member -> (completed, total)
+        try:
+            # Get all reports in the quarter
+            reports_resp = admin.table("reports").select("user_id, status, week_ending_date").gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
+            reports = reports_resp.data or []
+            # Map user_id to staff_member name (from profiles)
+            profiles_resp = admin.table("profiles").select("id, full_name").execute()
+            id_to_name = {p["id"]: p.get("full_name") for p in profiles_resp.data or []}
+            # Count completed reports
+            for r in reports:
+                user_id = r.get("user_id")
+                name = id_to_name.get(user_id, user_id)
+                if not name:
+                    continue
+                if name not in report_completion:
+                    report_completion[name] = {"completed": 0, "total": 0}
+                report_completion[name]["total"] += 1
+                if (r.get("status") or "").lower() == "finalized":
+                    report_completion[name]["completed"] += 1
+        except Exception as e:
+            print(f"[DEBUG] Could not fetch report completion: {e}")
+
+        # --- Scoring ---
+        scoring = {}
+        for staff_member in all_candidates:
+            base = ascend_counts.get(staff_member, 0)  # weekly recognitions
+            prev_win = 0 if staff_member in prev_winners else 1  # bonus if never won
+            completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
+            completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
+            completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
+            # Compose score: base + bonuses
+            score = base + prev_win + completion_bonus
+            scoring[staff_member] = {
+                "score": score,
+                "weekly_recognitions": base,
+                "never_won_quarterly": bool(prev_win),
+                "report_completion_rate": completion_rate,
+                "completion_bonus": completion_bonus,
+                "details": {
+                    "completed": completion["completed"],
+                    "total": completion["total"]
+                }
+            }
+
+        # Pick winner by highest score (ASCEND)
+        ascend_winner = None
+        if scoring:
+            ascend_winner = max(scoring, key=lambda k: scoring[k]["score"])
         north_winner = max(north_counts, key=north_counts.get) if north_counts else None
 
+        print(f"[DEBUG] Enhanced scoring breakdown: {scoring}")
         print(f"[DEBUG] Determined winners - ASCEND: {ascend_winner}, NORTH: {north_winner}")
 
         # If no winners found, return early with diagnostic info
@@ -1299,7 +1353,8 @@ def select_quarterly_winners(quarter, fiscal_year):
                     "records_found": len(data) if data else 0,
                     "ascend_count": len(ascend_counts),
                     "north_count": len(north_counts),
-                    "records": [{"week_ending_date": r.get('week_ending_date'), "has_ascend": bool(r.get('ascend_recognition')), "has_north": bool(r.get('north_recognition'))} for r in (data or [])]
+                    "records": [{"week_ending_date": r.get('week_ending_date'), "has_ascend": bool(r.get('ascend_recognition')), "has_north": bool(r.get('north_recognition'))} for r in (data or [])],
+                    "scoring": scoring
                 }
             }
         
