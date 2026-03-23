@@ -1213,8 +1213,9 @@ def select_quarterly_winners(quarter, fiscal_year):
             print(f"[DEBUG] Total records in DB: {len(data_all_records)}")
 
 
-        # --- Enhanced candidate scoring ---
-        ascend_counts = {}
+
+        # --- Enhanced candidate scoring: average weekly ASCEND score, previous quarter winner check, report completion ---
+        ascend_scores = {}  # staff_member -> list of weekly scores
         north_counts = {}
         ascend_details = {}
         north_details = {}
@@ -1235,15 +1236,17 @@ def select_quarterly_winners(quarter, fiscal_year):
             except (json.JSONDecodeError, TypeError):
                 return None
 
-        # Collect recognitions for the quarter
         for record in data or []:
             if record.get('ascend_recognition'):
                 try:
                     ascend_rec = parse_json_value(record['ascend_recognition'])
                     if ascend_rec:
                         staff_member = ascend_rec.get('staff_member')
+                        score = ascend_rec.get('score', 0)
                         if staff_member:
-                            ascend_counts[staff_member] = ascend_counts.get(staff_member, 0) + 1
+                            if staff_member not in ascend_scores:
+                                ascend_scores[staff_member] = []
+                            ascend_scores[staff_member].append(score)
                             if staff_member not in ascend_details:
                                 ascend_details[staff_member] = []
                             ascend_details[staff_member].append(ascend_rec)
@@ -1264,10 +1267,10 @@ def select_quarterly_winners(quarter, fiscal_year):
                 except Exception:
                     pass
 
-        # --- Enhanced scoring: previous quarterly wins, report completion, weekly recognitions ---
         admin = get_admin_client()
         # Get previous quarterly winners (all years/quarters before this one)
         prev_winners = set()
+        prev_quarter_winners = set()
         try:
             prev_resp = admin.table("quarterly_staff_recognition").select("ascend_winner, north_winner, fiscal_year, quarter").lt("fiscal_year", fiscal_year).execute()
             for rec in prev_resp.data or []:
@@ -1284,19 +1287,30 @@ def select_quarterly_winners(quarter, fiscal_year):
                                 name = None
                         if name:
                             prev_winners.add(name)
+                # Track previous quarter's winner for ASCEND only
+                if rec.get("fiscal_year") == fiscal_year and rec.get("quarter") == (quarter - 1):
+                    winner = rec.get("ascend_winner")
+                    if winner:
+                        if isinstance(winner, dict):
+                            name = winner.get("staff_member")
+                        else:
+                            try:
+                                winner_obj = json.loads(winner)
+                                name = winner_obj.get("staff_member")
+                            except Exception:
+                                name = None
+                        if name:
+                            prev_quarter_winners.add(name)
         except Exception as e:
             print(f"[DEBUG] Could not fetch previous quarterly winners: {e}")
 
         # Get all finalized reports for the quarter
         report_completion = {}  # staff_member -> (completed, total)
         try:
-            # Get all reports in the quarter
             reports_resp = admin.table("reports").select("user_id, status, week_ending_date").gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
             reports = reports_resp.data or []
-            # Map user_id to staff_member name (from profiles)
             profiles_resp = admin.table("profiles").select("id, full_name").execute()
             id_to_name = {p["id"]: p.get("full_name") for p in profiles_resp.data or []}
-            # Count completed reports
             for r in reports:
                 user_id = r.get("user_id")
                 name = id_to_name.get(user_id, user_id)
@@ -1309,6 +1323,35 @@ def select_quarterly_winners(quarter, fiscal_year):
                     report_completion[name]["completed"] += 1
         except Exception as e:
             print(f"[DEBUG] Could not fetch report completion: {e}")
+
+        # --- Scoring ---
+        scoring = {}
+        for staff_member in all_candidates:
+            # Base: average weekly ASCEND score for the quarter
+            scores = ascend_scores.get(staff_member, [])
+            base = sum(scores) / len(scores) if scores else 0
+            # Bonus: only if not previous quarter winner
+            prev_quarter = staff_member not in prev_quarter_winners
+            prev_win = 0 if staff_member in prev_winners else 1
+            completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
+            completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
+            completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
+            # Only give bonuses if not previous quarter winner
+            bonus = (prev_win + completion_bonus) if prev_quarter else 0
+            score = base + bonus
+            scoring[staff_member] = {
+                "score": score,
+                "average_weekly_score": base,
+                "weekly_scores": scores,
+                "never_won_quarterly": bool(prev_win),
+                "report_completion_rate": completion_rate,
+                "completion_bonus": completion_bonus,
+                "eligible_for_bonus": prev_quarter,
+                "details": {
+                    "completed": completion["completed"],
+                    "total": completion["total"]
+                }
+            }
 
         # --- Scoring ---
         scoring = {}
