@@ -1555,12 +1555,20 @@ def select_quarterly_winners(quarter, fiscal_year):
             return {"success": False, "message": error}
 
         return {
-            "success": True, 
-            "status": "success", 
-            "ascend_winner": ascend_winner, 
+            "success": True,
+            "status": "success",
+            "ascend_winner": ascend_winner,
             "north_winner": north_winner,
             "ascend_summary": ascend_summary,
-            "north_summary": north_summary
+            "north_summary": north_summary,
+            "ascend_second": ascend_second,
+            "ascend_third": ascend_third,
+            "ascend_second_reason": ascend_second_reason,
+            "ascend_third_reason": ascend_third_reason,
+            "north_second": north_second,
+            "north_third": north_third,
+            "north_second_reason": north_second_reason,
+            "north_third_reason": north_third_reason
         }
 
     except Exception as e:
