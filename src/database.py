@@ -1625,7 +1625,9 @@ def select_quarterly_winners(quarter, fiscal_year):
             "north_second": north_second,
             "north_third": north_third,
             "north_second_reason": north_second_reason,
-            "north_third_reason": north_third_reason
+            "north_third_reason": north_third_reason,
+            "scoring": scoring,
+            "north_scoring": north_scoring
         }
 
     except Exception as e:
