@@ -1220,6 +1220,7 @@ def select_quarterly_winners(quarter, fiscal_year):
         north_counts = {}
         ascend_details = {}
         north_details = {}
+        report_completion = {}  # staff_member -> (completed, total)
         all_candidates = set()
 
         def parse_json_value(value):
@@ -1252,7 +1253,6 @@ def select_quarterly_winners(quarter, fiscal_year):
                             if staff_member not in ascend_details:
                                 ascend_details[staff_member] = []
                             ascend_details[staff_member].append(ascend_rec)
-                            all_candidates.add(staff_member)
                 except Exception:
                     pass
             if record.get('north_recognition'):
@@ -1265,9 +1265,30 @@ def select_quarterly_winners(quarter, fiscal_year):
                             if staff_member not in north_details:
                                 north_details[staff_member] = []
                             north_details[staff_member].append(north_rec)
-                            all_candidates.add(staff_member)
                 except Exception:
                     pass
+
+        # Get all finalized reports for the quarter (move up so we can use it for all_candidates)
+        try:
+            reports_resp = admin.table("reports").select("user_id, status, week_ending_date").gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
+            reports = reports_resp.data or []
+            profiles_resp = admin.table("profiles").select("id, full_name").execute()
+            id_to_name = {p["id"]: p.get("full_name") for p in profiles_resp.data or []}
+            for r in reports:
+                user_id = r.get("user_id")
+                name = id_to_name.get(user_id, user_id)
+                if not name:
+                    continue
+                if name not in report_completion:
+                    report_completion[name] = {"completed": 0, "total": 0}
+                report_completion[name]["total"] += 1
+                if (r.get("status") or "").lower() == "finalized":
+                    report_completion[name]["completed"] += 1
+        except Exception as e:
+            print(f"[DEBUG] Could not fetch report completion: {e}")
+
+        # All candidates are everyone who submitted a report
+        all_candidates = set(report_completion.keys())
 
         admin = get_admin_client()
         # Get previous quarterly winners (all years/quarters before this one)
@@ -1337,6 +1358,10 @@ def select_quarterly_winners(quarter, fiscal_year):
                 score = base
                 eligible_for_bonus = False
                 applied_bonus = 0
+                prev_win = 0
+                completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
+                completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
+                completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
             else:
                 # Bonus: +1 if never won, +1 if 90%+ completion
                 prev_win = 0 if staff_member in prev_winners else 1
