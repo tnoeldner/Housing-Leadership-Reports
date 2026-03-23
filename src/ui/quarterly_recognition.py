@@ -266,17 +266,12 @@ def quarterly_recognition_page():
                         st.json(result)
                         # --- Custom Debug Table: Staff Competition Breakdown ---
                         debug_scoring = result.get('debug', {}).get('scoring') or result.get('scoring')
-                        north_scoring = result.get('north_scoring') if 'north_scoring' in result else None
                         if debug_scoring:
                             import pandas as pd
                             table_data = []
                             for staff, info in debug_scoring.items():
                                 avg_ascend = round(info.get('average_weekly_score', 0), 2) if 'average_weekly_score' in info else None
-                                avg_north = None
-                                if north_scoring and staff in north_scoring:
-                                    avg_north = round(north_scoring[staff].get('weekly_recognitions', 0), 2)
-                                elif 'average_north_score' in info:
-                                    avg_north = round(info.get('average_north_score', 0), 2)
+                                avg_north = round(info.get('average_north_score', 0), 2) if 'average_north_score' in info else None
                                 prev_win_bonus = 1 if info.get('never_won_quarterly') else 0
                                 completion_bonus = 1 if info.get('completion_bonus', 0) else 0
                                 table_data.append({
