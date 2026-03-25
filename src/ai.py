@@ -45,23 +45,23 @@ STRICT OUTPUT ORDER AND TEMPLATE:
 
 ## ASCEND Framework Summary
 ASCEND UND Housing is a unified performance framework for the University of North Dakota's Housing and Residence Life staff. It is designed to clearly define job expectations and drive high performance across the department.
-- Affinity & Community Building: bullets with staff names/dates.
-- Service Excellence & Support: bullets with staff names/dates.
-- Cultivating Equity & Inclusion: bullets with staff names/dates.
-- Empowering Learning & Growth: bullets with staff names/dates.
-- Navigating Discovery & Innovation: bullets with staff names/dates.
-- Dedicated & Driven: bullets with staff names/dates.
+- Affinity & Community Building: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this category.
+- Service Excellence & Support: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this category.
+- Cultivating Equity & Inclusion: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this category.
+- Empowering Learning & Growth: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this category.
+- Navigating Discovery & Innovation: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this category.
+- Dedicated & Driven: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this category.
 
 ## Guiding NORTH Pillars Summary
 Guiding NORTH is our core communication standard for UND Housing & Residence Life. It's a simple, five-principle framework that ensures every interaction with students and parents is clear, consistent, and supportive. Its purpose is to build trust and provide reliable direction, making students feel valued and well-supported throughout their housing journey.
-- Navigate Needs: bullets with staff names/dates.
-- Own the Outcome: bullets with staff names/dates.
-- Respond Respectfully: bullets with staff names/dates.
-- Timely & Truthful: bullets with staff names/dates.
-- Help Proactively: bullets with staff names/dates.
+- Navigate Needs: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this pillar.
+- Own the Outcome: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this pillar.
+- Respond Respectfully: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this pillar.
+- Timely & Truthful: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this pillar.
+- Help Proactively: bullets with staff names, dates, and a brief description of the specific action, example, or item from their report that demonstrates this pillar.
 
 ## UND LEADS Summary
-Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." For each pillar (Learning, Equity, Affinity, Discovery, Service) include bullets that name the staff member and the date of the activity, using dates from the source reports. If no date is present, add "(date not provided)" after the staff name.
+Start with: "UND LEADS is a roadmap that outlines the university's goals and aspirations. It's built on the idea of empowering people to make a difference and passing on knowledge to future generations." For each pillar (Learning, Equity, Affinity, Discovery, Service) include bullets that name the staff member, the date of the activity, and a brief description of the specific action, example, or item from their report that demonstrates this pillar. If no date is present, add "(date not provided)" after the staff name.
 
 ## Overall Staff Well-being
 The average well-being score for the week was {{average_score}} out of 5. Provide a brief qualitative summary.
