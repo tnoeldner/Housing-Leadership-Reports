@@ -156,12 +156,24 @@ from src.database import get_admin_client, get_user_client, log_user_activity
 client = None
 
 
+import streamlit as st
 import json
 import google.generativeai as genai
 from src.config import get_secret
+from src.database import get_admin_client
+
+AI_RATE_CARD = {
+    # USD per 1K tokens (prompt, response) — replace with your actual rate card
+    "models/gemini-2.5-flash": {"prompt": 0.000018, "response": 0.000054},
+    "models/gemini-2.5-pro": {"prompt": 0.000125, "response": 0.000375},
     "gemini-2.5-flash": {"prompt": 0.000018, "response": 0.000054},
     "gemini-2.5-pro": {"prompt": 0.000125, "response": 0.000375},
 }
+
+
+def extract_usage_metadata(response):
+    """Best-effort extraction of usage metadata from Gemini responses."""
+    if response is None:
         return None
 
     # Common attributes
@@ -170,6 +182,7 @@ from src.config import get_secret
         if val:
             return val
 
+    # Nested result object
     res = getattr(response, "result", None) or getattr(response, "_result", None)
     if res:
         for attr in ["usage_metadata", "usageMetadata"]:
@@ -178,6 +191,7 @@ from src.config import get_secret
                 return val
 
     # Fallback to dict form if available
+    to_dict = getattr(response, "to_dict", None)
     if callable(to_dict):
         try:
             data = to_dict()
