@@ -183,6 +183,8 @@ def quarterly_recognition_page():
                     st.write(f"**Never Won Quarterly:** {'Yes' if c.get('never_won_quarterly') else 'No'}")
                     st.write(f"**90%+ Completion Bonus:** {c.get('completion_bonus', 0)}")
                     st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "-")
+                    if c.get('ascend_summary'):
+                        st.markdown(f"**Recognition Summary:** {c['ascend_summary']}")
             # NORTH
             st.markdown("### 🧭 NORTH Candidates")
             north_selected = st.radio(

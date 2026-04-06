@@ -1432,9 +1432,15 @@ def select_quarterly_winners(quarter, fiscal_year):
         ascend_ranking = []
         if scoring:
             sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
-            ascend_ranking = [
-                {"staff_member": k, **v} for k, v in sorted_ascend[:3]
-            ]
+            for k, v in sorted_ascend[:3]:
+                # Find the most recent ASCEND recognition with a 'reasoning' or summary
+                summary = None
+                details = ascend_details.get(k, [])
+                for rec in reversed(details):
+                    if rec.get('reasoning'):
+                        summary = rec.get('reasoning')
+                        break
+                ascend_ranking.append({"staff_member": k, **v, "ascend_summary": summary})
         north_ranking = []
         north_scoring = {}
         if north_counts:
