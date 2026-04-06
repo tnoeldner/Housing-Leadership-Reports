@@ -1463,9 +1463,15 @@ def select_quarterly_winners(quarter, fiscal_year):
                     }
                 }
             sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
-            north_ranking = [
-                {"staff_member": k, **v} for k, v in sorted_north[:3]
-            ]
+            for k, v in sorted_north[:3]:
+                # Find the most recent NORTH recognition with a 'reasoning' or summary
+                summary = None
+                details = north_details.get(k, [])
+                for rec in reversed(details):
+                    if rec.get('reasoning'):
+                        summary = rec.get('reasoning')
+                        break
+                north_ranking.append({"staff_member": k, **v, "north_summary": summary})
         return {
             "success": True,
             "status": "success",

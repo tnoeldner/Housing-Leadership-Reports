@@ -208,15 +208,22 @@ def quarterly_recognition_page():
                 st.write(f"**Never Won Quarterly:** {'Yes' if c.get('never_won_quarterly') else 'No'}")
                 st.write(f"**90%+ Completion Bonus:** {c.get('completion_bonus', 0)}")
                 st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "-")
+                if c.get('north_summary'):
+                    st.markdown(f"**Recognition Summary:** {c['north_summary']}")
         if st.button("Finalize Quarterly Recognition"):
             # Save the selected winners and comments
             from src.database import get_admin_client
             admin = get_admin_client()
+            # Find full details for selected winners
+            ascend_winner_detail = next((c for c in st.session_state.get("ascend_candidates", []) if c["staff_member"] == st.session_state["ascend_winner_radio"]), {})
+            north_winner_detail = next((c for c in st.session_state.get("north_candidates", []) if c["staff_member"] == st.session_state["north_winner_radio"]), {})
+            ascend_comment = st.session_state.get("ascend_comment", "")
+            north_comment = st.session_state.get("north_comment", "")
             save_data = {
                 "fiscal_year": selected_fy,
                 "quarter": selected_quarter,
-                "ascend_winner": json.dumps({"staff_member": st.session_state["ascend_winner_radio"], "comment": st.session_state.get("ascend_comment", "")}),
-                "north_winner": json.dumps({"staff_member": st.session_state["north_winner_radio"], "comment": st.session_state.get("north_comment", "")})
+                "ascend_winner": json.dumps({**ascend_winner_detail, "comment": ascend_comment}),
+                "north_winner": json.dumps({**north_winner_detail, "comment": north_comment})
             }
             # Check for existing record
             check_response = admin.table("quarterly_staff_recognition").select("id").eq("fiscal_year", selected_fy).eq("quarter", selected_quarter).execute()
@@ -227,6 +234,26 @@ def quarterly_recognition_page():
                 result = admin.table("quarterly_staff_recognition").insert(save_data).execute()
             st.success("Quarterly recognition finalized and saved!")
             st.balloons()
+            # Show all details for winners
+            st.subheader("Finalized Quarterly Recognition Winners")
+            st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner_detail.get('staff_member','')}")
+            st.write(f"**Score:** {ascend_winner_detail.get('score','')}")
+            st.write(f"**Weekly Recognitions:** {ascend_winner_detail.get('weekly_recognitions','')}")
+            st.write(f"**Never Won Quarterly:** {'Yes' if ascend_winner_detail.get('never_won_quarterly') else 'No'}")
+            st.write(f"**90%+ Completion Bonus:** {ascend_winner_detail.get('completion_bonus','')}")
+            st.write(f"**Report Completion Rate:** {round(ascend_winner_detail.get('report_completion_rate',0)*100,1)}%" if ascend_winner_detail.get('report_completion_rate') is not None else "-")
+            if ascend_winner_detail.get('ascend_summary'):
+                st.markdown(f"**Recognition Summary:** {ascend_winner_detail['ascend_summary']}")
+            st.write(f"**Admin Comment:** {ascend_comment}")
+            st.markdown(f"### 🧭 NORTH Winner: {north_winner_detail.get('staff_member','')}")
+            st.write(f"**Score:** {north_winner_detail.get('score','')}")
+            st.write(f"**Weekly Recognitions:** {north_winner_detail.get('weekly_recognitions','')}")
+            st.write(f"**Never Won Quarterly:** {'Yes' if north_winner_detail.get('never_won_quarterly') else 'No'}")
+            st.write(f"**90%+ Completion Bonus:** {north_winner_detail.get('completion_bonus','')}")
+            st.write(f"**Report Completion Rate:** {round(north_winner_detail.get('report_completion_rate',0)*100,1)}%" if north_winner_detail.get('report_completion_rate') is not None else "-")
+            if north_winner_detail.get('north_summary'):
+                st.markdown(f"**Recognition Summary:** {north_winner_detail['north_summary']}")
+            st.write(f"**Admin Comment:** {north_comment}")
 
     # --- Manual Tie-Breaking Logic ---
     print(f"[DEBUG] Checking for manual_winner in session_state: {list(st.session_state.keys())}")
