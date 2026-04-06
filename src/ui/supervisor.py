@@ -318,51 +318,54 @@ def duty_analysis_section() -> None:
                     key="download_duty_analysis",
                 )
 
-                if analysis_result.get("variant") == "weekly_summary":
-                    if st.button("💾 Save Weekly Duty Summary", type="secondary", key="save_weekly_duty_summary"):
-                        try:
-                            admin_client = get_admin_client()
-                            save_payload = {
-                                "week_ending_date": filter_end,
-                                "report_type": "weekly_summary",
-                                "date_range_start": filter_start,
-                                "date_range_end": filter_end,
-                                "reports_analyzed": analyzed_count,
-                                "total_selected": selected_count,
-                                "analysis_text": summary,
-                                "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
-                                "created_at": datetime.now().isoformat(),
-                                "updated_at": datetime.now().isoformat(),
-                            }
+                report_type_key = "weekly_summary" if analysis_result.get("variant") == "weekly_summary" else "standard"
+                save_label = "💾 Save Weekly Duty Summary" if report_type_key == "weekly_summary" else "💾 Save Duty Analysis"
+                save_btn_key = "save_weekly_duty_summary" if report_type_key == "weekly_summary" else "save_standard_duty_analysis"
 
-                            # Try insert first; if duplicate, perform update manually (avoids missing unique index errors)
-                            try:
-                                admin_client.table("saved_duty_analyses").insert(save_payload).execute()
-                                st.success("✅ Weekly duty summary saved to database.")
-                            except Exception as insert_exc:  # noqa: BLE001
-                                err_text = str(insert_exc)
-                                if "duplicate key" in err_text or "unique constraint" in err_text:
-                                    admin_client.table("saved_duty_analyses").update(
-                                        {
-                                            "date_range_start": filter_start,
-                                            "date_range_end": filter_end,
-                                            "reports_analyzed": analyzed_count,
-                                            "total_selected": selected_count,
-                                            "analysis_text": summary,
-                                            "updated_at": datetime.now().isoformat(),
-                                        }
-                                    ).match(
-                                        {
-                                            "week_ending_date": filter_end,
-                                            "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
-                                            "report_type": "weekly_summary",
-                                        }
-                                    ).execute()
-                                    st.success("✅ Weekly duty summary updated in database.")
-                                else:
-                                    raise insert_exc
-                        except Exception as exc:  # noqa: BLE001
-                            st.error(f"Failed to save weekly duty summary: {exc}")
+                if st.button(save_label, type="secondary", key=save_btn_key):
+                    try:
+                        admin_client = get_admin_client()
+                        save_payload = {
+                            "week_ending_date": filter_end,
+                            "report_type": report_type_key,
+                            "date_range_start": filter_start,
+                            "date_range_end": filter_end,
+                            "reports_analyzed": analyzed_count,
+                            "total_selected": selected_count,
+                            "analysis_text": summary,
+                            "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
+                            "created_at": datetime.now().isoformat(),
+                            "updated_at": datetime.now().isoformat(),
+                        }
+
+                        # Try insert first; if duplicate, perform update manually
+                        try:
+                            admin_client.table("saved_duty_analyses").insert(save_payload).execute()
+                            st.success(f"✅ {report_label} saved to database.")
+                        except Exception as insert_exc:  # noqa: BLE001
+                            err_text = str(insert_exc)
+                            if "duplicate key" in err_text or "unique constraint" in err_text:
+                                admin_client.table("saved_duty_analyses").update(
+                                    {
+                                        "date_range_start": filter_start,
+                                        "date_range_end": filter_end,
+                                        "reports_analyzed": analyzed_count,
+                                        "total_selected": selected_count,
+                                        "analysis_text": summary,
+                                        "updated_at": datetime.now().isoformat(),
+                                    }
+                                ).match(
+                                    {
+                                        "week_ending_date": filter_end,
+                                        "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
+                                        "report_type": report_type_key,
+                                    }
+                                ).execute()
+                                st.success(f"✅ {report_label} updated in database.")
+                            else:
+                                raise insert_exc
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"Failed to save duty analysis: {exc}")
 
 
 def general_form_analysis_section() -> None:
