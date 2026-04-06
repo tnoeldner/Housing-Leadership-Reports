@@ -1432,14 +1432,13 @@ def select_quarterly_winners(quarter, fiscal_year):
         ascend_ranking = []
         if scoring:
             sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
+            # Get AI summaries for all top candidates
+            top_ascend_names = [k for k, v in sorted_ascend[:3]]
+            ai_ascend_summaries = analyze_candidates_for_quarterly_winner(
+                "ASCEND", {k: ascend_details.get(k, []) for k in top_ascend_names}, quarter, fiscal_year
+            )
             for k, v in sorted_ascend[:3]:
-                # Find the most recent ASCEND recognition with a 'reasoning' or summary
-                summary = None
-                details = ascend_details.get(k, [])
-                for rec in reversed(details):
-                    if rec.get('reasoning'):
-                        summary = rec.get('reasoning')
-                        break
+                summary = ai_ascend_summaries.get(k)
                 ascend_ranking.append({"staff_member": k, **v, "ascend_summary": summary})
         north_ranking = []
         north_scoring = {}
@@ -1463,14 +1462,12 @@ def select_quarterly_winners(quarter, fiscal_year):
                     }
                 }
             sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
+            top_north_names = [k for k, v in sorted_north[:3]]
+            ai_north_summaries = analyze_candidates_for_quarterly_winner(
+                "NORTH", {k: north_details.get(k, []) for k in top_north_names}, quarter, fiscal_year
+            )
             for k, v in sorted_north[:3]:
-                # Find the most recent NORTH recognition with a 'reasoning' or summary
-                summary = None
-                details = north_details.get(k, [])
-                for rec in reversed(details):
-                    if rec.get('reasoning'):
-                        summary = rec.get('reasoning')
-                        break
+                summary = ai_north_summaries.get(k)
                 north_ranking.append({"staff_member": k, **v, "north_summary": summary})
         return {
             "success": True,
