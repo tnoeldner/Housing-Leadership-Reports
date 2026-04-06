@@ -1429,22 +1429,15 @@ def select_quarterly_winners(quarter, fiscal_year):
             }
 
         # Pick top 3 by score (ASCEND)
-        ascend_winner = None
         ascend_ranking = []
-        ascend_second = None
-        ascend_third = None
         if scoring:
             sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
-            ascend_ranking = [k for k, v in sorted_ascend]
-            ascend_winner = ascend_ranking[0] if ascend_ranking else None
-            ascend_second = ascend_ranking[1] if len(ascend_ranking) > 1 else None
-            ascend_third = ascend_ranking[2] if len(ascend_ranking) > 2 else None
-
-        # NORTH: Use same scoring logic as ASCEND, but for north_counts
+            ascend_ranking = [
+                {"staff_member": k, **v} for k, v in sorted_ascend[:3]
+            ]
         north_ranking = []
         north_scoring = {}
         if north_counts:
-            # Only consider candidates who received NORTH recognitions
             for staff_member in north_counts:
                 base = north_counts.get(staff_member, 0)
                 prev_win = 0 if staff_member in prev_winners else 1
@@ -1464,211 +1457,14 @@ def select_quarterly_winners(quarter, fiscal_year):
                     }
                 }
             sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
-            north_ranking = [k for k, v in sorted_north]
-            north_winner = north_ranking[0] if north_ranking else None
-        else:
-            north_winner = None
-
-        north_second = north_ranking[1] if len(north_ranking) > 1 else None
-        north_third = north_ranking[2] if len(north_ranking) > 2 else None
-
-        def explain_not_selected(candidate, winner, scoring):
-            if not candidate or not winner or candidate not in scoring or winner not in scoring:
-                return "No data available."
-            reasons = []
-            if scoring[candidate]["score"] < scoring[winner]["score"]:
-                reasons.append(f"Lower total score ({scoring[candidate]['score']}) than winner ({scoring[winner]['score']}).")
-            if scoring[candidate]["weekly_recognitions"] < scoring[winner]["weekly_recognitions"]:
-                reasons.append(f"Fewer weekly recognitions ({scoring[candidate]['weekly_recognitions']}) than winner ({scoring[winner]['weekly_recognitions']}).")
-            if scoring[candidate]["never_won_quarterly"] != scoring[winner]["never_won_quarterly"]:
-                if not scoring[candidate]["never_won_quarterly"]:
-                    reasons.append("Already received a quarterly recognition before.")
-            if scoring[candidate]["completion_bonus"] < scoring[winner]["completion_bonus"]:
-                reasons.append("Lower report completion rate.")
-            if not reasons:
-                reasons.append("Very close in score, but not selected due to tiebreaker.")
-            return " ".join(reasons)
-
-        ascend_second_reason = explain_not_selected(ascend_second, ascend_winner, scoring) if ascend_second else None
-        ascend_third_reason = explain_not_selected(ascend_third, ascend_winner, scoring) if ascend_third else None
-        north_second_reason = explain_not_selected(north_second, north_winner, north_scoring) if north_second else None
-        north_third_reason = explain_not_selected(north_third, north_winner, north_scoring) if north_third else None
-
-        print(f"[DEBUG] Enhanced scoring breakdown: {scoring}")
-        print(f"[DEBUG] Determined winners - ASCEND: {ascend_winner}, NORTH: {north_winner}")
-
-        # If no winners found, return early with diagnostic info
-        if not ascend_winner and not north_winner:
-            print(f"[DEBUG] No winners determined - counts are empty")
-            return {
-                "success": True,
-                "status": "success",
-                "ascend_winner": None,
-                "north_winner": None,
-                "ascend_second": None,
-                "ascend_third": None,
-                "ascend_second_reason": None,
-                "ascend_third_reason": None,
-                "debug": {
-                    "records_found": len(data) if data else 0,
-                    "ascend_count": len(ascend_counts),
-                    "north_count": len(north_counts),
-                    "records": [{"week_ending_date": r.get('week_ending_date'), "has_ascend": bool(r.get('ascend_recognition')), "has_north": bool(r.get('north_recognition'))} for r in (data or [])],
-                    "scoring": scoring
-                }
-            }
-        
-        # Check for ties - with AI analysis
-        if ascend_winner and list(ascend_counts.values()).count(ascend_counts[ascend_winner]) > 1:
-            tied_winners = [k for k, v in ascend_counts.items() if v == ascend_counts[ascend_winner]]
-            # Generate AI summaries for tied candidates
-            ai_summaries = analyze_candidates_for_quarterly_winner("ASCEND", 
-                                                                    {w: ascend_details.get(w, []) for w in tied_winners},
-                                                                    quarter, fiscal_year)
-            print(f"[DEBUG] ASCEND tie detected. AI summaries: {ai_summaries}")
-            return {
-                "success": True, 
-                "status": "tie", 
-                "category": "ASCEND", 
-                "winners": tied_winners,
-                "ai_summaries": ai_summaries
-            }
-
-        if north_winner and list(north_counts.values()).count(north_counts[north_winner]) > 1:
-            tied_winners = [k for k, v in north_counts.items() if v == north_counts[north_winner]]
-            # Generate AI summaries for tied candidates  
-            ai_summaries = analyze_candidates_for_quarterly_winner("NORTH",
-                                                                    {w: north_details.get(w, []) for w in tied_winners},
-                                                                    quarter, fiscal_year)
-            print(f"[DEBUG] NORTH tie detected. AI summaries: {ai_summaries}")
-            return {
-                "success": True,
-                "status": "tie",
-                "category": "NORTH",
-                "winners": tied_winners,
-                "ai_summaries": ai_summaries
-            }
-
-        # No tie - generate AI summary explaining why the winner was chosen
-        ascend_summary = None
-        north_summary = None
-        
-        if ascend_winner:
-            summaries = analyze_candidates_for_quarterly_winner("ASCEND", {ascend_winner: ascend_details.get(ascend_winner, [])}, quarter, fiscal_year)
-            ascend_summary = summaries.get(ascend_winner)
-        
-        if north_winner:
-            summaries = analyze_candidates_for_quarterly_winner("NORTH", {north_winner: north_details.get(north_winner, [])}, quarter, fiscal_year)
-            north_summary = summaries.get(north_winner)
-
-        # Save winners to the database
-        ascend_winner_obj = {}
-        if ascend_winner:
-            for record in data or []:
-                if record.get('ascend_recognition'):
-                    try:
-                        ascend_data = record['ascend_recognition']
-                        # Check if it's already a dict or needs JSON parsing
-                        if isinstance(ascend_data, dict):
-                            ascend_rec = ascend_data
-                        else:
-                            # Remove surrounding quotes and handle escaping
-                            cleaned = ascend_data.strip()
-                            while cleaned.startswith('"') and cleaned.endswith('"'):
-                                cleaned = cleaned[1:-1]
-                            cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
-                            ascend_rec = json.loads(cleaned)
-                        
-                        if ascend_rec.get('staff_member') == ascend_winner:
-                            ascend_winner_obj = ascend_rec
-                            break
-                    except (json.JSONDecodeError, TypeError, AttributeError):
-                        continue
-        
-        north_winner_obj = {}
-        if north_winner:
-            for record in data or []:
-                if record.get('north_recognition'):
-                    try:
-                        north_data = record['north_recognition']
-                        # Check if it's already a dict or needs JSON parsing
-                        if isinstance(north_data, dict):
-                            north_rec = north_data
-                        else:
-                            # Remove surrounding quotes and handle escaping
-                            cleaned = north_data.strip()
-                            while cleaned.startswith('"') and cleaned.endswith('"'):
-                                cleaned = cleaned[1:-1]
-                            cleaned = cleaned.replace('\\"', '"').replace('\\\\', '\\')
-                            north_rec = json.loads(cleaned)
-                        
-                        if north_rec.get('staff_member') == north_winner:
-                            north_winner_obj = north_rec
-                            break
-                    except (json.JSONDecodeError, TypeError, AttributeError):
-                        continue
-
-        # Update winner objects with AI-generated quarterly summaries as reasoning
-        if ascend_winner_obj and ascend_summary:
-            ascend_winner_obj['reasoning'] = ascend_summary
-        
-        if north_winner_obj and north_summary:
-            north_winner_obj['reasoning'] = north_summary
-
-        # Store as JSON objects; the Supabase client will serialize dicts to jsonb
-        save_data = {
-            "fiscal_year": fiscal_year,
-            "quarter": quarter,
-            "ascend_winner": ascend_winner_obj,
-            "north_winner": north_winner_obj
-        }
-
-        # Use service-role client for RLS-protected writes
-        admin = get_admin_client()
-
-        # Check if a record for this quarter already exists
-        check_success, existing_records, check_error = safe_db_query(
-            admin.table("quarterly_staff_recognition")
-            .select("id")
-            .eq("fiscal_year", fiscal_year)
-            .eq("quarter", quarter),
-            "Checking for existing quarterly winner record"
-        )
-
-        if check_success and existing_records and len(existing_records) > 0:
-            # Record exists, update it
-            success, _, error = safe_db_query(
-                admin.table("quarterly_staff_recognition")
-                .update(save_data)
-                .eq("fiscal_year", fiscal_year)
-                .eq("quarter", quarter),
-                "Updating quarterly winners"
-            )
-        else:
-            # Record doesn't exist, insert it
-            success, _, error = safe_db_query(
-                admin.table("quarterly_staff_recognition").insert(save_data),
-                "Saving quarterly winners"
-            )
-
-        if not success:
-            return {"success": False, "message": error}
-
+            north_ranking = [
+                {"staff_member": k, **v} for k, v in sorted_north[:3]
+            ]
         return {
             "success": True,
             "status": "success",
-            "ascend_winner": ascend_winner,
-            "north_winner": north_winner,
-            "ascend_summary": ascend_summary,
-            "north_summary": north_summary,
-            "ascend_second": ascend_second,
-            "ascend_third": ascend_third,
-            "ascend_second_reason": ascend_second_reason,
-            "ascend_third_reason": ascend_third_reason,
-            "north_second": north_second,
-            "north_third": north_third,
-            "north_second_reason": north_second_reason,
-            "north_third_reason": north_third_reason,
+            "ascend_candidates": ascend_ranking,
+            "north_candidates": north_ranking,
             "scoring": scoring,
             "north_scoring": north_scoring
         }
