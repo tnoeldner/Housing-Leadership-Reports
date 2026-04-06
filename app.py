@@ -2341,7 +2341,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
             'date_range_end': end_date,
             'reports_analyzed': len(analysis_data['selected_forms']),
             'total_selected': len(analysis_data.get('all_selected_forms', analysis_data['selected_forms'])),
-            'analysis_text': analysis_data['summary'],
+            'analysis_text': analysis_data['summary'] if isinstance(analysis_data['summary'], str) else (analysis_data['summary'].get('summary', '') if isinstance(analysis_data['summary'], dict) else str(analysis_data['summary'])),
             'created_by': created_by_user_id,
             'updated_at': datetime.now().isoformat()
         }

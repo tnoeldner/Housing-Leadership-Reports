@@ -325,6 +325,10 @@ def duty_analysis_section() -> None:
                 if st.button(save_label, type="secondary", key=save_btn_key):
                     try:
                         admin_client = get_admin_client()
+                        # Ensure summary is plain text, not a dict/JSON wrapper
+                        save_summary = summary
+                        if isinstance(save_summary, dict):
+                            save_summary = save_summary.get("summary", "") or save_summary.get("analysis_text", "") or json.dumps(save_summary)
                         save_payload = {
                             "week_ending_date": filter_end,
                             "report_type": report_type_key,
@@ -332,7 +336,7 @@ def duty_analysis_section() -> None:
                             "date_range_end": filter_end,
                             "reports_analyzed": analyzed_count,
                             "total_selected": selected_count,
-                            "analysis_text": summary,
+                            "analysis_text": save_summary,
                             "created_by": st.session_state.get("user").id if st.session_state.get("user") else None,
                             "created_at": datetime.now().isoformat(),
                             "updated_at": datetime.now().isoformat(),
@@ -351,7 +355,7 @@ def duty_analysis_section() -> None:
                                         "date_range_end": filter_end,
                                         "reports_analyzed": analyzed_count,
                                         "total_selected": selected_count,
-                                        "analysis_text": summary,
+                                        "analysis_text": save_summary,
                                         "updated_at": datetime.now().isoformat(),
                                     }
                                 ).match(
