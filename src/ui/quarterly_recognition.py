@@ -158,177 +158,65 @@ def quarterly_recognition_page():
                     st.rerun()
 
     # --- Winner Selection Logic ---
-    if st.button("Select Quarterly Winners") and 'tied_winners' not in st.session_state:
-        # Set session state IMMEDIATELY before any complex operations
-        st.session_state['button_clicked'] = True
-        
-        with st.spinner("Determining winners..."):
-            st.info(f"Querying for winners in FY{selected_fy} Quarter {selected_quarter} ({', '.join(quarter_months)})")
-            
-            result = select_quarterly_winners(selected_quarter, selected_fy)
 
+    if st.button("Show Top Quarterly Candidates"):
+        st.session_state['button_clicked'] = True
+        with st.spinner("Fetching top candidates..."):
+            st.info(f"Querying for top candidates in FY{selected_fy} Quarter {selected_quarter} ({', '.join(quarter_months)})")
+            result = select_quarterly_winners(selected_quarter, selected_fy)
             if not result.get("success"):
                 st.error(f"An error occurred: {result.get('message')}")
-                try:
-                    log_user_activity(
-                        "quarterly_recognition_select",
-                        context="quarterly_recognition",
-                        metadata={
-                            "fiscal_year": selected_fy,
-                            "quarter": selected_quarter,
-                            "status": "error",
-                            "message": result.get("message"),
-                        },
-                    )
-                except Exception:
-                    pass
-            elif result.get("status") == "tie":
-                st.warning(f"🤝 A tie was found for the {result['category']} category.")
-                st.write("AI is analyzing each candidate's performance...")
-                
-                # Store tied winners AND AI summaries in session state
-                st.session_state['tied_winners'] = result['winners']
-                st.session_state['tie_category'] = result['category']
-                st.session_state['fiscal_year'] = selected_fy
-                st.session_state['quarter'] = selected_quarter
-                st.session_state['ai_summaries'] = result.get('ai_summaries', {})
-
-                try:
-                    log_user_activity(
-                        "quarterly_recognition_select",
-                        context="quarterly_recognition",
-                        metadata={
-                            "fiscal_year": selected_fy,
-                            "quarter": selected_quarter,
-                            "status": "tie",
-                            "category": result['category'],
-                            "winners": result['winners'],
-                        },
-                    )
-                except Exception:
-                    pass
-                
-                print(f"[DEBUG] Winners list: {result['winners']}")
-                print(f"[DEBUG] AI Summaries: {result.get('ai_summaries', {})}")
-                
-                # Rerun to show tie-breaking buttons with AI summaries
-                st.rerun()
-
-            else:
-                ascend_winner = result.get('ascend_winner')
-                north_winner = result.get('north_winner')
-                
-                if not ascend_winner and not north_winner:
-                    debug_info = result.get('debug', {})
-                    st.warning(f"""
-                    ⚠️ No staff recognitions found for FY{selected_fy} Quarter {selected_quarter} ({', '.join(quarter_months)}).
-                    
-                    Please ensure that:
-                    1. Weekly staff recognitions have been created for these months
-                    2. The recognitions have been saved (visible in "Saved Reports")
-                    
-                    Once you create weekly recognitions for {', '.join(quarter_months)}, come back and try again.
-                    """)
-                    
-                    # Show debug info
-                    if debug_info:
-                        with st.expander("Debug Information"):
-                            st.write(f"**Records found:** {debug_info.get('records_found', 0)}")
-                            st.write(f"**ASCEND recognitions:** {debug_info.get('ascend_count', 0)}")
-                            st.write(f"**NORTH recognitions:** {debug_info.get('north_count', 0)}")
-                            if debug_info.get('records'):
-                                st.write("**Record Details:**")
-                                for rec in debug_info['records']:
-                                    st.write(f"- Week ending {rec['week_ending_date']}: ASCEND={rec['has_ascend']}, NORTH={rec['has_north']}")
-                            st.write("**Note:** Check the terminal/console for complete debug output including recent dates in database")
+                return
+            st.subheader(f"FY{selected_fy} Q{selected_quarter} - Top Candidates")
+            # ASCEND
+            st.markdown("### 🌟 ASCEND Candidates")
+            ascend_selected = st.radio(
+                "Select ASCEND Winner:",
+                [c["staff_member"] for c in result.get("ascend_candidates", [])],
+                key="ascend_winner_radio"
+            ) if result.get("ascend_candidates") else None
+            ascend_comment = st.text_area("Comment for ASCEND selection:", key="ascend_comment")
+            for c in result.get("ascend_candidates", []):
+                with st.expander(f"{c['staff_member']} - Details"):
+                    st.write(f"**Score:** {c['score']}")
+                    st.write(f"**Weekly Recognitions:** {c.get('weekly_recognitions', '-')}")
+                    st.write(f"**Never Won Quarterly:** {'Yes' if c.get('never_won_quarterly') else 'No'}")
+                    st.write(f"**90%+ Completion Bonus:** {c.get('completion_bonus', 0)}")
+                    st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "-")
+            # NORTH
+            st.markdown("### 🧭 NORTH Candidates")
+            north_selected = st.radio(
+                "Select NORTH Winner:",
+                [c["staff_member"] for c in result.get("north_candidates", [])],
+                key="north_winner_radio"
+            ) if result.get("north_candidates") else None
+            north_comment = st.text_area("Comment for NORTH selection:", key="north_comment")
+            for c in result.get("north_candidates", []):
+                with st.expander(f"{c['staff_member']} - Details"):
+                    st.write(f"**Score:** {c['score']}")
+                    st.write(f"**Weekly Recognitions:** {c.get('weekly_recognitions', '-')}")
+                    st.write(f"**Never Won Quarterly:** {'Yes' if c.get('never_won_quarterly') else 'No'}")
+                    st.write(f"**90%+ Completion Bonus:** {c.get('completion_bonus', 0)}")
+                    st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "-")
+            if st.button("Finalize Quarterly Recognition"):
+                # Save the selected winners and comments
+                from src.database import get_admin_client
+                admin = get_admin_client()
+                save_data = {
+                    "fiscal_year": selected_fy,
+                    "quarter": selected_quarter,
+                    "ascend_winner": json.dumps({"staff_member": ascend_selected, "comment": ascend_comment}),
+                    "north_winner": json.dumps({"staff_member": north_selected, "comment": north_comment})
+                }
+                # Check for existing record
+                check_response = admin.table("quarterly_staff_recognition").select("id").eq("fiscal_year", selected_fy).eq("quarter", selected_quarter).execute()
+                existing_record = check_response.data if check_response else []
+                if existing_record and len(existing_record) > 0:
+                    result = admin.table("quarterly_staff_recognition").update(save_data).eq("fiscal_year", selected_fy).eq("quarter", selected_quarter).execute()
                 else:
-                    st.success("✅ Quarterly winners selected and saved successfully!")
-                    st.balloons()
-                    st.subheader(f"FY{selected_fy} Q{selected_quarter} Winners")
-
-                    try:
-                        log_user_activity(
-                            "quarterly_recognition_select",
-                            context="quarterly_recognition",
-                            metadata={
-                                "fiscal_year": selected_fy,
-                                "quarter": selected_quarter,
-                                "status": "success",
-                                "ascend_winner": ascend_winner,
-                                "north_winner": north_winner,
-                            },
-                        )
-                    except Exception:
-                        pass
-                    
-                    # Debug output for backend result
-                    with st.expander("🛠️ Debug: Backend Result Data"):
-                        st.json(result)
-                        # --- Custom Debug Table: Staff Competition Breakdown ---
-                        debug_scoring = result.get('debug', {}).get('scoring') or result.get('scoring')
-                        if debug_scoring:
-                            import pandas as pd
-                            table_data = []
-                            for staff, info in debug_scoring.items():
-                                avg_ascend = round(info.get('average_weekly_score', 0), 2) if 'average_weekly_score' in info else None
-                                avg_north = round(info.get('average_north_score', 0), 2) if 'average_north_score' in info else None
-                                prev_win_bonus = 1 if info.get('never_won_quarterly') else 0
-                                completion_bonus = 1 if info.get('completion_bonus', 0) else 0
-                                table_data.append({
-                                    'Staff': staff,
-                                    'Avg ASCEND': avg_ascend,
-                                    'Avg NORTH': avg_north,
-                                    'Prev Win Bonus': prev_win_bonus,
-                                    '90%+ Completion Bonus': completion_bonus
-                                })
-                            if table_data:
-                                st.markdown('#### Staff Competition Breakdown')
-                                st.dataframe(pd.DataFrame(table_data))
-                    col1, col2 = st.columns(2)
-                    # ASCEND block
-                    with col1:
-                        if ascend_winner:
-                            st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner}")
-                            if result.get('ascend_summary'):
-                                with st.expander("📊 Why this winner?"):
-                                    st.write(result.get('ascend_summary'))
-                            # Show 2nd and 3rd place
-                            ascend_second = result.get('ascend_second')
-                            ascend_third = result.get('ascend_third')
-                            ascend_second_reason = result.get('ascend_second_reason')
-                            ascend_third_reason = result.get('ascend_third_reason')
-                            if ascend_second:
-                                st.markdown(f"#### 🥈 2nd Place: {ascend_second}")
-                                if ascend_second_reason:
-                                    st.caption(f"Why not selected: {ascend_second_reason}")
-                            if ascend_third:
-                                st.markdown(f"#### 🥉 3rd Place: {ascend_third}")
-                                if ascend_third_reason:
-                                    st.caption(f"Why not selected: {ascend_third_reason}")
-                        else:
-                            st.metric("🌟 ASCEND Winner", "Not awarded")
-                    # NORTH block
-                    with col2:
-                        north_winner = result.get('north_winner')
-                        north_second = result.get('north_second')
-                        north_third = result.get('north_third')
-                        north_second_reason = result.get('north_second_reason')
-                        north_third_reason = result.get('north_third_reason')
-                        if north_winner:
-                            st.markdown(f"### 🧭 NORTH Winner: {north_winner}")
-                            if result.get('north_summary'):
-                                with st.expander("📊 Why this winner?"):
-                                    st.write(result.get('north_summary'))
-                            if north_second:
-                                st.markdown(f"#### 🥈 2nd Place: {north_second}")
-                                if north_second_reason:
-                                    st.caption(f"Why not selected: {north_second_reason}")
-                            if north_third:
-                                st.markdown(f"#### 🥉 3rd Place: {north_third}")
-                                if north_third_reason:
-                                    st.caption(f"Why not selected: {north_third_reason}")
-                        else:
-                            st.metric("🧭 NORTH Winner", "Not awarded")
+                    result = admin.table("quarterly_staff_recognition").insert(save_data).execute()
+                st.success("Quarterly recognition finalized and saved!")
+                st.balloons()
 
     # --- Manual Tie-Breaking Logic ---
     print(f"[DEBUG] Checking for manual_winner in session_state: {list(st.session_state.keys())}")
