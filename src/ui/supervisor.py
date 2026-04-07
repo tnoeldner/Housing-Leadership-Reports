@@ -6,6 +6,8 @@ import streamlit as st
 from src.ai import clean_summary_response, create_duty_report_summary, summarize_form_submissions
 from src.weekly_report import create_weekly_duty_report_summary
 from src.database import get_admin_client, log_user_activity, supabase
+from src.email_service import send_email
+from src.config import CORE_SECTIONS
 from src.roompact import (
     discover_form_types,
     fetch_roompact_forms,
@@ -1001,21 +1003,95 @@ def weekly_reports_viewer(supervisor_id=None) -> None:
                 st.markdown(f"**Status:** {status}")
                 if well_being is not None:
                     st.markdown(f"**Well-being Rating:** {well_being}")
-                if report.get("report_body"):
-                    st.markdown("---")
-                    st.markdown("**Report Body:**")
-                    st.text_area(
-                        label="",
-                        value=str(report.get("report_body", "")),
-                        height=200,
-                        disabled=True,
-                        key=f"wrv_body_{idx}",
-                        label_visibility="collapsed",
-                    )
+
+                # AI Summary
                 if report.get("ai_summary"):
                     st.markdown("---")
                     st.markdown("**AI Summary:**")
                     st.markdown(clean_summary_response(report.get("ai_summary", "")))
+                if report.get("individual_summary"):
+                    st.markdown("---")
+                    st.markdown("**Individual AI Summary:**")
+                    st.markdown(clean_summary_response(report.get("individual_summary", "")))
+
+                # Formatted report body sections
+                report_body = report.get("report_body") or {}
+                if isinstance(report_body, dict) and report_body:
+                    st.markdown("---")
+                    for section_key, section_name in CORE_SECTIONS.items():
+                        section_data = report_body.get(section_key)
+                        if section_data and isinstance(section_data, dict) and (section_data.get("successes") or section_data.get("challenges")):
+                            st.markdown(f"#### {section_name}")
+                            if section_data.get("successes"):
+                                st.markdown("**Successes:**")
+                                for s in section_data["successes"]:
+                                    if isinstance(s, dict):
+                                        st.markdown(
+                                            f"- {s.get('text', '')} `(ASCEND: {s.get('ascend_category', 'N/A')}, NORTH: {s.get('north_category', 'N/A')})`"
+                                        )
+                                    else:
+                                        st.markdown(f"- {s}")
+                            if section_data.get("challenges"):
+                                st.markdown("**Challenges:**")
+                                for c in section_data["challenges"]:
+                                    if isinstance(c, dict):
+                                        st.markdown(
+                                            f"- {c.get('text', '')} `(ASCEND: {c.get('ascend_category', 'N/A')}, NORTH: {c.get('north_category', 'N/A')})`"
+                                        )
+                                    else:
+                                        st.markdown(f"- {c}")
+                            st.markdown("---")
+
+                    # General updates
+                    has_general = any(report.get(k) for k in ["professional_development", "key_topics_lookahead", "personal_check_in", "director_concerns"])
+                    if has_general:
+                        st.markdown("#### General Updates")
+                        if report.get("professional_development"):
+                            st.markdown("**Professional Development:**")
+                            st.write(report.get("professional_development", ""))
+                        if report.get("key_topics_lookahead"):
+                            st.markdown("**Lookahead:**")
+                            st.write(report.get("key_topics_lookahead", ""))
+                        if report.get("personal_check_in"):
+                            st.markdown("**Personal Check-in Details:**")
+                            st.write(report.get("personal_check_in", ""))
+                        if report.get("director_concerns"):
+                            st.warning(f"**Concerns for Director:** {report.get('director_concerns')}")
+
+                # Supervisor comment and email response
+                st.markdown("---")
+                comment_key = f"wrv_comment_{report.get('id')}_{idx}"
+                comment = st.text_area("Supervisor Comment:", key=comment_key, placeholder="Add your feedback here...")
+                if st.button("📧 Respond with Comments (Email)", key=f"wrv_respond_{report.get('id')}_{idx}"):
+                    staff_email = None
+                    staff_id = report.get("user_id")
+                    for s in staff_options:
+                        if s.get("id") == staff_id:
+                            staff_email = s.get("email")
+                            break
+                    if not staff_email:
+                        st.error("Could not find staff email address.")
+                    elif not comment.strip():
+                        st.warning("Please add a comment before sending.")
+                    else:
+                        sender_name = st.session_state.get("full_name", "Supervisor/Admin")
+                        subject = f"Weekly Report Response for {week} from {sender_name}"
+                        # Build readable body for email
+                        body_parts = [
+                            f"Hello {staff_name},",
+                            f"\nYour weekly report for the week ending {week} has been reviewed.",
+                            f"\n--- Supervisor Comments ---\n{comment}",
+                        ]
+                        if report.get("individual_summary"):
+                            body_parts.append(f"\n--- AI Summary ---\n{clean_summary_response(report.get('individual_summary', ''))}")
+                        body_parts.append(f"\nBest regards,\n{sender_name}")
+                        body = "\n".join(body_parts)
+                        with st.spinner("Sending email..."):
+                            success = send_email(staff_email, subject, body)
+                        if success:
+                            st.success(f"Email sent to {staff_email}")
+                        else:
+                            st.error("Failed to send email. Check email configuration.")
 
 
 # Helper utilities
