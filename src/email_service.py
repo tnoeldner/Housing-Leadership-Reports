@@ -2,6 +2,7 @@ import smtplib
 import email.message
 import streamlit as st
 import re
+from src.config import get_secret
 
 def extract_und_leads_section(summary_text):
     """Extract the UND LEADS Summary section from a weekly summary"""
