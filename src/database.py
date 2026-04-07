@@ -70,6 +70,40 @@ def log_user_activity(event_type: str, context: str = None, metadata: dict = Non
             pass
         return
 
+
+def get_active_users(minutes=15):
+    """Return users with activity in the last `minutes` minutes."""
+    try:
+        admin = get_admin_client()
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        # Get recent activity grouped by user
+        resp = admin.table("user_activity_logs") \
+            .select("user_id, user_email, event_type, context, created_at") \
+            .gte("created_at", cutoff) \
+            .order("created_at", desc=True) \
+            .execute()
+        rows = resp.data or []
+        if not rows:
+            return []
+        # Deduplicate: keep latest activity per user_email
+        seen = {}
+        for r in rows:
+            email = r.get("user_email") or "unknown"
+            if email not in seen:
+                seen[email] = {
+                    "user_id": r.get("user_id"),
+                    "user_email": email,
+                    "last_event": r.get("event_type"),
+                    "last_page": r.get("context"),
+                    "last_active": r.get("created_at"),
+                }
+        return list(seen.values())
+    except Exception as e:
+        print(f"[WARN] get_active_users failed: {e}")
+        return []
+
+
 def safe_db_query(query_builder, operation_name="Database query", max_retries=3):
     """
     Safely execute a Supabase query with retry logic and error handling.

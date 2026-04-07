@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta, date, time as dt_time
 from supabase import create_client, Client
 from src.ai import init_ai, get_gemini_models, gemini_test_prompt, generate_admin_dashboard_summary
-from src.database import log_user_activity
+from src.database import log_user_activity, get_active_users
 
 try:
     from zoneinfo import ZoneInfo  # Python 3.9+
@@ -129,6 +129,19 @@ else:
             st.sidebar.write(f"Viewing as: {effective_role.title()}")
         if effective_is_supervisor:
             st.sidebar.write("✓ Supervisor")
+
+        # --- Active Users (admin only) ---
+        if actual_role == "admin":
+            with st.sidebar.expander("🟢 Active Users", expanded=False):
+                active = get_active_users(minutes=15)
+                if not active:
+                    st.caption("No users active in the last 15 min.")
+                else:
+                    for u in active:
+                        page = (u.get("last_page") or "").replace("nav:", "")
+                        st.markdown(f"**{u['user_email']}**")
+                        if page:
+                            st.caption(f"📄 {page}")
         if st.sidebar.button("Logout", key="sidebar_logout"):
             try:
                 log_user_activity(
