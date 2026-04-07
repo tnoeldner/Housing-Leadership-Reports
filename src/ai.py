@@ -163,11 +163,13 @@ from src.config import get_secret
 from src.database import get_admin_client
 
 AI_RATE_CARD = {
-    # USD per 1K tokens (prompt, response) — replace with your actual rate card
-    "models/gemini-2.5-flash": {"prompt": 0.000018, "response": 0.000054},
-    "models/gemini-2.5-pro": {"prompt": 0.000125, "response": 0.000375},
-    "gemini-2.5-flash": {"prompt": 0.000018, "response": 0.000054},
-    "gemini-2.5-pro": {"prompt": 0.000125, "response": 0.000375},
+    # USD per 1K tokens — Google Gemini Developer API pricing (paid tier, standard)
+    # Source: https://ai.google.dev/gemini-api/docs/pricing (updated 2026-04)
+    # Output rates include thinking tokens per Google's pricing.
+    "models/gemini-2.5-flash": {"prompt": 0.0003, "response": 0.0025},
+    "models/gemini-2.5-pro": {"prompt": 0.00125, "response": 0.01},
+    "gemini-2.5-flash": {"prompt": 0.0003, "response": 0.0025},
+    "gemini-2.5-pro": {"prompt": 0.00125, "response": 0.01},
 }
 
 
@@ -252,6 +254,10 @@ def log_ai_usage(model_name, usage, context=None, user_id=None, user_email=None)
 
     prompt_tokens = _get("prompt_token_count") or _get("input_token_count") or _get("input_tokens")
     response_tokens = _get("candidates_token_count") or _get("output_token_count") or _get("output_tokens")
+    # Gemini 2.5 models emit thinking tokens separately; Google bills them as output.
+    thinking_tokens = _get("thoughts_token_count") or _get("thinking_token_count") or 0
+    # Include thinking tokens in the output count for cost calculation
+    response_tokens = (response_tokens or 0) + (thinking_tokens or 0)
     total_tokens = _get("total_token_count") or _get("total_tokens") or (
         ((prompt_tokens or 0) + (response_tokens or 0)) if (prompt_tokens is not None or response_tokens is not None) else None
     )
