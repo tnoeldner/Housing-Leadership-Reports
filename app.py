@@ -2098,26 +2098,60 @@ def create_weekly_duty_report_summary(selected_forms, start_date, end_date):
 
             reports_text += "\n" + "="*50 + "\n"
 
-        # Updated AI prompt for improved, actionable, bullet-pointed summary
+        # Updated AI prompt for weekly duty report in leadership format
         prompt = f"""
-You are analyzing residence life duty reports for a weekly administrative summary. Your goal is to produce a concise, actionable, and easy-to-read report for leadership. Please:
+You are a senior residence life administrator producing a formal weekly duty report analysis for leadership at UND Housing & Residence Life.
 
-- Summarize the week's overall activity and key trends in 3-5 bullet points.
-- Highlight the most important incidents, challenges, or successes that require attention. Use bullet points for each item.
-- Provide a quantitative breakdown (number of reports, incidents by type, hall-by-hall summary) in a clear, readable format.
-- For each hall, create a dedicated section with the hall name as the header. The individual halls are: Swanson, West, McVey, Brannon, Noren, Selke, Johnstone, Smith, University Place. Under each hall, list the key items, incidents, challenges, successes, and any notable staff actions for that hall as bullet points. Do not group halls together; each hall should have its own section, even if some halls have no incidents or items to report.
-- List specific action items or recommendations for staff or administration. Make these actionable and direct.
-- Note any staff performance highlights or concerns.
-- If relevant, mention any policy, facility, or safety issues that need follow-up.
+Use the following EXACT structure and formatting. Write in a professional, narrative style with specific details, staff names, room numbers, work order numbers, and dates from the data provided. Do NOT use generic or vague language.
 
-Do NOT include a separate "Recurring Issues" section. Instead, ensure hall-specific issues are included under each hall's section.
+## Weekly Duty Report Analysis: [Date Range]
 
-Format your response in markdown with clear headers and bullet points. Focus on actionable insights and brevity. Do not include unnecessary narrative or filler text.
+**To:** Leadership
+**From:** Senior Residence Life Administrator
+**Date:** [Today's Date]
+
+### Executive Summary
+Write 2-3 paragraphs summarizing the week's overall activity, key incidents, staff performance trends, and any urgent concerns. Be specific and data-driven.
+
+### Incident Analysis
+For each significant incident during the week, provide a detailed narrative entry with:
+- The incident description (what happened, where, when, who was involved)
+- Staff response and effectiveness
+- Work order numbers, Maxient numbers, or UPD report numbers if available
+- Any follow-up needed
+
+Group similar incidents together (e.g., all car collisions, all flooded toilets, all lockouts). Use sub-bullets for details within each incident category.
+
+### Operational Insights
+Cover the following topics with specific examples from the data:
+- **Resident Engagement:** How are residents using common spaces? Notable interactions?
+- **Rounds Quality:** Are RAs conducting thorough rounds? Specific examples.
+- **Staff Preparedness & Training:** Any gaps identified? Commendable actions?
+- **Common Area Tidiness:** Patterns in cleanliness, furniture organization, poster management.
+
+### Facility & Maintenance
+Organize into:
+- **URGENT ISSUES:** Items requiring immediate attention (safety hazards, broken equipment affecting residents). Include work order numbers.
+- **Recurring Issues:** Ongoing problems that have persisted across multiple reports or weeks.
+- **General Tidiness:** Patterns in common area and laundry room conditions.
+
+### Recommendations
+Organize into:
+- **Urgent Issues for Immediate Action:** Numbered list of items needing immediate follow-up with specific actions.
+- **Operational & Programmatic Improvements:** Suggestions for process improvements, resident education, etc.
+- **Staff Development:** Training needs, commendations, and accountability items.
+
+IMPORTANT FORMATTING RULES:
+- Use markdown headers (##, ###) and bullet points consistently.
+- Reference specific staff names, room numbers, dates, work order numbers, and report numbers from the data.
+- Do NOT create a separate hall-by-hall section. Instead, weave hall-specific details into the relevant sections above (Incident Analysis, Facility & Maintenance, etc.).
+- Be comprehensive but concise. Focus on actionable insights for leadership.
+- Do NOT include generic filler text or disclaimers.
 
 DUTY REPORTS DATA:
 {reports_text}
 
-Generate the weekly duty analysis summary below:
+Generate the weekly duty report analysis below:
 """
 
         import google.generativeai as genai
