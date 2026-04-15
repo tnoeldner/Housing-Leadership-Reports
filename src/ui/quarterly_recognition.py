@@ -188,12 +188,11 @@ def quarterly_recognition_page():
         ) if st.session_state.get("ascend_candidates") else None
         ascend_comment = st.text_area("Comment for ASCEND selection:", key="ascend_comment")
         for c in st.session_state.get("ascend_candidates", []):
-            with st.expander(f"{c['staff_member']} - Details"):
-                st.write(f"**Score:** {c['score']}")
-                st.write(f"**Weekly Recognitions:** {c.get('weekly_recognitions', '-')}")
-                st.write(f"**Never Won Quarterly:** {'Yes' if c.get('never_won_quarterly') else 'No'}")
-                st.write(f"**90%+ Completion Bonus:** {c.get('completion_bonus', 0)}")
-                st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "-")
+            with st.expander(f"{c['staff_member']} — Score: {round(c['score'], 2)}"):
+                st.write(f"**Average ASCEND Score:** {round(c.get('average_weekly_score', 0), 2)}/4")
+                st.write(f"**Never Won Quarterly Bonus:** {'+1' if c.get('never_won_quarterly') else '0'}")
+                st.write(f"**90%+ Completion Bonus:** {'+1' if c.get('completion_bonus', 0) else '0'}")
+                st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "**Report Completion Rate:** -")
                 if c.get('ascend_summary'):
                     st.markdown(f"**Recognition Summary:** {c['ascend_summary']}")
         # NORTH
@@ -207,12 +206,11 @@ def quarterly_recognition_page():
         ) if st.session_state.get("north_candidates") else None
         north_comment = st.text_area("Comment for NORTH selection:", key="north_comment")
         for c in st.session_state.get("north_candidates", []):
-            with st.expander(f"{c['staff_member']} - Details"):
-                st.write(f"**Score:** {c['score']}")
-                st.write(f"**Weekly Recognitions:** {c.get('weekly_recognitions', '-')}")
-                st.write(f"**Never Won Quarterly:** {'Yes' if c.get('never_won_quarterly') else 'No'}")
-                st.write(f"**90%+ Completion Bonus:** {c.get('completion_bonus', 0)}")
-                st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "-")
+            with st.expander(f"{c['staff_member']} — Score: {round(c['score'], 2)}"):
+                st.write(f"**Average NORTH Score:** {round(c.get('average_north_score', 0), 2)}/4")
+                st.write(f"**Never Won Quarterly Bonus:** {'+1' if c.get('never_won_quarterly') else '0'}")
+                st.write(f"**90%+ Completion Bonus:** {'+1' if c.get('completion_bonus', 0) else '0'}")
+                st.write(f"**Report Completion Rate:** {round(c.get('report_completion_rate', 0)*100, 1)}%" if c.get('report_completion_rate') is not None else "**Report Completion Rate:** -")
                 if c.get('north_summary'):
                     st.markdown(f"**Recognition Summary:** {c['north_summary']}")
         if st.button("Finalize Quarterly Recognition"):

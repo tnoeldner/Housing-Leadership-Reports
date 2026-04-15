@@ -1455,11 +1455,11 @@ def select_quarterly_winners(quarter, fiscal_year):
         if scoring:
             sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["average_weekly_score"]))
             # Get AI summaries for all top candidates
-            top_ascend_names = [k for k, v in sorted_ascend[:5]]
+            top_ascend_names = [k for k, v in sorted_ascend]
             ai_ascend_summaries = analyze_candidates_for_quarterly_winner(
                 "ASCEND", {k: ascend_details_comprehensive.get(k, ascend_details.get(k, [])) for k in top_ascend_names}, quarter, fiscal_year
             )
-            for k, v in sorted_ascend[:5]:
+            for k, v in sorted_ascend:
                 summary = ai_ascend_summaries.get(k)
                 ascend_ranking.append({"staff_member": k, **v, "ascend_summary": summary})
         north_ranking = []
@@ -1490,11 +1490,11 @@ def select_quarterly_winners(quarter, fiscal_year):
             }
         if north_scoring:
             sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["average_north_score"]))
-            top_north_names = [k for k, v in sorted_north[:5]]
+            top_north_names = [k for k, v in sorted_north]
             ai_north_summaries = analyze_candidates_for_quarterly_winner(
                 "NORTH", {k: north_details_comprehensive.get(k, north_details.get(k, [])) for k in top_north_names}, quarter, fiscal_year
             )
-            for k, v in sorted_north[:5]:
+            for k, v in sorted_north:
                 summary = ai_north_summaries.get(k)
                 north_ranking.append({"staff_member": k, **v, "north_summary": summary})
         return {
