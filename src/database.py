@@ -1323,19 +1323,31 @@ def select_quarterly_winners(quarter, fiscal_year):
 
         # --- NEW: Pull all ASCEND/NORTH scores for the quarter ---
         admin = get_admin_client()
-        scores_resp = admin.table("staff_recognition_scores").select("staff_member_name, category_type, score, week_ending_date").gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
+        scores_resp = admin.table("staff_recognition_scores").select("staff_member_name, category_type, category_name, score, reasoning, week_ending_date").gte("week_ending_date", start_date).lte("week_ending_date", end_date).execute()
         scores_data = scores_resp.data or []
         # Build: staff -> list of ASCEND scores, list of NORTH scores
+        # Also build comprehensive details for AI summaries (all categories, all weeks, with reasoning)
         ascend_scores = {}
         north_scores = {}
+        ascend_details_comprehensive = {}
+        north_details_comprehensive = {}
         for row in scores_data:
             name = row.get("staff_member_name")
             if not name:
                 continue
+            rec = {
+                "staff_member": name,
+                "category": row.get("category_name", "Unknown"),
+                "score": row.get("score", 0),
+                "reasoning": row.get("reasoning", ""),
+                "week_ending_date": row.get("week_ending_date", "Unknown"),
+            }
             if row.get("category_type") == "ASCEND":
                 ascend_scores.setdefault(name, []).append(row.get("score", 0))
+                ascend_details_comprehensive.setdefault(name, []).append(rec)
             elif row.get("category_type") == "NORTH":
                 north_scores.setdefault(name, []).append(row.get("score", 0))
+                north_details_comprehensive.setdefault(name, []).append(rec)
         # All candidates are everyone who submitted a report or has a score
         all_candidates = set(report_completion.keys()) | set(ascend_scores.keys()) | set(north_scores.keys())
 
@@ -1422,8 +1434,6 @@ def select_quarterly_winners(quarter, fiscal_year):
                 applied_bonus = prev_win + completion_bonus
                 score = avg_ascend + applied_bonus
                 eligible_for_bonus = True
-            # Cap score at 4
-            score = min(score, 4)
             scoring[staff_member] = {
                 "score": score,
                 "average_weekly_score": avg_ascend,
@@ -1440,19 +1450,36 @@ def select_quarterly_winners(quarter, fiscal_year):
                 }
             }
 
-        # --- Scoring ---
-        scoring = {}
+        # Pick top 3 by score (ASCEND)
+        ascend_ranking = []
+        if scoring:
+            sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["average_weekly_score"]))
+            # Get AI summaries for all top candidates
+            top_ascend_names = [k for k, v in sorted_ascend[:3]]
+            ai_ascend_summaries = analyze_candidates_for_quarterly_winner(
+                "ASCEND", {k: ascend_details_comprehensive.get(k, ascend_details.get(k, [])) for k in top_ascend_names}, quarter, fiscal_year
+            )
+            for k, v in sorted_ascend[:3]:
+                summary = ai_ascend_summaries.get(k)
+                ascend_ranking.append({"staff_member": k, **v, "ascend_summary": summary})
+        north_ranking = []
+        north_scoring = {}
         for staff_member in all_candidates:
-            base = ascend_counts.get(staff_member, 0)  # weekly recognitions
-            prev_win = 0 if staff_member in prev_winners else 1  # bonus if never won
+            north_list = north_scores.get(staff_member, [])
+            if not north_list:
+                continue
+            avg_north = sum(north_list) / len(north_list)
+            prev_win = 0 if staff_member in prev_winners else 1
             completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
             completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
             completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
-            # Compose score: base + bonuses
-            score = base + prev_win + completion_bonus
-            scoring[staff_member] = {
+            applied_bonus = prev_win + completion_bonus
+            score = avg_north + applied_bonus
+            north_scoring[staff_member] = {
                 "score": score,
-                "weekly_recognitions": base,
+                "average_north_score": avg_north,
+                "weekly_scores": north_list,
+                "applied_bonus": applied_bonus,
                 "never_won_quarterly": bool(prev_win),
                 "report_completion_rate": completion_rate,
                 "completion_bonus": completion_bonus,
@@ -1461,44 +1488,11 @@ def select_quarterly_winners(quarter, fiscal_year):
                     "total": completion["total"]
                 }
             }
-
-        # Pick top 3 by score (ASCEND)
-        ascend_ranking = []
-        if scoring:
-            sorted_ascend = sorted(scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
-            # Get AI summaries for all top candidates
-            top_ascend_names = [k for k, v in sorted_ascend[:3]]
-            ai_ascend_summaries = analyze_candidates_for_quarterly_winner(
-                "ASCEND", {k: ascend_details.get(k, []) for k in top_ascend_names}, quarter, fiscal_year
-            )
-            for k, v in sorted_ascend[:3]:
-                summary = ai_ascend_summaries.get(k)
-                ascend_ranking.append({"staff_member": k, **v, "ascend_summary": summary})
-        north_ranking = []
-        north_scoring = {}
-        if north_counts:
-            for staff_member in north_counts:
-                base = north_counts.get(staff_member, 0)
-                prev_win = 0 if staff_member in prev_winners else 1
-                completion = report_completion.get(staff_member, {"completed": 0, "total": 0})
-                completion_rate = (completion["completed"] / completion["total"]) if completion["total"] > 0 else 0
-                completion_bonus = 1 if completion_rate >= 0.9 and completion["total"] > 0 else 0
-                score = base + prev_win + completion_bonus
-                north_scoring[staff_member] = {
-                    "score": score,
-                    "weekly_recognitions": base,
-                    "never_won_quarterly": bool(prev_win),
-                    "report_completion_rate": completion_rate,
-                    "completion_bonus": completion_bonus,
-                    "details": {
-                        "completed": completion["completed"],
-                        "total": completion["total"]
-                    }
-                }
-            sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["weekly_recognitions"]))
+        if north_scoring:
+            sorted_north = sorted(north_scoring.items(), key=lambda x: (-x[1]["score"], -x[1]["average_north_score"]))
             top_north_names = [k for k, v in sorted_north[:3]]
             ai_north_summaries = analyze_candidates_for_quarterly_winner(
-                "NORTH", {k: north_details.get(k, []) for k in top_north_names}, quarter, fiscal_year
+                "NORTH", {k: north_details_comprehensive.get(k, north_details.get(k, [])) for k in top_north_names}, quarter, fiscal_year
             )
             for k, v in sorted_north[:3]:
                 summary = ai_north_summaries.get(k)
