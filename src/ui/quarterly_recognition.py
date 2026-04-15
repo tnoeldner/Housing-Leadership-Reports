@@ -160,9 +160,14 @@ def quarterly_recognition_page():
     # --- Winner Selection Logic ---
 
     # --- Top Candidates State Management ---
-    if st.button("Show Top Quarterly Candidates") or st.session_state.get("show_candidates"):
-        if not st.session_state.get("show_candidates"):
+    candidates_key = f"{selected_fy}_Q{selected_quarter}"
+    quarter_changed = st.session_state.get("candidates_key") != candidates_key
+
+    if st.button("Show Top Quarterly Candidates") or (st.session_state.get("show_candidates") and not quarter_changed):
+        needs_fetch = not st.session_state.get("show_candidates") or quarter_changed
+        if needs_fetch:
             st.session_state["show_candidates"] = True
+            st.session_state["candidates_key"] = candidates_key
             with st.spinner("Fetching top candidates..."):
                 st.info(f"Querying for top candidates in FY{selected_fy} Quarter {selected_quarter} ({', '.join(quarter_months)})")
                 result = select_quarterly_winners(selected_quarter, selected_fy)
