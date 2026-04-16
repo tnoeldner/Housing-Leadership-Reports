@@ -241,21 +241,23 @@ def quarterly_recognition_page():
             st.subheader("Finalized Quarterly Recognition Winners")
             st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner_detail.get('staff_member','')}")
             st.write(f"**Score:** {ascend_winner_detail.get('score','')}")
-            st.write(f"**Weekly Recognitions:** {ascend_winner_detail.get('weekly_recognitions','')}")
-            st.write(f"**Never Won Quarterly:** {'Yes' if ascend_winner_detail.get('never_won_quarterly') else 'No'}")
-            st.write(f"**90%+ Completion Bonus:** {ascend_winner_detail.get('completion_bonus','')}")
-            st.write(f"**Report Completion Rate:** {round(ascend_winner_detail.get('report_completion_rate',0)*100,1)}%" if ascend_winner_detail.get('report_completion_rate') is not None else "-")
-            if ascend_winner_detail.get('ascend_summary'):
-                st.markdown(f"**Recognition Summary:** {ascend_winner_detail['ascend_summary']}")
+            st.write(f"**Average ASCEND Score:** {ascend_winner_detail.get('average_weekly_score','')}")
+            st.write(f"**Never Won Quarterly Bonus:** {'+1' if ascend_winner_detail.get('never_won_quarterly') else '0'}")
+            st.write(f"**90%+ Completion Bonus:** {'+1' if ascend_winner_detail.get('completion_bonus') else '0'}")
+            st.write(f"**Report Completion Rate:** {round(ascend_winner_detail.get('report_completion_rate',0)*100,1)}%" if ascend_winner_detail.get('report_completion_rate') is not None else "**Report Completion Rate:** -")
+            ascend_summary = ascend_winner_detail.get('ascend_summary')
+            if ascend_summary:
+                st.markdown(f"**Recognition Summary:** {ascend_summary}")
             st.write(f"**Admin Comment:** {ascend_comment}")
             st.markdown(f"### 🧭 NORTH Winner: {north_winner_detail.get('staff_member','')}")
             st.write(f"**Score:** {north_winner_detail.get('score','')}")
-            st.write(f"**Weekly Recognitions:** {north_winner_detail.get('weekly_recognitions','')}")
-            st.write(f"**Never Won Quarterly:** {'Yes' if north_winner_detail.get('never_won_quarterly') else 'No'}")
-            st.write(f"**90%+ Completion Bonus:** {north_winner_detail.get('completion_bonus','')}")
-            st.write(f"**Report Completion Rate:** {round(north_winner_detail.get('report_completion_rate',0)*100,1)}%" if north_winner_detail.get('report_completion_rate') is not None else "-")
-            if north_winner_detail.get('north_summary'):
-                st.markdown(f"**Recognition Summary:** {north_winner_detail['north_summary']}")
+            st.write(f"**Average NORTH Score:** {north_winner_detail.get('average_north_score','')}")
+            st.write(f"**Never Won Quarterly Bonus:** {'+1' if north_winner_detail.get('never_won_quarterly') else '0'}")
+            st.write(f"**90%+ Completion Bonus:** {'+1' if north_winner_detail.get('completion_bonus') else '0'}")
+            st.write(f"**Report Completion Rate:** {round(north_winner_detail.get('report_completion_rate',0)*100,1)}%" if north_winner_detail.get('report_completion_rate') is not None else "**Report Completion Rate:** -")
+            north_summary = north_winner_detail.get('north_summary')
+            if north_summary:
+                st.markdown(f"**Recognition Summary:** {north_summary}")
             st.write(f"**Admin Comment:** {north_comment}")
 
     # --- Manual Tie-Breaking Logic ---
@@ -459,16 +461,30 @@ def quarterly_recognition_page():
                 with col1:
                     if ascend_winner_data and ascend_winner_data.get('staff_member'):
                         with st.expander(f"🌟 ASCEND: {ascend_winner_data['staff_member']}"):
-                            st.write(f"**Category:** {ascend_winner_data.get('category', 'N/A')}")
-                            st.write(f"**Reasoning:** {ascend_winner_data.get('reasoning', 'N/A')}")
+                            st.write(f"**Score:** {ascend_winner_data.get('score', 'N/A')}")
+                            st.write(f"**Average ASCEND Score:** {ascend_winner_data.get('average_weekly_score', 'N/A')}")
+                            st.write(f"**Never Won Quarterly Bonus:** {'+1' if ascend_winner_data.get('never_won_quarterly') else '0'}")
+                            st.write(f"**90%+ Completion Bonus:** {'+1' if ascend_winner_data.get('completion_bonus') else '0'}")
+                            summary = ascend_winner_data.get('ascend_summary') or ascend_winner_data.get('reasoning')
+                            if summary:
+                                st.markdown(f"**Recognition Summary:** {summary}")
+                            if ascend_winner_data.get('comment'):
+                                st.write(f"**Admin Comment:** {ascend_winner_data['comment']}")
                     else:
                         st.info("No ASCEND winner for this quarter.")
                 
                 with col2:
                     if north_winner_data and north_winner_data.get('staff_member'):
                         with st.expander(f"🧭 NORTH: {north_winner_data['staff_member']}"):
-                            st.write(f"**Category:** {north_winner_data.get('category', 'N/A')}")
-                            st.write(f"**Reasoning:** {north_winner_data.get('reasoning', 'N/A')}")
+                            st.write(f"**Score:** {north_winner_data.get('score', 'N/A')}")
+                            st.write(f"**Average NORTH Score:** {north_winner_data.get('average_north_score', 'N/A')}")
+                            st.write(f"**Never Won Quarterly Bonus:** {'+1' if north_winner_data.get('never_won_quarterly') else '0'}")
+                            st.write(f"**90%+ Completion Bonus:** {'+1' if north_winner_data.get('completion_bonus') else '0'}")
+                            summary = north_winner_data.get('north_summary') or north_winner_data.get('reasoning')
+                            if summary:
+                                st.markdown(f"**Recognition Summary:** {summary}")
+                            if north_winner_data.get('comment'):
+                                st.write(f"**Admin Comment:** {north_winner_data['comment']}")
                     else:
                         st.info("No NORTH winner for this quarter.")
                 st.divider()
