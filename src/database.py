@@ -1,6 +1,7 @@
 import streamlit as st
 from supabase import create_client, Client
 import time
+import calendar
 from datetime import datetime
 import json
 from src.config import get_secret, CORE_SECTIONS
@@ -803,7 +804,8 @@ def select_monthly_winners(month, year):
     """
     try:
         start_date = f"{year}-{month:02d}-01"
-        end_date = f"{year}-{month:02d}-31"
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = f"{year}-{month:02d}-{last_day:02d}"
 
         print(f"\n[DEBUG] select_monthly_winners called for {year}-{month:02d}")
         print(f"[DEBUG] Date range: {start_date} to {end_date}")
@@ -1169,7 +1171,8 @@ def select_quarterly_winners(quarter, fiscal_year):
         end_month = months[-1]
         
         start_date = f"{start_month[0]}-{start_month[1]:02d}-01"
-        end_date = f"{end_month[0]}-{end_month[1]:02d}-31"
+        quarter_end_last_day = calendar.monthrange(end_month[0], end_month[1])[1]
+        end_date = f"{end_month[0]}-{end_month[1]:02d}-{quarter_end_last_day:02d}"
 
         print(f"\n[DEBUG] select_quarterly_winners called for FY{fiscal_year} Q{quarter}")
         print(f"[DEBUG] Date range: {start_date} to {end_date}")
