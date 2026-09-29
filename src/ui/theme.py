@@ -45,9 +45,24 @@ def apply_custom_theme():
         /* Sidebar */
         [data-testid="stSidebar"] {{
             background: linear-gradient(180deg, {PRIMARY_DARK} 0%, {PRIMARY} 100%);
+            color: #ffffff;
         }}
-        [data-testid="stSidebar"] * {{
+        /* Only force white on text elements, not on inputs/controls with light backgrounds */
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] h4,
+        [data-testid="stSidebar"] .stMarkdown {{
             color: #ffffff !important;
+        }}
+        /* Text/password inputs keep a white field with dark, readable text */
+        [data-testid="stSidebar"] input,
+        [data-testid="stSidebar"] textarea {{
+            color: #1a1a1a !important;
+            background-color: #ffffff !important;
         }}
         [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div {{
             background-color: rgba(255,255,255,0.12);
@@ -57,9 +72,16 @@ def apply_custom_theme():
         [data-testid="stSidebar"] hr {{
             border-color: rgba(255,255,255,0.25);
         }}
+        /* Tabs in the sidebar (Login / Sign Up): keep selected tab text dark since its background is light */
+        [data-testid="stSidebar"] .stTabs [aria-selected="true"] {{
+            color: {PRIMARY_DARK} !important;
+        }}
+        [data-testid="stSidebar"] .stTabs [aria-selected="false"] {{
+            color: #ffffff !important;
+        }}
 
-        /* Buttons */
-        .stButton > button, .stDownloadButton > button {{
+        /* Buttons (including form submit buttons) */
+        .stButton > button, .stDownloadButton > button, [data-testid="stFormSubmitButton"] > button {{
             border-radius: 8px;
             border: none;
             font-weight: 600;
@@ -67,17 +89,19 @@ def apply_custom_theme():
             transition: all 0.15s ease-in-out;
             box-shadow: 0 1px 3px rgba(0,0,0,0.12);
         }}
-        .stButton > button:hover, .stDownloadButton > button:hover {{
+        .stButton > button:hover, .stDownloadButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover {{
             transform: translateY(-1px);
             box-shadow: 0 4px 10px rgba(0,154,68,0.25);
         }}
-        [data-testid="stSidebar"] .stButton > button {{
-            background-color: rgba(255,255,255,0.15);
-            color: #ffffff;
+        [data-testid="stSidebar"] .stButton > button,
+        [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button {{
+            background-color: rgba(255,255,255,0.18);
+            color: #ffffff !important;
             width: 100%;
         }}
-        [data-testid="stSidebar"] .stButton > button:hover {{
-            background-color: rgba(255,255,255,0.28);
+        [data-testid="stSidebar"] .stButton > button:hover,
+        [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button:hover {{
+            background-color: rgba(255,255,255,0.32);
         }}
 
         /* Metrics as cards */
