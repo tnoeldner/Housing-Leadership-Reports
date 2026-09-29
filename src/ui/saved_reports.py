@@ -9,7 +9,7 @@ def saved_reports_page():
     """View saved duty analyses, staff recognition reports, and weekly summaries"""
     st.title("Saved Reports Archive")
     st.write("View all saved reports: duty analyses, staff recognition, weekly summaries, and submitted reports.")
-    tab1, tab2, tab3, tab4 = st.tabs(["🛡️ Duty Analyses", "🏆 Staff Recognition", "📅 Weekly Summaries", "📝 Weekly Reports"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Duty Analyses", "Staff Recognition", "Weekly Summaries", "Weekly Reports"])
     admin_supabase = get_admin_client()
 
     with tab1:

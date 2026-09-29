@@ -132,8 +132,8 @@ def send_email(to_email, subject, body, from_email=None, smtp_server=None, smtp_
             smtp_server = get_secret("SMTP_SERVER", "smtp.gmail.com") or "smtp.gmail.com"
         
         # Debug information
-        st.write(f"🔧 Debug - Using SMTP server: {smtp_server}")
-        st.write(f"🔧 Debug - From email: {from_email}")
+        st.write(f"Debug - Using SMTP server: {smtp_server}")
+        st.write(f"Debug - From email: {from_email}")
         
         if not from_email or not email_password:
             st.error("Email configuration incomplete. Missing email address or password.")

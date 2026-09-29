@@ -6,7 +6,7 @@ import time
 
 def monthly_recognition_page():
     """Render the monthly staff recognition winners selection page"""
-    st.title("🏆 Monthly Staff Recognition Winners")
+    st.title("Monthly Staff Recognition Winners")
     
     # Check if the monthly_staff_recognition table exists
     try:
@@ -15,7 +15,7 @@ def monthly_recognition_page():
         error_msg = str(e).lower()
         if "not found" in error_msg or "does not exist" in error_msg or "pgrst205" in error_msg:
             st.warning("""
-            **⚠️ Database Setup Required**
+            **Database Setup Required**
             
             The `monthly_staff_recognition` table has not been created yet.
             
@@ -73,7 +73,7 @@ def monthly_recognition_page():
 
     # --- Check if we need to display tie-breaking options ---
     if 'tied_winners' in st.session_state and st.session_state.get('tied_winners'):
-        st.warning(f"🤝 A tie was found for the {st.session_state.get('tie_category')} category.")
+        st.warning(f"A tie was found for the {st.session_state.get('tie_category')} category.")
         st.write("Please review the AI-generated summaries below and select the winner:")
         
         # Display AI summaries for each tied candidate
@@ -81,7 +81,7 @@ def monthly_recognition_page():
         for winner in st.session_state.get('tied_winners', []):
             col1, col2 = st.columns([3, 1])
             with col1:
-                with st.expander(f"📊 {winner} - AI Analysis"):
+                with st.expander(f"{winner} - AI Analysis"):
                     summary = ai_summaries.get(winner, "No summary available")
                     st.write(summary)
             with col2:
@@ -106,7 +106,7 @@ def monthly_recognition_page():
             if not result.get("success"):
                 st.error(f"An error occurred: {result.get('message')}")
             elif result.get("status") == "tie":
-                st.warning(f"🤝 A tie was found for the {result['category']} category.")
+                st.warning(f"A tie was found for the {result['category']} category.")
                 st.write("AI is analyzing each candidate's performance...")
                 
                 # Store tied winners AND AI summaries in session state
@@ -128,7 +128,7 @@ def monthly_recognition_page():
                 if not ascend_winner and not north_winner:
                     debug_info = result.get('debug', {})
                     st.warning(f"""
-                    ⚠️ No staff recognitions found for {selected_month_name} {selected_year}.
+                    No staff recognitions found for {selected_month_name} {selected_year}.
                     
                     Please ensure that:
                     1. Weekly staff recognitions have been created for this month
@@ -149,28 +149,28 @@ def monthly_recognition_page():
                                     st.write(f"- Week ending {rec['week_ending_date']}: ASCEND={rec['has_ascend']}, NORTH={rec['has_north']}")
                             st.write("**Note:** Check the terminal/console for complete debug output including recent dates in database")
                 else:
-                    st.success("✅ Monthly winners selected and saved successfully!")
+                    st.success("Monthly winners selected and saved successfully!")
                     st.balloons()
                     st.subheader("This Month's Winners")
                     
                     col1, col2 = st.columns(2)
                     with col1:
                         if ascend_winner:
-                            st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner}")
+                            st.markdown(f"### ASCEND Winner: {ascend_winner}")
                             if result.get('ascend_summary'):
-                                with st.expander("📊 Why this winner?"):
+                                with st.expander("Why this winner?"):
                                     st.write(result.get('ascend_summary'))
                         else:
-                            st.metric("🌟 ASCEND Winner", "Not awarded")
+                            st.metric("ASCEND Winner", "Not awarded")
                     
                     with col2:
                         if north_winner:
-                            st.markdown(f"### 🧭 NORTH Winner: {north_winner}")
+                            st.markdown(f"### NORTH Winner: {north_winner}")
                             if result.get('north_summary'):
-                                with st.expander("📊 Why this winner?"):
+                                with st.expander("Why this winner?"):
                                     st.write(result.get('north_summary'))
                         else:
-                            st.metric("🧭 NORTH Winner", "Not awarded")
+                            st.metric("NORTH Winner", "Not awarded")
 
     # --- Manual Tie-Breaking Logic ---
     print(f"[DEBUG] Checking for manual_winner in session_state: {list(st.session_state.keys())}")
@@ -179,7 +179,7 @@ def monthly_recognition_page():
         print(f"[DEBUG] FOUND manual_winner! Processing tie-breaking save...")
         
         with st.container(border=True):
-            st.write("🔍 **TIE-BREAKING LOGIC RUNNING**")
+            st.write("**TIE-BREAKING LOGIC RUNNING**")
             
             winner = st.session_state.get('manual_winner')
             category = st.session_state.get('tie_category')
@@ -227,7 +227,7 @@ def monthly_recognition_page():
                                         
                                     if rec.get('staff_member') == winner:
                                         winner_obj = rec
-                                        st.write(f"✅ Found winner object for {winner}")
+                                        st.write(f"Found winner object for {winner}")
                                         print(f"[DEBUG] Found winner object: {winner_obj}")
                                         break
                                 except (json.JSONDecodeError, TypeError) as e:
@@ -235,11 +235,11 @@ def monthly_recognition_page():
                                     continue
                 
                 if not winner_obj:
-                    st.warning(f"⚠️ No recognition object found for {winner} in month {start_date} - saving empty object")
+                    st.warning(f"No recognition object found for {winner} in month {start_date} - saving empty object")
                     print(f"[DEBUG] No winner_obj found! winner={winner}, category={category}")
                     
             except Exception as e:
-                st.error(f"❌ Failed to load winner data: {e}")
+                st.error(f"Failed to load winner data: {e}")
                 st.error(f"Full error details: {str(e)}")
                 print(f"[ERROR] Tie-breaking fetch failed: {e}")
                 import traceback
@@ -294,7 +294,7 @@ def monthly_recognition_page():
                 # Check success - be more lenient about what counts as success
                 success = result is not None
                 if success:
-                    st.success(f"✅ Winner for {category} saved successfully!")
+                    st.success(f"Winner for {category} saved successfully!")
                     st.write(f"Category={category}, Winner={winner}, Month={recognition_month}")
                     # Clear session state
                     if 'manual_winner' in st.session_state:
@@ -308,10 +308,10 @@ def monthly_recognition_page():
                     time.sleep(1)  # Give user time to see success message
                     st.rerun()
                 else:
-                    st.error(f"❌ Failed to save the winner. Result was None/empty.")
+                    st.error(f"Failed to save the winner. Result was None/empty.")
                     print(f"[ERROR] Save returned None/empty")
             except Exception as e:
-                st.error(f"❌ Failed to save the winner: {e}")
+                st.error(f"Failed to save the winner: {e}")
                 print(f"[ERROR] Tie-breaking save failed: {e}")
                 import traceback
                 traceback.print_exc()
@@ -330,7 +330,7 @@ def monthly_recognition_page():
                 col1, col2 = st.columns(2)
                 with col1:
                     if ascend_winner_data and ascend_winner_data.get('staff_member'):
-                        with st.expander(f"🌟 ASCEND: {ascend_winner_data['staff_member']}"):
+                        with st.expander(f"ASCEND: {ascend_winner_data['staff_member']}"):
                             st.write(f"**Category:** {ascend_winner_data.get('category', 'N/A')}")
                             st.write(f"**Reasoning:** {ascend_winner_data.get('reasoning', 'N/A')}")
                     else:
@@ -338,7 +338,7 @@ def monthly_recognition_page():
                 
                 with col2:
                     if north_winner_data and north_winner_data.get('staff_member'):
-                        with st.expander(f"🧭 NORTH: {north_winner_data['staff_member']}"):
+                        with st.expander(f"NORTH: {north_winner_data['staff_member']}"):
                             st.write(f"**Category:** {north_winner_data.get('category', 'N/A')}")
                             st.write(f"**Reasoning:** {north_winner_data.get('reasoning', 'N/A')}")
                     else:

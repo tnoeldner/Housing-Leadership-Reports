@@ -250,7 +250,7 @@ def dashboard_page(supervisor_mode=False):
                                 entry[w.isoformat()] = "N/A"
                             else:
                                 status = user_weeks.get(w_date)
-                                entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
+                                entry[w.isoformat()] = "✓" if status == "finalized" else "–"
                         matrix_rows.append(entry)
                     matrix_df = pd.DataFrame(matrix_rows)
                     st.dataframe(matrix_df[["Name", "% Complete", *week_labels]], use_container_width=True, hide_index=True)
@@ -301,11 +301,11 @@ def dashboard_page(supervisor_mode=False):
                         admin_created_staff.append(str(member))
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
-                        st.markdown(f"#### ✅ Finalized ({len(finalized_staff)})")
+                        st.markdown(f"#### Finalized ({len(finalized_staff)})")
                         for person in sorted(finalized_staff):
                             st.markdown(f"- {person}")
                     with col2:
-                        st.markdown(f"#### 📝 Draft ({len(draft_staff)})")
+                        st.markdown(f"#### Draft ({len(draft_staff)})")
                         for person in sorted(draft_staff):
                             st.markdown(f"- {person}")
                     with col3:
@@ -313,10 +313,10 @@ def dashboard_page(supervisor_mode=False):
                         for person in sorted(unlocked_staff):
                             st.markdown(f"- {person}")
                     with col4:
-                        st.markdown(f"#### 🏷️ Created by Admin ({len(admin_created_staff)})")
+                        st.markdown(f"#### Created by Admin ({len(admin_created_staff)})")
                         for person in sorted(admin_created_staff):
                             st.markdown(f"- {person}")
-                    st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
+                    st.markdown(f"#### Missing ({len(missing_staff)})")
                     for person in sorted(missing_staff):
                         st.markdown(f"- {person}")
 
@@ -341,12 +341,12 @@ def dashboard_page(supervisor_mode=False):
                     st.info("A summary for this week already exists. Generating a new one will overwrite it.")
                     with st.expander("View existing saved summary"):
                         st.markdown(clean_summary_response(saved_summaries[selected_date_for_summary]))
-                    button_text = "🔄 Regenerate Weekly Summary"
+                    button_text = "Regenerate Weekly Summary"
                 if st.button(button_text, key="sup_generate_summary"):
                     st.session_state['trigger_generate_summary'] = True
 
                 if st.session_state.get('trigger_generate_summary'):
-                    with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+                    with st.spinner("Analyzing reports and generating comprehensive summary..."):
                         try:
                             # Use normalized week value to avoid mismatches between date/datetime strings
                             weekly_reports = [
@@ -403,7 +403,7 @@ def dashboard_page(supervisor_mode=False):
                                     if week_match:
                                         filtered_duty_reports.append(dr)
                                 if filtered_duty_reports:
-                                    st.success("🛡️ Duty analysis FOUND for this week. It will be included in the summary.")
+                                    st.success("Duty analysis FOUND for this week. It will be included in the summary.")
                                     duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
                                     for i, duty_report in enumerate(filtered_duty_reports, 1):
                                         duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
@@ -442,7 +442,7 @@ Weekly staff reports:\n{reports_text}
                             )
                             summary_text = response.data if hasattr(response, 'data') else response
                             st.session_state['debug_summary_response'] = summary_text
-                            st.success("✅ Weekly summary generated!")
+                            st.success("Weekly summary generated!")
                             st.markdown(clean_summary_response(summary_text))
                         except Exception as e:
                             st.error(f"Failed to generate summary: {e}")
@@ -517,11 +517,11 @@ Weekly staff reports:\n{reports_text}
             admin_created_staff.append(str(member))
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.markdown(f"#### ✅ Finalized ({len(finalized_staff)})")
+            st.markdown(f"#### Finalized ({len(finalized_staff)})")
             for person in sorted(finalized_staff):
                 st.markdown(f"- {person}")
         with col2:
-            st.markdown(f"#### 📝 Draft ({len(draft_staff)})")
+            st.markdown(f"#### Draft ({len(draft_staff)})")
             for person in sorted(draft_staff):
                 st.markdown(f"- {person}")
         with col3:
@@ -529,10 +529,10 @@ Weekly staff reports:\n{reports_text}
             for person in sorted(unlocked_staff):
                 st.markdown(f"- {person}")
         with col4:
-            st.markdown(f"#### 🏷️ Created by Admin ({len(admin_created_staff)})")
+            st.markdown(f"#### Created by Admin ({len(admin_created_staff)})")
             for person in sorted(admin_created_staff):
                 st.markdown(f"- {person}")
-        st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
+        st.markdown(f"#### Missing ({len(missing_staff)})")
         for person in sorted(missing_staff):
             st.markdown(f"- {person}")
 
@@ -566,13 +566,13 @@ Weekly staff reports:\n{reports_text}
     if selected_date_for_summary in saved_summaries:
         st.info("A summary for this week already exists. Generating a new one will overwrite it.")
         with st.expander("View existing saved summary"): st.markdown(clean_summary_response(saved_summaries[selected_date_for_summary]))
-        button_text = "🔄 Regenerate Weekly Summary"
+        button_text = "Regenerate Weekly Summary"
     if st.button(button_text):
         st.session_state['trigger_generate_summary'] = True
 
     if st.session_state.get('trigger_generate_summary'):
         # --- BEGIN summary generation logic (was inside button block) ---
-        with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+        with st.spinner("Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if isinstance(r, dict) and r.get("week_ending_date") == selected_date_for_summary]
                 st.session_state['debug_after_weekly_reports'] = True
@@ -630,7 +630,7 @@ Weekly staff reports:\n{reports_text}
                         if week_match:
                             filtered_duty_reports.append(dr)
                     if filtered_duty_reports:
-                        st.success(f"🛡️ Duty analysis FOUND for this week. It will be included in the summary.")
+                        st.success(f"Duty analysis FOUND for this week. It will be included in the summary.")
                         duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
                         for i, duty_report in enumerate(filtered_duty_reports, 1):
                             duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
@@ -647,13 +647,13 @@ Weekly staff reports:\n{reports_text}
                             duty_reports_section += "\n" + "="*50 + "\n"
                         st.session_state['last_duty_reports_section'] = duty_reports_section
                     else:
-                        st.warning("⚠️ No duty analysis found for this week. None will be included in the summary.")
+                        st.warning("No duty analysis found for this week. None will be included in the summary.")
 
                 # Check for saved weekly engagement reports to integrate
                 engagement_reports_section = ""
                 st.session_state['debug_after_engagement_reports_section'] = True
                 if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
-                    st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
+                    st.info("**Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
                     engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
                     for i, engagement_report in enumerate(st.session_state['weekly_engagement_reports'], 1):
                         engagement_reports_section += f"\n--- ENGAGEMENT REPORT {i} ---\n"
@@ -701,7 +701,7 @@ Weekly staff reports:\n{reports_text}
                 st.info("DEBUG: Entered dashboard summary generation block (before AI call)")
                 print("DEBUG: Entered dashboard summary generation block (before AI call)")
                 st.session_state['debug_about_to_call_ai_summary'] = True
-                st.info("🟢 Generating a new admin dashboard summary with Gemini AI...")
+                st.info("Generating a new admin dashboard summary with Gemini AI...")
                 print("DEBUG: About to call generate_admin_dashboard_summary...")
                 st.info("DEBUG: About to call generate_admin_dashboard_summary...")
                 try:
@@ -721,19 +721,19 @@ Weekly staff reports:\n{reports_text}
                     st.error(f"EXCEPTION in generate_admin_dashboard_summary: {exc}")
                     cleaned_text = None
                 if not cleaned_text or not str(cleaned_text).strip():
-                    st.error("❌ No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
+                    st.error("No summary was generated. The AI may have returned an empty response or an error occurred. Please check your input data and try again.")
                     print("DEBUG: cleaned_text is empty or None after AI call.")
                 elif str(cleaned_text).strip().lower().startswith("error:") or str(cleaned_text).strip().lower().startswith("ai error:"):
-                    st.error(f"❌ {cleaned_text}")
+                    st.error(f"{cleaned_text}")
                     print(f"DEBUG: cleaned_text is error: {repr(cleaned_text)}")
                 else:
-                    st.success("✅ Summary generated successfully.")
+                    st.success("Summary generated successfully.")
                     print(f"DEBUG: cleaned_text is valid summary: {repr(cleaned_text)}")
                 print(f"DEBUG: Setting st.session_state['last_summary'] to: {{'date': {selected_date_for_summary}, 'text': {repr(cleaned_text)}}}")
                 st.session_state['last_summary'] = {"date": selected_date_for_summary, "text": cleaned_text}
                 # Fallback: If no Streamlit message was shown, show a generic error
                 if not cleaned_text or not str(cleaned_text).strip():
-                    st.error("❌ Fallback: No summary or debug output was generated. There may be a silent failure in the AI call or Streamlit UI. Please check logs and input data.")
+                    st.error("Fallback: No summary or debug output was generated. There may be a silent failure in the AI call or Streamlit UI. Please check logs and input data.")
             except Exception as e:
                 st.error(f"An error occurred while generating the summary: {e}")
 
@@ -754,7 +754,7 @@ Weekly staff reports:\n{reports_text}
             # Warn if the AI output does not contain the required section
             summary_text = summary_data.get("text") or ""
             if "Operational & Safety Summary" not in summary_text:
-                st.warning("⚠️ The AI output does not contain the 'Operational & Safety Summary' section. Please review the prompt and summary.")
+                st.warning("The AI output does not contain the 'Operational & Safety Summary' section. Please review the prompt and summary.")
             with st.form("save_summary_form"):
                 edited_summary = st.text_area("Edit Summary:", value=summary_text, height=400)
                 save_button = st.form_submit_button("Save Final Summary to Archive", type="primary")

@@ -255,11 +255,11 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
     """Fetch forms and discover all available form types"""
     try:
         def progress_update(page_num, total_forms, oldest_date, reached_target):
-            status_text = f"📄 Page {page_num}: {total_forms} forms found"
+            status_text = f"Page {page_num}: {total_forms} forms found"
             if oldest_date != "Unknown":
                 status_text += f" | Oldest: {oldest_date}"
             if reached_target:
-                status_text += " | ✅ Target date reached"
+                status_text += " | Target date reached"
             return status_text
         
         progress_placeholder = st.empty()

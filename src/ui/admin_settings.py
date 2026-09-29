@@ -20,15 +20,15 @@ def admin_settings_page():
     st.title("Administrator Settings")
     st.write("Configure system settings and deadlines.")
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-        "📅 Deadline Settings",
-        "📊 Submission Tracking",
-        "📧 Email Configuration",
-        "👥 User Management",
-        "📝 AI Prompt Templates",
-        "📋 Weekly Reports Summary",
-        "📊 Weekly Summary Generator",
-        "💰 AI Usage",
-        "📜 Activity Logs",
+        "Deadline Settings",
+        "Submission Tracking",
+        "Email Configuration",
+        "User Management",
+        "AI Prompt Templates",
+        "Weekly Reports Summary",
+        "Weekly Summary Generator",
+        "AI Usage",
+        "Activity Logs",
     ])
     
     with tab4:
@@ -37,7 +37,7 @@ def admin_settings_page():
         # Admin-only access
         user_role = st.session_state.get('role', 'user')
         if user_role != 'admin':
-            st.error("❌ Access Denied: Only admins can manage users.")
+            st.error("Access Denied: Only admins can manage users.")
             st.stop()
         
         st.write("Manage user roles and permissions.")
@@ -55,7 +55,7 @@ def admin_settings_page():
             
             users = users_response.data if users_response else []
             
-            with st.expander("🔍 Debug: Email Status", expanded=False):
+            with st.expander("Debug: Email Status", expanded=False):
                 st.write(f"Loaded {len(users)} profiles")
                 
                 # Count profiles with email
@@ -63,9 +63,9 @@ def admin_settings_page():
                 st.write(f"Profiles with email: {len(users_with_email)}")
                 
                 if users_with_email:
-                    st.success("✅ Email sync working - emails are stored in profiles")
+                    st.success("Email sync working - emails are stored in profiles")
                 else:
-                    st.warning("⚠️ No emails found in profiles - only new signups will have emails")
+                    st.warning("No emails found in profiles - only new signups will have emails")
                     
         except Exception as e:
             st.error(f"Error loading users: {e}")
@@ -161,7 +161,7 @@ def admin_settings_page():
                     
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        if st.button("💾 Save Changes", key=f"save_{selected_name}"):
+                        if st.button("Save Changes", key=f"save_{selected_name}"):
                             try:
                                 with st.spinner("Updating user..."):
                                     # Only include fields that should be updated
@@ -198,7 +198,7 @@ def admin_settings_page():
                                     st.write(f"Result count: {result.count if result else 'None'}")
                                     
                                     if result and result.data and len(result.data) > 0:
-                                        st.success(f"✅ User {selected_name} updated! Changes saved to database.")
+                                        st.success(f"User {selected_name} updated! Changes saved to database.")
                                         time.sleep(1)
                                         st.rerun()
                                     elif result:
@@ -215,14 +215,14 @@ def admin_settings_page():
                     with col2:
                         email_to_reset = selected_user.get('email', '')
                         if email_to_reset and email_to_reset != "Email not set":
-                            if st.button("🔐 Send Password Reset", key=f"reset_{selected_name}"):
+                            if st.button("Send Password Reset", key=f"reset_{selected_name}"):
                                 try:
                                     supabase.auth.admin.send_recovery_email(email=email_to_reset)
-                                    st.success(f"✅ Reset email sent to {email_to_reset}")
+                                    st.success(f"Reset email sent to {email_to_reset}")
                                 except Exception as e:
                                     st.error(f"Failed to send reset: {e}")
                         else:
-                            st.button("🔐 Email Not Available", disabled=True)
+                            st.button("Email Not Available", disabled=True)
         else:
             st.info("No users found in the system.")
 
@@ -375,7 +375,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             "setting_value": staff_eval_rubric_edit,
                             "updated_by": admin_user_id
                         }, on_conflict="setting_name").execute()
-                    st.success("✅ AI prompt templates and rubrics saved successfully!")
+                    st.success("AI prompt templates and rubrics saved successfully!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Failed to save AI prompts or rubrics: {e}")
@@ -574,7 +574,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
         st.subheader("AI Usage & Cost Tracking")
         user_role = st.session_state.get('role', 'user')
         if user_role != 'admin':
-            st.error("❌ Access Denied: Only admins can view AI usage.")
+            st.error("Access Denied: Only admins can view AI usage.")
             st.stop()
 
         today = datetime.now().date()
@@ -1277,7 +1277,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                         except Exception:
                             pass
                     st.session_state["admin_deadline_settings"] = new_settings
-                    st.success("✅ Deadline settings saved successfully to database!")
+                    st.success("Deadline settings saved successfully to database!")
                     st.info(f"Saved: Reports due **{['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][deadline_day]}** at **{deadline_hour:02d}:{deadline_minute:02d}** with **{grace_period}** hour grace period")
                     time.sleep(2)
                     st.rerun()
@@ -1449,7 +1449,7 @@ You are writing a weekly staff recognition summary. From the following staff rep
                             entry[w.isoformat()] = "N/A"
                         else:
                             status = user_weeks.get(w_date)
-                            entry[w.isoformat()] = "✅" if status == "finalized" else "❌"
+                            entry[w.isoformat()] = "✓" if status == "finalized" else "–"
                     matrix_rows.append(entry)
                 matrix_df = pd.DataFrame(matrix_rows)
                 st.dataframe(matrix_df[["Name", "% Complete", *week_labels]], use_container_width=True, hide_index=True)
@@ -1488,21 +1488,21 @@ You are writing a weekly staff recognition summary. From the following staff rep
         st.subheader("Test Email Configuration")
         with st.form("test_email"):
             test_email = st.text_input("Send test email to:", placeholder="your-email@und.edu")
-            if st.form_submit_button("📧 Send Test Email"):
+            if st.form_submit_button("Send Test Email"):
                 if test_email:
                     test_subject = "UND Housing Reports - Email Test"
                     test_body = """This is a test email from the UND Housing Leadership Reports system.\n\nIf you received this email, your email configuration is working correctly!\n\nTest sent at: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     with st.spinner("Sending test email..."):
                         success = send_email(test_email, test_subject, test_body)
                         if success:
-                            st.success(f"✅ Test email sent successfully to {test_email}")
+                            st.success(f"Test email sent successfully to {test_email}")
                         else:
-                            st.error("❌ Failed to send test email. Please check your configuration.")
+                            st.error("Failed to send test email. Please check your configuration.")
                 else:
                     st.error("Please enter an email address for testing.")
         st.subheader("Configuration Status")
         try:
-            st.write("🔍 **Debug Information:**")
+            st.write("**Debug Information:**")
             current_dir = os.getcwd()
             secrets_path = os.path.join(current_dir, ".streamlit", "secrets.toml")
             st.info(f"**Secrets file location:** `{secrets_path}`")
@@ -1515,33 +1515,33 @@ You are writing a weekly staff recognition summary. From the following staff rep
             try:
                 email_address = get_secret("EMAIL_ADDRESS")
                 if email_address.startswith("your-") or "placeholder" in email_address.lower():
-                    st.error(f"❌ EMAIL_ADDRESS still contains placeholder: {email_address}")
+                    st.error(f"EMAIL_ADDRESS still contains placeholder: {email_address}")
                     st.warning("Please update your .streamlit/secrets.toml with your real Gmail address")
                 else:
-                    st.success("✅ Email Address Found")
+                    st.success("Email Address Found")
                     st.text(f"From: {email_address}")
             except KeyError:
-                st.error("❌ EMAIL_ADDRESS key not found in secrets")
+                st.error("EMAIL_ADDRESS key not found in secrets")
             except Exception as e:
-                st.error(f"❌ Error accessing EMAIL_ADDRESS: {e}")
+                st.error(f"Error accessing EMAIL_ADDRESS: {e}")
             try:
                 email_password = get_secret("EMAIL_PASSWORD")
                 if email_password.startswith("your-") or "placeholder" in email_password.lower() or len(email_password) != 16:
-                    st.error(f"❌ EMAIL_PASSWORD appears to be placeholder or wrong length (should be 16 chars)")
+                    st.error(f"EMAIL_PASSWORD appears to be placeholder or wrong length (should be 16 chars)")
                     st.warning("Please update your .streamlit/secrets.toml with your real Gmail App Password")
                 else:
-                    st.success("✅ Email Password Found")
+                    st.success("Email Password Found")
                     st.text("Password: [HIDDEN - 16 characters detected]")
             except KeyError:
-                st.error("❌ EMAIL_PASSWORD key not found in secrets")
+                st.error("EMAIL_PASSWORD key not found in secrets")
             except Exception as e:
-                st.error(f"❌ Error accessing EMAIL_PASSWORD: {e}")
+                st.error(f"Error accessing EMAIL_PASSWORD: {e}")
             try:
                 smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
-                st.success("✅ SMTP Server Available")
+                st.success("SMTP Server Available")
                 st.text(f"Server: {smtp_server}")
             except Exception as e:
-                st.error(f"❌ Error accessing SMTP_SERVER: {e}")
+                st.error(f"Error accessing SMTP_SERVER: {e}")
         except Exception as e:
             st.error(f"Error checking configuration: {e}")
         st.subheader("Troubleshooting")

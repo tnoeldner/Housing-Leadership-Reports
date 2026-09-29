@@ -129,8 +129,8 @@ def yearly_summaries_page():
     fiscal_start_default, fiscal_end_default = _default_fiscal_range()
 
     tab_reports, tab_summaries = st.tabs([
-        "📄 Individual Weekly Reports (Calendar Year)",
-        "📅 Weekly Summaries (Fiscal Year)",
+        "Individual Weekly Reports (Calendar Year)",
+        "Weekly Summaries (Fiscal Year)",
     ])
 
     with tab_reports:
@@ -149,7 +149,7 @@ def yearly_summaries_page():
         )
         staff_ids = [staff_lookup[label] for label in selected_staff]
 
-        if st.button("🔄 Load reports", type="primary", key="load_yearly_reports"):
+        if st.button("Load reports", type="primary", key="load_yearly_reports"):
             try:
                 reports = _fetch_reports(admin_client, cal_start, cal_end, staff_ids)
                 if not include_drafts:
@@ -185,7 +185,7 @@ def yearly_summaries_page():
             )
             custom_prompt = st.text_area("AI prompt (optional)", value=default_prompt, height=140, key="yearly_prompt")
 
-            if st.button("🤖 Generate annual summary", type="primary", key="run_yearly_ai"):
+            if st.button("Generate annual summary", type="primary", key="run_yearly_ai"):
                 reports_text = _build_reports_text(reports)
                 prompt = (
                     f"Prepare an annual performance synthesis for the reports between {cal_start} and {cal_end}.\n"
@@ -229,7 +229,7 @@ def yearly_summaries_page():
         )
         fiscal_start, fiscal_end = fiscal_range if isinstance(fiscal_range, (list, tuple)) else (fiscal_start_default, fiscal_end_default)
 
-        if st.button("🔄 Load weekly summaries", type="primary", key="load_weekly_summaries"):
+        if st.button("Load weekly summaries", type="primary", key="load_weekly_summaries"):
             try:
                 summaries = _fetch_weekly_summaries(admin_client, fiscal_start, fiscal_end)
                 st.session_state["yearly_weekly_summaries"] = summaries
@@ -254,7 +254,7 @@ def yearly_summaries_page():
             )
             custom_prompt = st.text_area("AI prompt (optional)", value=default_prompt, height=140, key="fiscal_prompt")
 
-            if st.button("🤖 Generate fiscal-year rollup", type="primary", key="run_fiscal_ai"):
+            if st.button("Generate fiscal-year rollup", type="primary", key="run_fiscal_ai"):
                 summaries_text = _build_weekly_summaries_text(summaries)
                 prompt = (
                     f"Create a fiscal-year rollup for weekly summaries between {fiscal_start} and {fiscal_end}.\n"

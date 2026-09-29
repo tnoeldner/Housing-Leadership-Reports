@@ -60,7 +60,7 @@ def supervisor_summaries_page() -> None:
 
 def supervisors_section_page() -> None:
     """Entry point for the supervisors section (tabs for duty, general, and viewer)."""
-    st.title("👩‍💼 Supervisors Section - Form Analysis")
+    st.title("Supervisors Section - Form Analysis")
     st.markdown(
         """
         Review Roompact form submissions, run AI-powered summaries, and drill into individual reports.
@@ -68,7 +68,7 @@ def supervisors_section_page() -> None:
     )
 
     tab_duty, tab_general, tab_viewer = st.tabs(
-        ["⛑️ Duty Analysis", "📝 General Form Analysis", "📄 Individual Reports"]
+        ["Duty Analysis", "General Form Analysis", "Individual Reports"]
     )
 
     with tab_duty:
@@ -83,25 +83,25 @@ def supervisors_section_page() -> None:
 
 def duty_analysis_section() -> None:
     """Specialized analysis for duty-related forms."""
-    st.subheader("⛑️ Duty Report Analysis")
+    st.subheader("Duty Report Analysis")
 
     col1, col2 = st.columns(2)
     with col1:
         duty_start_date = st.date_input(
-            "📅 Start Date",
+            "Start Date",
             value=datetime.now().date() - timedelta(days=30),
             help="Analyze duty reports from this date forward",
             key="duty_start_date",
         )
     with col2:
         duty_end_date = st.date_input(
-            "📅 End Date",
+            "End Date",
             value=datetime.now().date(),
             help="Analyze duty reports up to this date",
             key="duty_end_date",
         )
 
-    if st.button("🔄 Fetch Duty Reports", type="primary", key="fetch_duty_reports"):
+    if st.button("Fetch Duty Reports", type="primary", key="fetch_duty_reports"):
         days_back = (datetime.now().date() - duty_start_date).days
         if days_back > 90:
             max_pages = 500
@@ -117,11 +117,11 @@ def duty_analysis_section() -> None:
         progress_placeholder = st.empty()
 
         def show_progress(page_num: int, total_forms: int, oldest_date: str, reached_target: bool) -> None:
-            status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+            status = f"Page {page_num}/{max_pages}: {total_forms} forms found"
             if oldest_date != "Unknown":
                 status += f" | Oldest: {oldest_date}"
             if reached_target:
-                status += f" | ✅ Reached {duty_start_date}"
+                status += f" | Reached {duty_start_date}"
             progress_placeholder.info(status)
 
         with st.spinner("Fetching duty reports from Roompact..."):
@@ -154,7 +154,7 @@ def duty_analysis_section() -> None:
         st.session_state.pop("duty_analysis_result", None)
 
         if duty_forms:
-            st.success(f"✅ Found {len(duty_forms)} duty reports (from {len(all_forms)} total forms)")
+            st.success(f"Found {len(duty_forms)} duty reports (from {len(all_forms)} total forms)")
         else:
             st.warning(
                 f"No duty reports found in the date range {duty_start_date} to {duty_end_date}"
@@ -167,7 +167,7 @@ def duty_analysis_section() -> None:
     filter_info = st.session_state.get("duty_filter_info", {})
 
     st.info(
-        f"📊 Analysis Ready: {filter_info.get('filtered_count', len(duty_forms))} reports from "
+        f"Analysis Ready: {filter_info.get('filtered_count', len(duty_forms))} reports from "
         f"{filter_info.get('start_date')} to {filter_info.get('end_date')}"
     )
 
@@ -191,7 +191,7 @@ def duty_analysis_section() -> None:
                     author = current.get("author", "Unknown")
                     date_str = _format_date(current.get("date", ""))
                     if st.checkbox(
-                        f"📄 {author} - {date_str}", key=f"duty_form_{form_type}_{idx}"
+                        f"{author} - {date_str}", key=f"duty_form_{form_type}_{idx}"
                     ):
                         selected.append(form)
             st.write("---")
@@ -200,7 +200,7 @@ def duty_analysis_section() -> None:
         st.markdown("**Analysis Options:**")
         report_type = st.radio(
             "Report Type",
-            ["📊 Standard Analysis", "📅 Weekly Summary"],
+            ["Standard Analysis", "Weekly Summary"],
             help="Choose a detailed analysis or a weekly summary format",
             key="duty_report_type",
         )
@@ -223,13 +223,13 @@ def duty_analysis_section() -> None:
         )
 
         if selected:
-            st.success(f"✅ {len(selected)} duty reports selected")
-            if st.button("🤖 Generate Duty Analysis", type="primary", key="run_duty_analysis"):
+            st.success(f"{len(selected)} duty reports selected")
+            if st.button("Generate Duty Analysis", type="primary", key="run_duty_analysis"):
                 start_date = filter_info.get("start_date")
                 end_date = filter_info.get("end_date")
                 start_date_str = start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date)
                 end_date_str = end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date)
-                if report_type == "📅 Weekly Summary":
+                if report_type == "Weekly Summary":
                     summary_result = create_weekly_duty_report_summary(
                         selected[:max_forms],
                         start_date,
@@ -257,7 +257,7 @@ def duty_analysis_section() -> None:
                     file_prefix = "duty_analysis"
                 # Cache the result for reuse on rerun (keeps save/download buttons visible)
                 st.session_state["duty_analysis_result"] = {
-                    "variant": "weekly_summary" if report_type == "📅 Weekly Summary" else "standard",
+                    "variant": "weekly_summary" if report_type == "Weekly Summary" else "standard",
                     "label": report_label,
                     "file_prefix": file_prefix,
                     "summary": summary,
@@ -297,7 +297,7 @@ def duty_analysis_section() -> None:
                 filter_end = analysis_result.get("filter_info", {}).get("end_date")
                 analyzed_count = analysis_result.get("analyzed", len(selected))
                 selected_count = analysis_result.get("selected", len(selected))
-                st.subheader(f"📊 {report_label} Results")
+                st.subheader(f"{report_label} Results")
                 if summary:
                     st.markdown(summary)
                 else:
@@ -313,7 +313,7 @@ def duty_analysis_section() -> None:
                     custom_prompt=analysis_result.get("custom_prompt", ""),
                 )
                 st.download_button(
-                    label="📄 Download Analysis Report",
+                    label="Download Analysis Report",
                     data=download_data,
                     file_name=f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                     mime="text/markdown",
@@ -321,7 +321,7 @@ def duty_analysis_section() -> None:
                 )
 
                 report_type_key = "weekly_summary" if analysis_result.get("variant") == "weekly_summary" else "standard"
-                save_label = "💾 Save Weekly Duty Summary" if report_type_key == "weekly_summary" else "💾 Save Duty Analysis"
+                save_label = "Save Weekly Duty Summary" if report_type_key == "weekly_summary" else "Save Duty Analysis"
                 save_btn_key = "save_weekly_duty_summary" if report_type_key == "weekly_summary" else "save_standard_duty_analysis"
 
                 if st.button(save_label, type="secondary", key=save_btn_key):
@@ -347,7 +347,7 @@ def duty_analysis_section() -> None:
                         # Try insert first; if duplicate, perform update manually
                         try:
                             admin_client.table("saved_duty_analyses").insert(save_payload).execute()
-                            st.success(f"✅ {report_label} saved to database.")
+                            st.success(f"{report_label} saved to database.")
                         except Exception as insert_exc:  # noqa: BLE001
                             err_text = str(insert_exc)
                             if "duplicate key" in err_text or "unique constraint" in err_text:
@@ -367,7 +367,7 @@ def duty_analysis_section() -> None:
                                         "report_type": report_type_key,
                                     }
                                 ).execute()
-                                st.success(f"✅ {report_label} updated in database.")
+                                st.success(f"{report_label} updated in database.")
                             else:
                                 raise insert_exc
                     except Exception as exc:  # noqa: BLE001
@@ -376,24 +376,24 @@ def duty_analysis_section() -> None:
 
 def general_form_analysis_section() -> None:
     """General Roompact form discovery, fetching, and AI analysis."""
-    st.subheader("📝 General Form Analysis")
+    st.subheader("General Form Analysis")
 
     # Discover available form types
     col_discover_start, col_discover_end, col_discover_button = st.columns([1, 1, 1])
     with col_discover_start:
         discovery_start = st.date_input(
-            "📅 Discover: Start Date",
+            "Discover: Start Date",
             value=datetime.now().date() - timedelta(days=60),
             key="general_discovery_start",
         )
     with col_discover_end:
         discovery_end = st.date_input(
-            "📅 Discover: End Date",
+            "Discover: End Date",
             value=datetime.now().date(),
             key="general_discovery_end",
         )
     with col_discover_button:
-        if st.button("🔍 Discover Form Types", key="discover_general_forms"):
+        if st.button("Discover Form Types", key="discover_general_forms"):
             days_back = (datetime.now().date() - discovery_start).days
             if days_back > 90:
                 max_pages = 600
@@ -407,11 +407,11 @@ def general_form_analysis_section() -> None:
             progress_placeholder = st.empty()
 
             def show_progress(page_num: int, total_forms: int, oldest_date: str, reached_target: bool) -> None:
-                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                status = f"Page {page_num}/{max_pages}: {total_forms} forms found"
                 if oldest_date != "Unknown":
                     status += f" | Oldest: {oldest_date}"
                 if reached_target:
-                    status += f" | ✅ Reached {discovery_start}"
+                    status += f" | Reached {discovery_start}"
                 progress_placeholder.info(status)
 
             with st.spinner("Discovering available form types..."):
@@ -429,12 +429,12 @@ def general_form_analysis_section() -> None:
                     "start_date": discovery_start,
                     "end_date": discovery_end,
                 }
-                st.success(f"✅ Discovered {len(form_types)} form types")
+                st.success(f"Discovered {len(form_types)} form types")
             else:
                 st.warning("No forms found in the specified range.")
 
     if "discovered_form_types" not in st.session_state:
-        st.info("👆 Run discovery to see available form types.")
+        st.info("Run discovery to see available form types.")
         return
 
     form_options = st.session_state.get("discovered_form_types", [])
@@ -470,18 +470,18 @@ def general_form_analysis_section() -> None:
     col_fetch_start, col_fetch_end = st.columns(2)
     with col_fetch_start:
         fetch_start = st.date_input(
-            "📅 Fetch: Start Date",
+            "Fetch: Start Date",
             value=discovery_dates.get("start_date", datetime.now().date() - timedelta(days=30)),
             key="general_fetch_start",
         )
     with col_fetch_end:
         fetch_end = st.date_input(
-            "📅 Fetch: End Date",
+            "Fetch: End Date",
             value=discovery_dates.get("end_date", datetime.now().date()),
             key="general_fetch_end",
         )
 
-    if st.button("🔄 Fetch Forms in Date Range", type="primary", key="fetch_general_forms"):
+    if st.button("Fetch Forms in Date Range", type="primary", key="fetch_general_forms"):
         if not selected_form_types:
             st.warning("Select at least one form type.")
         else:
@@ -500,11 +500,11 @@ def general_form_analysis_section() -> None:
             progress_placeholder = st.empty()
 
             def show_fetch_progress(page_num: int, total_forms: int, oldest_date: str, reached_target: bool) -> None:
-                status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+                status = f"Page {page_num}/{max_pages}: {total_forms} forms found"
                 if oldest_date != "Unknown":
                     status += f" | Oldest: {oldest_date}"
                 if reached_target:
-                    status += f" | ✅ Reached {fetch_start}"
+                    status += f" | Reached {fetch_start}"
                 progress_placeholder.info(status)
 
             with st.spinner("Fetching forms from Roompact..."):
@@ -539,7 +539,7 @@ def general_form_analysis_section() -> None:
 
             if filtered_forms:
                 st.success(
-                    f"✅ Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)"
+                    f"Found {len(filtered_forms)} forms matching your criteria (from {len(all_forms)} total forms)"
                 )
             else:
                 st.warning(
@@ -553,7 +553,7 @@ def general_form_analysis_section() -> None:
     filter_info = st.session_state.get("filter_info", {})
 
     st.info(
-        f"📊 Filter Results: {filter_info.get('filtered_count', len(forms))} forms from {filter_info.get('total_fetched', len(forms))} fetched"
+        f"Filter Results: {filter_info.get('filtered_count', len(forms))} forms from {filter_info.get('total_fetched', len(forms))} fetched"
     )
 
     col_forms, col_options = st.columns([2, 1])
@@ -581,7 +581,7 @@ def general_form_analysis_section() -> None:
                     author = current_revision.get("author", "Unknown")
                     date_str = _format_date(current_revision.get("date", ""))
                     form_key = f"form_{template_name}_{idx}"
-                    if st.checkbox(f"📄 {author} - {date_str}", key=form_key):
+                    if st.checkbox(f"{author} - {date_str}", key=form_key):
                         selected_forms.append(form)
                 st.markdown("</div>", unsafe_allow_html=True)
             st.write("---")
@@ -609,10 +609,10 @@ def general_form_analysis_section() -> None:
         )
 
         if selected_forms:
-            st.success(f"✅ {len(selected_forms)} forms selected")
-            if st.button("🤖 Generate AI Summary", type="primary", key="run_general_analysis"):
+            st.success(f"{len(selected_forms)} forms selected")
+            if st.button("Generate AI Summary", type="primary", key="run_general_analysis"):
                 if len(selected_forms) > max_forms:
-                    st.warning(f"⚠️ Too many forms selected. Analyzing first {max_forms} forms.")
+                    st.warning(f"Too many forms selected. Analyzing first {max_forms} forms.")
 
                 form_types = filter_info.get("form_types", [])
                 is_duty_only = (
@@ -655,7 +655,7 @@ def general_form_analysis_section() -> None:
                 except Exception:
                     pass
 
-                st.subheader("📊 General Analysis Results")
+                st.subheader("General Analysis Results")
                 st.markdown(summary)
 
                 download_data = _build_download(
@@ -668,7 +668,7 @@ def general_form_analysis_section() -> None:
                     custom_prompt=custom_prompt,
                 )
                 st.download_button(
-                    label="📄 Download Analysis Report",
+                    label="Download Analysis Report",
                     data=download_data,
                     file_name=f"general_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                     mime="text/markdown",
@@ -679,7 +679,7 @@ def general_form_analysis_section() -> None:
 
     st.divider()
 
-    with st.expander("🔧 API Connection Status", expanded=False):
+    with st.expander("API Connection Status", expanded=False):
         config, error = get_roompact_config()
         if error:
             st.error(error)
@@ -698,37 +698,37 @@ def general_form_analysis_section() -> None:
             if test_error:
                 st.error(f"API connection test failed: {test_error}")
             else:
-                st.success("✅ API connection successful")
+                st.success("API connection successful")
                 total_forms = test_data.get("total_records", 0) if isinstance(test_data, dict) else 0
-                st.info(f"📊 Total forms available: {total_forms}")
+                st.info(f"Total forms available: {total_forms}")
 
 
 def individual_reports_viewer() -> None:
     """Fetch and browse individual reports with filters."""
-    st.subheader("📄 Individual Reports Viewer")
+    st.subheader("Individual Reports Viewer")
 
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.date_input(
-            "📅 Start Date",
+            "Start Date",
             value=datetime.now().date() - timedelta(days=30),
             help="View reports from this date",
             key="individual_start_date",
         )
     with col2:
         end_date = st.date_input(
-            "📅 End Date",
+            "End Date",
             value=datetime.now().date(),
             help="View reports up to this date",
             key="individual_end_date",
         )
 
-    if st.button("🔍 Fetch Reports", type="primary", key="fetch_individual_reports"):
+    if st.button("Fetch Reports", type="primary", key="fetch_individual_reports"):
         max_pages = 300
         progress_placeholder = st.empty()
 
         def show_progress(page_num: int, total_forms: int, oldest_date: str, reached_target: bool) -> None:
-            status = f"📄 Page {page_num}/{max_pages}: {total_forms} forms found"
+            status = f"Page {page_num}/{max_pages}: {total_forms} forms found"
             if oldest_date:
                 status += f" | Oldest: {oldest_date}"
             progress_placeholder.info(status)
@@ -761,7 +761,7 @@ def individual_reports_viewer() -> None:
         }
 
         if filtered_forms:
-            st.success(f"✅ Found {len(filtered_forms)} reports in the selected date range")
+            st.success(f"Found {len(filtered_forms)} reports in the selected date range")
         else:
             st.warning("No reports found matching your criteria")
 
@@ -772,7 +772,7 @@ def individual_reports_viewer() -> None:
     date_range = st.session_state.get("individual_reports_date_range", {})
 
     st.markdown("---")
-    st.subheader("📊 Filter and View Reports")
+    st.subheader("Filter and View Reports")
 
     staff_members = set()
     form_types = set()
@@ -788,7 +788,7 @@ def individual_reports_viewer() -> None:
     col1, col2, col3 = st.columns(3)
     with col1:
         selected_staff = st.multiselect(
-            "👤 Filter by Staff Member",
+            "Filter by Staff Member",
             options=sorted(list(staff_members)),
             default=[],
             help="Select one or more staff members to filter",
@@ -796,7 +796,7 @@ def individual_reports_viewer() -> None:
         )
     with col2:
         selected_form_types = st.multiselect(
-            "📝 Filter by Form Type",
+            "Filter by Form Type",
             options=sorted(list(form_types)),
             default=[],
             help="Select one or more form types to filter",
@@ -804,7 +804,7 @@ def individual_reports_viewer() -> None:
         )
     with col3:
         sort_order = st.selectbox(
-            "📅 Sort By",
+            "Sort By",
             options=["Newest First", "Oldest First"],
             key="sort_order",
         )
@@ -837,12 +837,12 @@ def individual_reports_viewer() -> None:
         staff_counts[author] = staff_counts.get(author, 0) + 1
 
     if filtered_reports:
-        with st.expander("📊 Report Counts by Staff Member"):
+        with st.expander("Report Counts by Staff Member"):
             for staff, count in sorted(staff_counts.items(), key=lambda item: item[1], reverse=True):
                 st.write(f"**{staff}:** {count} report(s)")
 
     st.markdown("---")
-    st.subheader(f"📋 Individual Reports ({len(filtered_reports)})")
+    st.subheader(f"Individual Reports ({len(filtered_reports)})")
 
     for idx, form in enumerate(filtered_reports, 1):
         current_revision = form.get("current_revision", {})
@@ -896,7 +896,7 @@ def individual_reports_viewer() -> None:
                     report_markdown += f"**{field_label}:** {field_response}\n\n"
 
             st.download_button(
-                label="📥 Download Report",
+                label="Download Report",
                 data=report_markdown,
                 file_name=f"{form_name}_{author}_{date_str.replace(':', '-').replace(' ', '_')}.md",
                 mime="text/markdown",
@@ -934,7 +934,7 @@ def weekly_reports_viewer(supervisor_id=None) -> None:
     with col3:
         st.write("")
         st.write("")
-        refresh = st.button("🔄 Refresh", key=f"wrv_refresh_{supervisor_id}")
+        refresh = st.button("Refresh", key=f"wrv_refresh_{supervisor_id}")
 
     staff_options = []
     staff_lookup = {}
@@ -1062,7 +1062,7 @@ def weekly_reports_viewer(supervisor_id=None) -> None:
                 st.markdown("---")
                 comment_key = f"wrv_comment_{report.get('id')}_{idx}"
                 comment = st.text_area("Supervisor Comment:", key=comment_key, placeholder="Add your feedback here...")
-                if st.button("📧 Respond with Comments (Email)", key=f"wrv_respond_{report.get('id')}_{idx}"):
+                if st.button("Respond with Comments (Email)", key=f"wrv_respond_{report.get('id')}_{idx}"):
                     staff_email = None
                     staff_id = report.get("user_id")
                     for s in staff_options:

@@ -14,7 +14,7 @@ def init_connection():
     
     # Validate required keys exist
     if not url or not key:
-        st.error("❌ Missing Supabase configuration. Please check your secrets or environment variables.")
+        st.error("Missing Supabase configuration. Please check your secrets or environment variables.")
         st.stop()
     
     return create_client(url, key)
@@ -175,7 +175,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None,
     """Save a duty analysis report to the database for permanent storage"""
     try:
         # Determine report type
-        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        report_type = "weekly_summary" if analysis_data['report_type'] == "Weekly Summary Report" else "standard_analysis"
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']
         end_date = analysis_data['filter_info']['end_date']
@@ -230,7 +230,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None,
                 if response.data:
                     return {
                         "success": True, 
-                        "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
+                        "message": f"Duty analysis saved for week ending {week_ending_date}",
                         "saved_id": response.data[0]['id'],
                         "action": "created_new",
                         "debug_save_data": debug_save_data
@@ -273,7 +273,7 @@ def save_staff_recognition(recognition_data, week_ending_date, created_by_user_i
 **Week Ending:** {week_ending_date}
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-## 🌟 ASCEND Recognition
+## ASCEND Recognition
 """
         
         if ascend_rec:
@@ -286,7 +286,7 @@ def save_staff_recognition(recognition_data, week_ending_date, created_by_user_i
         else:
             recognition_text += "No ASCEND recognition awarded this week.\n\n"
         
-        recognition_text += """## 🧭 NORTH Recognition
+        recognition_text += """## NORTH Recognition
 """
         
         if north_rec:
@@ -472,7 +472,7 @@ def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id
     """Save an engagement analysis report to the database for permanent storage"""
     try:
         # Determine report type
-        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        report_type = "weekly_summary" if analysis_data['report_type'] == "Weekly Summary Report" else "standard_analysis"
         
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']

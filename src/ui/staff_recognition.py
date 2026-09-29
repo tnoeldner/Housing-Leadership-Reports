@@ -130,7 +130,7 @@ REMINDER:
         )
         
         # Debug: Show prompt and raw response
-        with st.expander("🕵️ Debug: AI Input & Output"):
+        with st.expander("Debug: AI Input & Output"):
             st.subheader("Prompt Sent to AI")
             st.code(prompt, language="text")
             st.subheader("Raw AI Response")
@@ -194,7 +194,7 @@ def staff_recognition_page():
     """Standalone page for weekly staff recognition.
     Handles generation, cache clearing, and display of recognition results.
     """
-    st.title("🏆 Weekly Staff Recognition")
+    st.title("Weekly Staff Recognition")
     st.write("Generate AI-powered recognition for staff based on the ASCEND and NORTH frameworks.")
     
     # Fetch all finalized reports
@@ -245,7 +245,7 @@ def staff_recognition_page():
 
     # Generate button
     if st.button("Generate Staff Recognition"):
-        with st.spinner("🤖 Evaluating staff performance against ASCEND and NORTH criteria..."):
+        with st.spinner("Evaluating staff performance against ASCEND and NORTH criteria..."):
             weekly_reports = [r for r in all_reports if r.get("week_ending_date") == selected_date_for_summary]
             
             # Load rubrics
@@ -261,11 +261,11 @@ def staff_recognition_page():
                 # Display top performers
                 st.success("Recognition generated successfully!")
                 
-                st.subheader("🏆 Top Performers")
+                st.subheader("Top Performers")
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.markdown("### 🌟 ASCEND Recognition")
+                    st.markdown("### ASCEND Recognition")
                     ascend = recognition_results.get("ascend_recognition", {})
                     st.write(f"**Recipient:** {ascend.get('staff_member', 'Unknown')}")
                     st.write(f"**Category:** {ascend.get('category', 'Unknown')}")
@@ -273,7 +273,7 @@ def staff_recognition_page():
                     st.write(f"**Reasoning:** {ascend.get('reasoning', 'N/A')}")
                     
                 with col2:
-                    st.markdown("### 🧭 NORTH Recognition")
+                    st.markdown("### NORTH Recognition")
                     north = recognition_results.get("north_recognition", {})
                     st.write(f"**Recipient:** {north.get('staff_member', 'Unknown')}")
                     st.write(f"**Category:** {north.get('category', 'Unknown')}")
@@ -282,7 +282,7 @@ def staff_recognition_page():
                 
                 # Display full score matrix
                 st.markdown("---")
-                st.subheader("📊 All Staff Performance Scores")
+                st.subheader("All Staff Performance Scores")
                 
                 all_staff_scores = recognition_results.get("all_staff_scores", [])
                 if all_staff_scores:
@@ -290,7 +290,7 @@ def staff_recognition_page():
                     for staff_score in all_staff_scores:
                         staff_name = staff_score.get("staff_member", "Unknown")
                         
-                        with st.expander(f"📋 {staff_name}"):
+                        with st.expander(f"{staff_name}"):
                             # ASCEND scores
                             ascend_scores = staff_score.get("ascend_scores", [])
                             if ascend_scores:
@@ -343,7 +343,7 @@ def staff_recognition_page():
                         df.to_csv(csv_buffer, index=False)
                         
                         st.download_button(
-                            label="📥 Download Scores as CSV",
+                            label="Download Scores as CSV",
                             data=csv_buffer.getvalue(),
                             file_name=f"staff_scores_{selected_date_for_summary}.csv",
                             mime="text/csv"
@@ -374,6 +374,6 @@ def staff_recognition_page():
                     )
                     
                     if scores_save_result.get("success"):
-                        st.success(f"✅ {scores_save_result.get('message')}")
+                        st.success(f"{scores_save_result.get('message')}")
                     else:
                         st.error(f"Failed to save individual scores: {scores_save_result.get('message')}")

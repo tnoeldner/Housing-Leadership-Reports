@@ -52,7 +52,7 @@ def get_quarter_months(quarter):
 
 def quarterly_recognition_page():
     """Render the quarterly staff recognition winners selection page"""
-    st.title("🏆 Quarterly Staff Recognition Winners")
+    st.title("Quarterly Staff Recognition Winners")
     
     st.info("""
     **Quarterly Recognition System**
@@ -70,7 +70,7 @@ def quarterly_recognition_page():
         error_msg = str(e).lower()
         if "not found" in error_msg or "does not exist" in error_msg or "pgrst205" in error_msg:
             st.warning("""
-            **⚠️ Database Setup Required**
+            **Database Setup Required**
             
             The `quarterly_staff_recognition` table has not been created yet.
             
@@ -139,7 +139,7 @@ def quarterly_recognition_page():
 
     # --- Check if we need to display tie-breaking options ---
     if 'tied_winners' in st.session_state and st.session_state.get('tied_winners'):
-        st.warning(f"🤝 A tie was found for the {st.session_state.get('tie_category')} category.")
+        st.warning(f"A tie was found for the {st.session_state.get('tie_category')} category.")
         st.write("Please review the AI-generated summaries below and select the winner:")
         
         # Display AI summaries for each tied candidate
@@ -147,7 +147,7 @@ def quarterly_recognition_page():
         for winner in st.session_state.get('tied_winners', []):
             col1, col2 = st.columns([3, 1])
             with col1:
-                with st.expander(f"📊 {winner} - AI Analysis"):
+                with st.expander(f"{winner} - AI Analysis"):
                     summary = ai_summaries.get(winner, "No summary available")
                     st.write(summary)
             with col2:
@@ -178,7 +178,7 @@ def quarterly_recognition_page():
                 st.session_state["north_candidates"] = result.get("north_candidates", [])
         st.subheader(f"FY{selected_fy} Q{selected_quarter} - Top Candidates")
         # ASCEND
-        st.markdown("### 🌟 ASCEND Candidates")
+        st.markdown("### ASCEND Candidates")
         if "ascend_winner_radio" not in st.session_state:
             st.session_state["ascend_winner_radio"] = st.session_state.get("ascend_candidates", [{}])[0].get("staff_member") if st.session_state.get("ascend_candidates") else None
         ascend_selected = st.radio(
@@ -196,7 +196,7 @@ def quarterly_recognition_page():
                 if c.get('ascend_summary'):
                     st.markdown(f"**Recognition Summary:** {c['ascend_summary']}")
         # NORTH
-        st.markdown("### 🧭 NORTH Candidates")
+        st.markdown("### NORTH Candidates")
         if "north_winner_radio" not in st.session_state:
             st.session_state["north_winner_radio"] = st.session_state.get("north_candidates", [{}])[0].get("staff_member") if st.session_state.get("north_candidates") else None
         north_selected = st.radio(
@@ -239,7 +239,7 @@ def quarterly_recognition_page():
             st.balloons()
             # Show all details for winners
             st.subheader("Finalized Quarterly Recognition Winners")
-            st.markdown(f"### 🌟 ASCEND Winner: {ascend_winner_detail.get('staff_member','')}")
+            st.markdown(f"### ASCEND Winner: {ascend_winner_detail.get('staff_member','')}")
             st.write(f"**Score:** {ascend_winner_detail.get('score','')}")
             st.write(f"**Average ASCEND Score:** {ascend_winner_detail.get('average_weekly_score','')}")
             st.write(f"**Never Won Quarterly Bonus:** {'+1' if ascend_winner_detail.get('never_won_quarterly') else '0'}")
@@ -249,7 +249,7 @@ def quarterly_recognition_page():
             if ascend_summary:
                 st.markdown(f"**Recognition Summary:** {ascend_summary}")
             st.write(f"**Admin Comment:** {ascend_comment}")
-            st.markdown(f"### 🧭 NORTH Winner: {north_winner_detail.get('staff_member','')}")
+            st.markdown(f"### NORTH Winner: {north_winner_detail.get('staff_member','')}")
             st.write(f"**Score:** {north_winner_detail.get('score','')}")
             st.write(f"**Average NORTH Score:** {north_winner_detail.get('average_north_score','')}")
             st.write(f"**Never Won Quarterly Bonus:** {'+1' if north_winner_detail.get('never_won_quarterly') else '0'}")
@@ -267,7 +267,7 @@ def quarterly_recognition_page():
         print(f"[DEBUG] FOUND manual_winner! Processing tie-breaking save...")
         
         with st.container(border=True):
-            st.write("🔍 **TIE-BREAKING LOGIC RUNNING**")
+            st.write("**TIE-BREAKING LOGIC RUNNING**")
             
             winner = st.session_state.get('manual_winner')
             category = st.session_state.get('tie_category')
@@ -341,7 +341,7 @@ def quarterly_recognition_page():
                                         
                                     if rec.get('staff_member') == winner:
                                         winner_obj = rec
-                                        st.write(f"✅ Found winner object for {winner}")
+                                        st.write(f"Found winner object for {winner}")
                                         print(f"[DEBUG] Found winner object: {winner_obj}")
                                         break
                                 except (json.JSONDecodeError, TypeError) as e:
@@ -349,11 +349,11 @@ def quarterly_recognition_page():
                                     continue
                 
                 if not winner_obj:
-                    st.warning(f"⚠️ No recognition object found for {winner} in quarter - saving empty object")
+                    st.warning(f"No recognition object found for {winner} in quarter - saving empty object")
                     print(f"[DEBUG] No winner_obj found! winner={winner}, category={category}")
                     
             except Exception as e:
-                st.error(f"❌ Failed to load winner data: {e}")
+                st.error(f"Failed to load winner data: {e}")
                 st.error(f"Full error details: {str(e)}")
                 print(f"[ERROR] Tie-breaking fetch failed: {e}")
                 import traceback
@@ -408,7 +408,7 @@ def quarterly_recognition_page():
                 # Check success - be more lenient about what counts as success
                 success = result is not None
                 if success:
-                    st.success(f"✅ Winner for {category} saved successfully!")
+                    st.success(f"Winner for {category} saved successfully!")
                     st.write(f"Category={category}, Winner={winner}, FY={fiscal_year}, Q={quarter}")
                     try:
                         log_user_activity(
@@ -438,10 +438,10 @@ def quarterly_recognition_page():
                     time.sleep(1)  # Give user time to see success message
                     st.rerun()
                 else:
-                    st.error(f"❌ Failed to save the winner. Result was None/empty.")
+                    st.error(f"Failed to save the winner. Result was None/empty.")
                     print(f"[ERROR] Save returned None/empty")
             except Exception as e:
-                st.error(f"❌ Failed to save the winner: {e}")
+                st.error(f"Failed to save the winner: {e}")
                 print(f"[ERROR] Tie-breaking save failed: {e}")
                 import traceback
                 traceback.print_exc()
@@ -460,7 +460,7 @@ def quarterly_recognition_page():
                 col1, col2 = st.columns(2)
                 with col1:
                     if ascend_winner_data and ascend_winner_data.get('staff_member'):
-                        with st.expander(f"🌟 ASCEND: {ascend_winner_data['staff_member']}"):
+                        with st.expander(f"ASCEND: {ascend_winner_data['staff_member']}"):
                             st.write(f"**Score:** {ascend_winner_data.get('score', 'N/A')}")
                             st.write(f"**Average ASCEND Score:** {ascend_winner_data.get('average_weekly_score', 'N/A')}")
                             st.write(f"**Never Won Quarterly Bonus:** {'+1' if ascend_winner_data.get('never_won_quarterly') else '0'}")
@@ -475,7 +475,7 @@ def quarterly_recognition_page():
                 
                 with col2:
                     if north_winner_data and north_winner_data.get('staff_member'):
-                        with st.expander(f"🧭 NORTH: {north_winner_data['staff_member']}"):
+                        with st.expander(f"NORTH: {north_winner_data['staff_member']}"):
                             st.write(f"**Score:** {north_winner_data.get('score', 'N/A')}")
                             st.write(f"**Average NORTH Score:** {north_winner_data.get('average_north_score', 'N/A')}")
                             st.write(f"**Never Won Quarterly Bonus:** {'+1' if north_winner_data.get('never_won_quarterly') else '0'}")

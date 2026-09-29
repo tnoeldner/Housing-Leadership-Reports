@@ -131,7 +131,13 @@ def get_logo_base64():
         for path in possible_paths:
             if os.path.exists(path):
                 with open(path, "rb") as img_file:
-                    img_data = base64.b64encode(img_file.read()).decode()
+                    raw = img_file.read()
+                    # Skip placeholder/corrupt files that aren't real image data
+                    is_jpeg = raw.startswith(b"\xff\xd8\xff")
+                    is_png = raw.startswith(b"\x89PNG\r\n\x1a\n")
+                    if not (is_jpeg or is_png):
+                        continue
+                    img_data = base64.b64encode(raw).decode()
                     ext = path.split('.')[-1].lower()
                     return f"data:image/{ext};base64,{img_data}"
         

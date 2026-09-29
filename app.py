@@ -43,7 +43,7 @@ from src.ui.theme import apply_custom_theme, render_sidebar_brand
 
 
 
-st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="Weekly Impact Report", page_icon=None, layout="wide")
 apply_custom_theme()
 
 # --- Authentication Check ---
@@ -130,11 +130,11 @@ else:
         if effective_role != actual_role:
             st.sidebar.write(f"Viewing as: {effective_role.title()}")
         if effective_is_supervisor:
-            st.sidebar.write("✓ Supervisor")
+            st.sidebar.write("Supervisor")
 
         # --- Active Users (admin only) ---
         if actual_role == "admin":
-            with st.sidebar.expander("🟢 Active Users", expanded=False):
+            with st.sidebar.expander("Active Users", expanded=False):
                 active = get_active_users(minutes=15)
                 if not active:
                     st.caption("No users active in the last 15 min.")
@@ -143,7 +143,7 @@ else:
                         page = (u.get("last_page") or "").replace("nav:", "")
                         st.markdown(f"**{u['user_email']}**")
                         if page:
-                            st.caption(f"📄 {page}")
+                            st.caption(f"{page}")
         if st.sidebar.button("Logout", key="sidebar_logout"):
             try:
                 log_user_activity(
@@ -204,17 +204,17 @@ def init_connection():
     api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("google_api_key")
     # Validate required keys exist
     if not url or not key:
-        st.error("❌ Missing Supabase configuration. Please check your secrets or environment variables.")
+        st.error("Missing Supabase configuration. Please check your secrets or environment variables.")
         st.stop()
     if not api_key:
-        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+        st.error("Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
         # If you need to test Google API key, use genai.configure(api_key=api_key) only
         # test_model = genai.GenerativeModel("models/gemini-2.5-pro")  # Remove if not needed
         return create_client(url, key)
     except Exception as e:
-        st.error(f"❌ Google AI API key configuration failed: {e}")
+        st.error(f"Google AI API key configuration failed: {e}")
         st.info("Please update your Google AI API key in secrets or environment variables.")
         st.stop()
 
@@ -1288,11 +1288,11 @@ def format_summary_as_html(summary_text, week_date, creator_name="Unknown", prin
     if print_optimized:
         html_content += """
         <div class="print-instructions">
-            🖨️ <strong>PRINT TO PDF INSTRUCTIONS</strong><br>
+            <strong>PRINT TO PDF INSTRUCTIONS</strong><br>
             Press <kbd>Ctrl+P</kbd> (or <kbd>Cmd+P</kbd> on Mac) → Choose "Save as PDF" → Click "More settings" → Check "Background graphics" → Save
         </div>
         <div class="print-tip">
-            💡 <strong>Tip:</strong> This file is optimized for printing to PDF. All UND colors and formatting will be preserved when you print to PDF from your browser.
+            <strong>Tip:</strong> This file is optimized for printing to PDF. All UND colors and formatting will be preserved when you print to PDF from your browser.
         </div>
         """
     
@@ -1352,8 +1352,8 @@ def send_email(to_email, subject, body, from_email=None, smtp_server=None, smtp_
             smtp_server = get_secret("SMTP_SERVER", "smtp.gmail.com") or "smtp.gmail.com"
         
         # Debug information
-        st.write(f"🔧 Debug - Using SMTP server: {smtp_server}")
-        st.write(f"🔧 Debug - From email: {from_email}")
+        st.write(f"Debug - Using SMTP server: {smtp_server}")
+        st.write(f"Debug - From email: {from_email}")
         
         if not from_email or not email_password:
             st.error("Email configuration incomplete. Missing email address or password.")
@@ -1388,12 +1388,12 @@ def get_roompact_config():
         base_url = "https://api.roompact.com/v1"
         
         if not api_token:
-            return None, "❌ Missing Roompact API token. Please add 'roompact_api_token' to your secrets or environment variables."
+            return None, "Missing Roompact API token. Please add 'roompact_api_token' to your secrets or environment variables."
         
         return {"api_token": api_token, "base_url": base_url}, None
         
     except Exception as e:
-        return None, f"❌ Error accessing Roompact API configuration: {e}"
+        return None, f"Error accessing Roompact API configuration: {e}"
 
 def make_roompact_request(endpoint, params=None):
     """Make authenticated request to Roompact API"""
@@ -1417,14 +1417,14 @@ def make_roompact_request(endpoint, params=None):
     except requests.exceptions.RequestException as e:
         if hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 401:
-                return None, "❌ Unauthorized: Invalid API token or token has been deactivated"
+                return None, "Unauthorized: Invalid API token or token has been deactivated"
             elif e.response.status_code == 403:
-                return None, "❌ Forbidden: Insufficient permissions for this resource"
+                return None, "Forbidden: Insufficient permissions for this resource"
             else:
-                return None, f"❌ API Error {e.response.status_code}: {e.response.text}"
-        return None, f"❌ Connection error: {str(e)}"
+                return None, f"API Error {e.response.status_code}: {e.response.text}"
+        return None, f"Connection error: {str(e)}"
     except Exception as e:
-        return None, f"❌ Unexpected error: {str(e)}"
+        return None, f"Unexpected error: {str(e)}"
 
 def fetch_roompact_forms(cursor=None, max_pages=600, target_start_date=None, progress_callback=None):
     """Fetch forms data from Roompact API with pagination and optional date-based stopping"""
@@ -1517,11 +1517,11 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
     """Fetch forms and discover all available form types"""
     try:
         def progress_update(page_num, total_forms, oldest_date, reached_target):
-            status_text = f"📄 Page {page_num}: {total_forms} forms found"
+            status_text = f"Page {page_num}: {total_forms} forms found"
             if oldest_date != "Unknown":
                 status_text += f" | Oldest: {oldest_date}"
             if reached_target:
-                status_text += " | ✅ Target date reached"
+                status_text += " | Target date reached"
             return status_text
         
         progress_placeholder = st.empty()
@@ -1795,11 +1795,11 @@ def discover_form_types(max_pages=600, target_start_date=None, progress_callback
     """Fetch forms and discover all available form types"""
     try:
         def progress_update(page_num, total_forms, oldest_date, reached_target):
-            status_text = f"📄 Page {page_num}: {total_forms} forms found"
+            status_text = f"Page {page_num}: {total_forms} forms found"
             if oldest_date != "Unknown":
                 status_text += f" | Oldest: {oldest_date}"
             if reached_target:
-                status_text += " | ✅ Target date reached"
+                status_text += " | Target date reached"
             return status_text
         
         progress_placeholder = st.empty()
@@ -2338,11 +2338,11 @@ def store_duty_report_data(selected_forms, start_date, end_date, generated_by_us
             # Prepare result message
             messages = []
             if saved_count > 0:
-                messages.append(f"✅ Saved {saved_count} new incident records")
+                messages.append(f"Saved {saved_count} new incident records")
             if skipped_count > 0:
-                messages.append(f"⚠️ Skipped {skipped_count} duplicate records")
+                messages.append(f"Skipped {skipped_count} duplicate records")
             if errors:
-                messages.append(f"❌ {len(errors)} errors occurred")
+                messages.append(f"{len(errors)} errors occurred")
             
             return {
                 "success": saved_count > 0 or skipped_count > 0,
@@ -2362,7 +2362,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
     """Save a duty analysis report to the database for permanent storage"""
     try:
         # Determine report type
-        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        report_type = "weekly_summary" if analysis_data['report_type'] == "Weekly Summary Report" else "standard_analysis"
         
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']
@@ -2412,7 +2412,7 @@ def save_duty_analysis(analysis_data, week_ending_date, created_by_user_id=None)
                 if response.data:
                     return {
                         "success": True, 
-                        "message": f"✅ Duty analysis saved for week ending {week_ending_date}",
+                        "message": f"Duty analysis saved for week ending {week_ending_date}",
                         "saved_id": response.data[0]['id'],
                         "action": "created_new"
                     }
@@ -2454,7 +2454,7 @@ def save_staff_recognition(recognition_data, week_ending_date, created_by_user_i
 **Week Ending:** {week_ending_date}
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-## 🌟 ASCEND Recognition
+## ASCEND Recognition
 """
         
         if ascend_rec:
@@ -2467,7 +2467,7 @@ def save_staff_recognition(recognition_data, week_ending_date, created_by_user_i
         else:
             recognition_text += "No ASCEND recognition awarded this week.\n\n"
         
-        recognition_text += """## 🧭 NORTH Recognition
+        recognition_text += """## NORTH Recognition
 """
         
         if north_rec:
@@ -2632,9 +2632,9 @@ def replace_duty_report_data(selected_forms, start_date, end_date, generated_by_
             
             # Prepare result message
             if saved_count > 0:
-                success_msg = f"✅ Replaced data: saved {saved_count} incident records from {len(selected_forms)} duty reports"
+                success_msg = f"Replaced data: saved {saved_count} incident records from {len(selected_forms)} duty reports"
                 if errors:
-                    success_msg += f" | ❌ {len(errors)} errors occurred"
+                    success_msg += f" | {len(errors)} errors occurred"
                 
                 return {
                     "success": True, 
@@ -2800,7 +2800,7 @@ Please provide a comprehensive supervisory analysis:
 # --- Engagement Analysis Functions ---
 def analyze_engagement_forms_with_ai(selected_forms, report_type, filter_info):
     """Wrapper function to call appropriate engagement analysis function based on report type"""
-    if report_type == "📅 Weekly Summary Report":
+    if report_type == "Weekly Summary Report":
         return create_weekly_engagement_report_summary(selected_forms, filter_info)
     else:
         return create_engagement_report_summary(selected_forms, filter_info)
@@ -2992,7 +2992,7 @@ Focus on actionable insights that will help supervisors support staff and enhanc
             
             return {
                 'summary': result.text,
-                'report_type': "📅 Weekly Engagement Summary", 
+                'report_type': "Weekly Engagement Summary", 
                 'selected_forms': selected_forms,
                 'filter_info': filter_info,
                 'completed_events_count': len(completed_events),
@@ -3008,7 +3008,7 @@ Focus on actionable insights that will help supervisors support staff and enhanc
     except Exception as e:
         return {
             'summary': f"Error generating weekly engagement analysis: {str(e)}",
-            'report_type': "📅 Weekly Engagement Summary",
+            'report_type': "Weekly Engagement Summary",
             'selected_forms': selected_forms,
             'filter_info': filter_info,
             'error': True
@@ -3111,7 +3111,7 @@ Provide actionable insights that will help supervisors support staff and enhance
             
             return {
                 'summary': result.text,
-                'report_type': "📊 Standard Analysis",
+                'report_type': "Standard Analysis",
                 'selected_forms': selected_forms,
                 'filter_info': filter_info
             }
@@ -3610,7 +3610,7 @@ def create_db_based_engagement_analysis():
     """Create analysis based on database data with correct event_status"""
     from collections import defaultdict
     
-    st.write("🔍 **Database-Based Analysis** (Using Generated Event Status)")
+    st.write("**Database-Based Analysis** (Using Generated Event Status)")
     
     try:
         # Query engagement data with event_status (generated column)
@@ -3622,7 +3622,7 @@ def create_db_based_engagement_analysis():
         ).execute()
         
         if not response.data:
-            st.error("❌ No engagement data found in database. Please sync data first.")
+            st.error("No engagement data found in database. Please sync data first.")
             return
         
         # Analyze the data with proper event_status
@@ -3648,20 +3648,20 @@ def create_db_based_engagement_analysis():
                 stats['pending_events'] += 1
         
         # Display overall statistics
-        st.write("📊 **Event Status Summary:**")
+        st.write("**Event Status Summary:**")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric("Total Events", stats['total_events'])
         with col2:
-            st.metric("✅ Approved", stats['approved_events'])
+            st.metric("Approved", stats['approved_events'])
         with col3:
             st.metric("⏳ Pending", stats['pending_events']) 
         with col4:
-            st.metric("❌ Cancelled", stats['cancelled_events'])
+            st.metric("Cancelled", stats['cancelled_events'])
         
         # Show breakdown by status
-        st.write("🔍 **Event Status Details:**")
+        st.write("**Event Status Details:**")
         
         for status, events in events_by_status.items():
             with st.expander(f"{status.title()} Events ({len(events)})", expanded=(status == 'approved')):
@@ -3682,7 +3682,7 @@ def create_db_based_engagement_analysis():
                         st.write(f"   ... and {len(events) - 5} more")
         
         # Check if event_approval field extraction is working
-        st.write("🧪 **Event Approval Field Analysis:**")
+        st.write("**Event Approval Field Analysis:**")
         
         approval_values = defaultdict(int)
         empty_approval = 0
@@ -3701,10 +3701,10 @@ def create_db_based_engagement_analysis():
         
         if empty_approval > 0:
             st.write(f"**Empty/Missing approval values:** {empty_approval} events")
-            st.warning("⚠️ Some events have empty event_approval fields. This may indicate field mapping issues.")
+            st.warning("Some events have empty event_approval fields. This may indicate field mapping issues.")
         
         # Test the generated column logic
-        with st.expander("🎯 **Generated Status Column Logic**", expanded=False):
+        with st.expander("**Generated Status Column Logic**", expanded=False):
             st.write("The database automatically sets event_status based on:")
             st.code("""
 CASE 
@@ -3722,7 +3722,7 @@ END
             st.write("- Everything else → 'pending'")
         
     except Exception as e:
-        st.error(f"❌ Error loading engagement data: {e}")
+        st.error(f"Error loading engagement data: {e}")
 
 def save_engagement_data(analysis_data, created_by_user_id=None):
     """
@@ -4082,7 +4082,7 @@ def save_engagement_data(analysis_data, created_by_user_id=None):
                     if result.data:
                         total_saved += 1
                         event_display_name = csv_record.get('event_name', f"Event {form_id}")
-                        st.success(f"✅ Inserted: {event_display_name} (ID: {form_id})")
+                        st.success(f"Inserted: {event_display_name} (ID: {form_id})")
                     else:
                         errors.append(f"Database insert failed for {form_id}")
                         
@@ -4099,13 +4099,13 @@ def save_engagement_data(analysis_data, created_by_user_id=None):
                             if update_result.data:
                                 total_saved += 1
                                 event_display_name = csv_record.get('event_name', f"Event {form_id}")
-                                st.success(f"✅ Updated: {event_display_name} (ID: {form_id})")
+                                st.success(f"Updated: {event_display_name} (ID: {form_id})")
                             else:
                                 errors.append(f"Database update failed for {form_id}")
                                 
                         except Exception as update_error:
                             errors.append(f"Failed to update {form_id}: {update_error}")
-                            st.error(f"❌ Update failed for {form_id}")
+                            st.error(f"Update failed for {form_id}")
                     else:
                         # Re-raise if it's not a duplicate key error
                         raise insert_error
@@ -4115,7 +4115,7 @@ def save_engagement_data(analysis_data, created_by_user_id=None):
                 event_name = csv_record.get('event_name', 'Unknown') if 'csv_record' in locals() else 'Unknown'
                 
                 # Log the full error for debugging
-                st.error(f"❌ Error processing {event_name}: {error_msg}")
+                st.error(f"Error processing {event_name}: {error_msg}")
                 errors.append(f"Error processing {event_name}: {error_msg}")
                 
                 # Don't count database errors as "skipped duplicates" - they're actual errors
@@ -4124,13 +4124,13 @@ def save_engagement_data(analysis_data, created_by_user_id=None):
         result_messages = []
         
         if total_saved > 0:
-            result_messages.append(f"✅ Processed {total_saved} events")
+            result_messages.append(f"Processed {total_saved} events")
         
         if skipped_count > 0:
-            result_messages.append(f"⏭️ Skipped {skipped_count} duplicates")
+            result_messages.append(f"⏭Skipped {skipped_count} duplicates")
         
         if errors:
-            result_messages.append(f"❌ {len(errors)} errors occurred")
+            result_messages.append(f"{len(errors)} errors occurred")
         
         # Simple statistics
         total_processed = total_saved + skipped_count
@@ -4165,7 +4165,7 @@ def save_engagement_analysis(analysis_data, week_ending_date, created_by_user_id
     """Save an engagement analysis report to the database for permanent storage"""
     try:
         # Determine report type
-        report_type = "weekly_summary" if analysis_data['report_type'] == "📅 Weekly Summary Report" else "standard_analysis"
+        report_type = "weekly_summary" if analysis_data['report_type'] == "Weekly Summary Report" else "standard_analysis"
         
         # Handle date conversions for database storage
         start_date = analysis_data['filter_info']['start_date']
@@ -4402,7 +4402,7 @@ def submit_and_edit_page():
         admin_created_reports = [r for r in user_reports if r.get("status") == "admin_created"]
 
         if unlocked_reports:
-            st.info(f"📢 **Notice:** {len(unlocked_reports)} of your previously submitted reports have been unlocked by an administrator for editing. You can now make changes and resubmit them.")
+            st.info(f"**Notice:** {len(unlocked_reports)} of your previously submitted reports have been unlocked by an administrator for editing. You can now make changes and resubmit them.")
 
         if admin_created_reports:
             st.warning(f"⏰ **Missed Deadline:** {len(admin_created_reports)} report(s) were created by an administrator because you missed the deadline. Please complete and submit them as soon as possible.")
@@ -4438,14 +4438,14 @@ def submit_and_edit_page():
                 # Show deadline information
                 deadline_day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][deadline_config["day_of_week"]]
                 if has_unlocked_for_active_week:
-                    st.success(f"✅ Your report has been unlocked by an administrator. You can now edit and submit despite the missed deadline.")
-                    button_label = f"📝 Edit Unlocked Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                    st.success(f"Your report has been unlocked by an administrator. You can now edit and submit despite the missed deadline.")
+                    button_label = f"Edit Unlocked Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 elif is_grace_period:
                     st.info(f"⏰ You are in the grace period. Original deadline was {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}. Grace period ends {deadline_info['grace_end'].strftime('%A at %H:%M')}.")
-                    button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                    button_label = f"Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 else:
-                    st.info(f"📅 Reports for week ending {active_saturday.strftime('%m/%d/%Y')} are due {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}")
-                    button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                    st.info(f"Reports for week ending {active_saturday.strftime('%m/%d/%Y')} are due {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}")
+                    button_label = f"Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 if st.button(button_label, use_container_width=True, type="primary"):
                     clear_form_state()
                     existing_report = next((r for r in user_reports if r.get("week_ending_date") == active_report_date_str), None)
@@ -4462,9 +4462,9 @@ def submit_and_edit_page():
         st.markdown("##### Create Report for Previous Week")
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.info("💡 Need to submit a report for a previous week? Select any Saturday (week ending date) below.")
+            st.info("Need to submit a report for a previous week? Select any Saturday (week ending date) below.")
         with col2:
-            if st.button("📝 Create Previous Week Report", use_container_width=True):
+            if st.button("Create Previous Week Report", use_container_width=True):
                 # Calculate previous Saturdays as options
                 previous_saturday_1 = active_saturday - timedelta(days=7)
                 previous_saturday_2 = active_saturday - timedelta(days=14) 
@@ -4621,7 +4621,7 @@ def submit_and_edit_page():
                 "individual_summary": "This week demonstrated continued professional development and engagement with various activities that support student success and departmental goals."
             }
             
-            st.info("ℹ️ AI categorization used fallback defaults. You can manually review and adjust categories if needed.")
+            st.info("ℹAI categorization used fallback defaults. You can manually review and adjust categories if needed.")
             return fallback_result
             
         except Exception as e:
@@ -4732,7 +4732,7 @@ def submit_and_edit_page():
                 )
                 week_ending_date_str = week_ending_date.strftime("%Y-%m-%d")
             st.divider()
-            core_activities_tab, general_updates_tab = st.tabs(["📊 Core Activities", "📝 General Updates"])
+            core_activities_tab, general_updates_tab = st.tabs(["Core Activities", "General Updates"])
             with core_activities_tab:
                 core_tab_list = st.tabs(list(CORE_SECTIONS.values()))
                 add_buttons = {}
@@ -4741,12 +4741,12 @@ def submit_and_edit_page():
                         dynamic_entry_section(section_key, section_name, report_data.get("report_body", {}))
                         if section_key == "events":
                             # Special handling for events - just one add button
-                            add_buttons[f"add_event"] = st.form_submit_button("Add Event/Committee ➕", key=f"add_event")
+                            add_buttons[f"add_event"] = st.form_submit_button("Add Event/Committee ", key=f"add_event")
                         else:
                             # Regular success/challenge buttons for other sections
                             b1, b2 = st.columns(2)
-                            add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ➕", key=f"add_s_{section_key}")
-                            add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ➕", key=f"add_c_{section_key}")
+                            add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ", key=f"add_s_{section_key}")
+                            add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ", key=f"add_c_{section_key}")
             with general_updates_tab:
                 st.subheader("General Updates & Well-being")
                 st.markdown("**Personal Well-being Check-in**")
@@ -4923,10 +4923,10 @@ def submit_and_edit_page():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Report processing failed: {str(e)}. Please try again or contact support.")
-                        st.info("💡 **Troubleshooting Tips:**\n- Check that all text entries are properly filled\n- Try refreshing the page and submitting again\n- Ensure your internet connection is stable")
+                        st.info("**Troubleshooting Tips:**\n- Check that all text entries are properly filled\n- Try refreshing the page and submitting again\n- Ensure your internet connection is stable")
                 else:
                     st.error("The AI processing service is temporarily unavailable. Please try again in a few moments.")
-                    st.info("💡 **If this persists:**\n- Check your internet connection\n- Try refreshing the page\n- Contact your administrator if the issue continues")
+                    st.info("**If this persists:**\n- Check your internet connection\n- Try refreshing the page\n- Contact your administrator if the issue continues")
 
     def show_review_form():
         # Use authenticated client so RLS permits report saves
@@ -5029,7 +5029,7 @@ def submit_and_edit_page():
                 try:
                     client_to_use = admin_client or user_client
                     client_to_use.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
-                    st.success("✅ Your final report has been saved successfully!")
+                    st.success("Your final report has been saved successfully!")
                     is_update = bool(draft.get("report_id"))
                     if is_update:
                         supabase.table("weekly_summaries").delete().eq("week_ending_date", draft.get("week_ending_date")).execute()
@@ -5041,7 +5041,7 @@ def submit_and_edit_page():
                     if admin_client and client_to_use is not admin_client:
                         try:
                             admin_client.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
-                            st.success("✅ Your final report has been saved successfully! (admin override)")
+                            st.success("Your final report has been saved successfully! (admin override)")
                             is_update = bool(draft.get("report_id"))
                             if is_update:
                                 supabase.table("weekly_summaries").delete().eq("week_ending_date", draft.get("week_ending_date")).execute()
@@ -5145,11 +5145,11 @@ def dashboard_page(supervisor_mode=False):
                 missing_staff.append(display_info)
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"#### ✅ Submitted ({len(submitted_staff)})")
+            st.markdown(f"#### Submitted ({len(submitted_staff)})")
             for person in sorted(submitted_staff):
                 st.markdown(f"- {person}")
         with col2:
-            st.markdown(f"#### ❌ Missing ({len(missing_staff)})")
+            st.markdown(f"#### Missing ({len(missing_staff)})")
             for person in sorted(missing_staff):
                 st.markdown(f"- {person}")
 
@@ -5245,7 +5245,7 @@ def dashboard_page(supervisor_mode=False):
                     draft_weeks[week] = 0
                 draft_weeks[week] += 1
             
-            st.info(f"📝 Found {len(draft_reports_total)} total draft reports across {len(draft_weeks)} weeks: " + 
+            st.info(f"Found {len(draft_reports_total)} total draft reports across {len(draft_weeks)} weeks: " + 
                    ", ".join([f"{week} ({count} reports)" for week, count in sorted(draft_weeks.items(), reverse=True)]))
         
         # Get all draft reports for the selected week
@@ -5264,7 +5264,7 @@ def dashboard_page(supervisor_mode=False):
                 if deadline_passed:
                     st.warning("⏰ The deadline for this week has passed. These reports are currently blocked from submission.")
                 else:
-                    st.info("✅ The deadline for this week has not passed yet. These reports can already be submitted normally.")
+                    st.info("The deadline for this week has not passed yet. These reports can already be submitted normally.")
                 
                 # Display reports with enable submission buttons
                 for report in draft_reports:
@@ -5292,7 +5292,7 @@ def dashboard_page(supervisor_mode=False):
                                 except Exception as e:
                                     st.error(f"Failed to enable submission: {e}")
                         else:
-                            st.write("✅ Can submit")
+                            st.write("Can submit")
                 
                 # Bulk enable option for past deadline reports
                 if deadline_passed and draft_reports:
@@ -5342,8 +5342,8 @@ def dashboard_page(supervisor_mode=False):
                 existing_user_ids = {r['user_id'] for r in reports_data if isinstance(r, dict) and 'user_id' in r}
                 finalized_user_ids = {r['user_id'] for r in reports_data if isinstance(r, dict) and r.get('status') == 'finalized' and 'user_id' in r}
             else:
-                st.error(f"❌ {error}")
-                st.info("🔄 Please refresh the page and try again.")
+                st.error(f"{error}")
+                st.info("Please refresh the page and try again.")
                 return  # Exit the function if we can't get the data
             
             # Staff who need attention: no report at all OR have non-finalized reports
@@ -5374,8 +5374,8 @@ def dashboard_page(supervisor_mode=False):
                         if success:
                             existing_report = reports_data[0] if reports_data else None
                         else:
-                            st.error(f"❌ {error}")
-                            st.info("🔄 Please refresh the page and try again.")
+                            st.error(f"{error}")
+                            st.info("Please refresh the page and try again.")
                             existing_report = None
                         
                         if existing_report:
@@ -5394,10 +5394,10 @@ def dashboard_page(supervisor_mode=False):
                                     except Exception as e:
                                         st.error(f"Failed to unlock report: {e}")
                             else:
-                                st.write(f"📝 Report exists ({current_status})")
+                                st.write(f"Report exists ({current_status})")
                         else:
                             # No report exists - offer to create one
-                            if st.button("�📝 Create Report", key=f"create_{staff.get('id')}_{missed_week}", help="Create empty report for this staff member"):
+                            if st.button("�Create Report", key=f"create_{staff.get('id')}_{missed_week}", help="Create empty report for this staff member"):
                                 try:
                                     # Create a basic report template for the staff member
                                     empty_report = {
@@ -5433,7 +5433,7 @@ def dashboard_page(supervisor_mode=False):
                 
                 if len(truly_missing_staff) > 1:
                     st.divider()
-                    if st.button(f"📝 Create Empty Reports for All {len(truly_missing_staff)} Staff (No Existing Reports)", type="secondary"):
+                    if st.button(f"Create Empty Reports for All {len(truly_missing_staff)} Staff (No Existing Reports)", type="secondary"):
                         try:
                             bulk_reports = []
                             created_count = 0
@@ -5465,7 +5465,7 @@ def dashboard_page(supervisor_mode=False):
                         except Exception as e:
                             st.error(f"Failed to create bulk reports: {e}")
             else:
-                st.success("✅ All staff have submitted reports for this week!")
+                st.success("All staff have submitted reports for this week!")
 
     st.divider()
     st.subheader("Generate or Regenerate Weekly Summary")
@@ -5474,9 +5474,9 @@ def dashboard_page(supervisor_mode=False):
     if selected_date_for_summary in saved_summaries:
         st.info("A summary for this week already exists. Generating a new one will overwrite it.")
         with st.expander("View existing saved summary"): st.markdown(clean_summary_response(saved_summaries[selected_date_for_summary]))
-        button_text = "🔄 Regenerate Weekly Summary"
+        button_text = "Regenerate Weekly Summary"
     if st.button(button_text):
-        with st.spinner("🤖 Analyzing reports and generating comprehensive summary..."):
+        with st.spinner("Analyzing reports and generating comprehensive summary..."):
             try:
                 weekly_reports = [r for r in all_reports if r.get("week_ending_date") == selected_date_for_summary]
                 if not weekly_reports:
@@ -5545,7 +5545,7 @@ def dashboard_page(supervisor_mode=False):
 
                     duty_reports_section = ""
                     if 'weekly_duty_reports' in st.session_state and st.session_state['weekly_duty_reports']:
-                        st.info("🛡️ **Including Weekly Duty Reports:** Found saved duty analysis reports to integrate into this summary.")
+                        st.info("**Including Weekly Duty Reports:** Found saved duty analysis reports to integrate into this summary.")
                         duty_reports_section = "\n\n=== WEEKLY DUTY REPORTS INTEGRATION ===\n"
                         for i, duty_report in enumerate(st.session_state['weekly_duty_reports'], 1):
                             duty_reports_section += f"\n--- DUTY REPORT {i} ---\n"
@@ -5558,7 +5558,7 @@ def dashboard_page(supervisor_mode=False):
                     # Check for saved weekly engagement reports to integrate
                     engagement_reports_section = ""
                     if 'weekly_engagement_reports' in st.session_state and st.session_state['weekly_engagement_reports']:
-                        st.info("🎉 **Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
+                        st.info("**Including Weekly Engagement Reports:** Found saved engagement analysis reports to integrate into this summary.")
                         engagement_reports_section = "\n\n=== WEEKLY ENGAGEMENT REPORTS INTEGRATION ===\n"
                         for i, engagement_report in enumerate(st.session_state['weekly_engagement_reports'], 1):
                             engagement_reports_section += f"\n--- ENGAGEMENT REPORT {i} ---\n"

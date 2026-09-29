@@ -421,14 +421,14 @@ def init_ai():
     from src.config import get_secret
     api_key = get_secret("GOOGLE_API_KEY")
     if not api_key:
-        st.error("❌ Missing Google AI API key. Please check your secrets or environment variables.")
+        st.error("Missing Google AI API key. Please check your secrets or environment variables.")
         st.stop()
     try:
         genai.configure(api_key=api_key)
         # Return True to indicate initialization was successful
         return True
     except Exception as e:
-        st.error(f"❌ Google AI API key configuration failed: {e}")
+        st.error(f"Google AI API key configuration failed: {e}")
         st.info("Please update your Google AI API key in secrets or environment variables.")
         st.stop()
 
@@ -691,7 +691,7 @@ def create_duty_report_summary(selected_forms, start_date, end_date):
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg or "quota" in error_msg.lower():
-            return {"summary": f"⚠️ API Quota Exceeded: The analysis request was too large. Please try selecting a shorter date range or fewer reports. (Error: {error_msg})"}
+            return {"summary": f"API Quota Exceeded: The analysis request was too large. Please try selecting a shorter date range or fewer reports. (Error: {error_msg})"}
         return {"summary": f"Error generating duty report summary: {error_msg}"}
 
 def summarize_form_submissions(selected_forms, max_forms=10, custom_prompt=None, context="form_analysis"):

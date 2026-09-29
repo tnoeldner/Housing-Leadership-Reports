@@ -155,14 +155,14 @@ def submit_and_edit_page():
                 # Show deadline information
                 deadline_day_name = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][deadline_config["day_of_week"]]
                 if has_unlocked_for_active_week:
-                    st.success(f"✅ Your report has been unlocked by an administrator. You can now edit and submit despite the missed deadline.")
-                    button_label = f"📝 Edit Unlocked Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                    st.success(f"Your report has been unlocked by an administrator. You can now edit and submit despite the missed deadline.")
+                    button_label = f"Edit Unlocked Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 elif is_grace_period:
                     st.info(f"⏰ You are in the grace period. Original deadline was {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}. Grace period ends {deadline_info['grace_end'].strftime('%A at %H:%M')}.")
-                    button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                    button_label = f"Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 else:
-                    st.info(f"📅 Reports for week ending {active_saturday.strftime('%m/%d/%Y')} are due {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}")
-                    button_label = f"📝 Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
+                    st.info(f"Reports for week ending {active_saturday.strftime('%m/%d/%Y')} are due {deadline_day_name} at {deadline_config['hour']:02d}:{deadline_config['minute']:02d}")
+                    button_label = f"Create or Edit Report for week ending {active_saturday.strftime('%m/%d/%Y')}"
                 if st.button(button_label, use_container_width=True, type="primary", key=f"main_report_btn_{active_report_date_str}"):
                     clear_form_state()
                     existing_report = next((r for r in user_reports if r.get("week_ending_date") == active_report_date_str), None)
@@ -179,9 +179,9 @@ def submit_and_edit_page():
         st.markdown("##### Create Report for Previous Week")
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.info("💡 Need to submit a report for a previous week? Select any Saturday (week ending date) below.")
+            st.info("Need to submit a report for a previous week? Select any Saturday (week ending date) below.")
         with col2:
-            if st.button("📝 Create Previous Week Report", use_container_width=True, key=f"prev_week_btn_{active_saturday.strftime('%Y-%m-%d') if active_saturday else 'unknown'}"):
+            if st.button("Create Previous Week Report", use_container_width=True, key=f"prev_week_btn_{active_saturday.strftime('%Y-%m-%d') if active_saturday else 'unknown'}"):
                 # Calculate previous Saturdays as options
                 if active_saturday is not None:
                     previous_saturday_1 = active_saturday - timedelta(days=7)
@@ -374,10 +374,10 @@ def submit_and_edit_page():
                     "For the Week Ending", 
                     value=default_date, 
                     format="MM/DD/YYYY",
-                    help=f"💡 Recent Saturdays: {saturday_options}... (Reports are for weeks ending on Saturdays)"
+                    help=f"Recent Saturdays: {saturday_options}... (Reports are for weeks ending on Saturdays)"
                 )
             st.divider()
-            core_activities_tab, general_updates_tab = st.tabs(["📊 Core Activities", "📝 General Updates"])
+            core_activities_tab, general_updates_tab = st.tabs(["Core Activities", "General Updates"])
             with core_activities_tab:
                 core_tab_list = st.tabs(list(CORE_SECTIONS.values()))
                 add_buttons = {}
@@ -391,12 +391,12 @@ def submit_and_edit_page():
                         dynamic_entry_section(section_key, section_name, report_data.get("report_body", {}))
                         if section_key == "events":
                             # Special handling for events - just one add button
-                            add_buttons[f"add_event"] = st.form_submit_button("Add Event/Committee ➕", key=f"add_event")
+                            add_buttons[f"add_event"] = st.form_submit_button("Add Event/Committee ", key=f"add_event")
                         else:
                             # Regular success/challenge buttons for other sections
                             b1, b2 = st.columns(2)
-                            add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ➕", key=f"add_s_{section_key}")
-                            add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ➕", key=f"add_c_{section_key}")
+                            add_buttons[f"add_success_{section_key}"] = b1.form_submit_button("Add Success ", key=f"add_s_{section_key}")
+                            add_buttons[f"add_challenge_{section_key}"] = b2.form_submit_button("Add Challenge ", key=f"add_c_{section_key}")
             with general_updates_tab:
                 st.subheader("General Updates & Well-being")
                 st.markdown("**Personal Well-being Check-in**")
@@ -622,10 +622,10 @@ def submit_and_edit_page():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Report processing failed: {str(e)}. Please try again or contact support.")
-                        st.info("💡 **Troubleshooting Tips:**\n- Check that all text entries are properly filled\n- Try refreshing the page and submitting again\n- Ensure your internet connection is stable")
+                        st.info("**Troubleshooting Tips:**\n- Check that all text entries are properly filled\n- Try refreshing the page and submitting again\n- Ensure your internet connection is stable")
                 else:
                     st.error("The AI processing service is temporarily unavailable. Please try again in a few moments.")
-                    st.info("💡 **If this persists:**\n- Check your internet connection\n- Try refreshing the page\n- Contact your administrator if the issue continues")
+                    st.info("**If this persists:**\n- Check your internet connection\n- Try refreshing the page\n- Contact your administrator if the issue continues")
 
     def show_review_form():
         st.subheader("Review Your AI-Generated Report")
@@ -736,7 +736,7 @@ def submit_and_edit_page():
                     from src.database import get_user_client
                     user_client = get_user_client()
                     user_client.table("reports").upsert(final_data, on_conflict="user_id, week_ending_date").execute()
-                    st.success("✅ Your final report has been saved successfully!")
+                    st.success("Your final report has been saved successfully!")
                     is_update = bool(draft.get("report_id"))
                     if is_update:
                         user_client.table("weekly_summaries").delete().eq("week_ending_date", draft.get("week_ending_date")).execute()
