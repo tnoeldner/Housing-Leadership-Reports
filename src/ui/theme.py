@@ -103,6 +103,21 @@ def apply_custom_theme():
         [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button:hover {{
             background-color: rgba(255,255,255,0.32);
         }}
+        /* The login/signup form renders as a light card inside the sidebar,
+           so its text and button need dark-on-white styling instead of the
+           white-on-green styling used elsewhere in the sidebar. */
+        [data-testid="stSidebar"] div[data-testid="stForm"] label,
+        [data-testid="stSidebar"] div[data-testid="stForm"] p,
+        [data-testid="stSidebar"] div[data-testid="stForm"] span {{
+            color: #1a1a1a !important;
+        }}
+        [data-testid="stSidebar"] div[data-testid="stForm"] [data-testid="stFormSubmitButton"] > button {{
+            background-color: {PRIMARY} !important;
+            color: #ffffff !important;
+        }}
+        [data-testid="stSidebar"] div[data-testid="stForm"] [data-testid="stFormSubmitButton"] > button:hover {{
+            background-color: {PRIMARY_DARK} !important;
+        }}
 
         /* Metrics as cards */
         [data-testid="stMetric"] {{
