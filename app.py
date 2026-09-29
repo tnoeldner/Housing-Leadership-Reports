@@ -39,10 +39,12 @@ from src.ui.submission import submit_and_edit_page
 from src.ui.staff_recognition import staff_recognition_page
 from src.ui.quarterly_recognition import quarterly_recognition_page
 from src.ui.yearly_summaries import yearly_summaries_page
+from src.ui.theme import apply_custom_theme, render_sidebar_brand
 
 
 
 st.set_page_config(page_title="Weekly Impact Report", page_icon="🚀", layout="wide")
+apply_custom_theme()
 
 # --- Authentication Check ---
 if "user" not in st.session_state:
@@ -88,7 +90,7 @@ else:
                 st.session_state["is_supervisor"] = False
         
         # --- Sidebar Navigation (single instance, after login) ---
-        st.sidebar.title("Navigation")
+        render_sidebar_brand()
         st.sidebar.write(f"Welcome, {st.session_state.get('full_name') or st.session_state['user'].email}!")
 
         actual_role = st.session_state.get("role", "user")
