@@ -1398,14 +1398,21 @@ def select_quarterly_winners(quarter, fiscal_year):
             reports = reports_resp.data or []
             profiles_resp = admin.table("profiles").select("id, full_name").execute()
             id_to_name = {p["id"]: p.get("full_name") for p in profiles_resp.data or []}
+            # Total expected reports = number of distinct weeks that have occurred in the quarter so far,
+            # not just the rows a given user happens to have (otherwise anyone who only ever
+            # started/finalized a few weeks would show 100% completion).
+            distinct_weeks = {r.get("week_ending_date") for r in reports if r.get("week_ending_date")}
+            total_weeks = len(distinct_weeks)
+            for name in id_to_name.values():
+                if name:
+                    report_completion[name] = {"completed": 0, "total": total_weeks}
             for r in reports:
                 user_id = r.get("user_id")
                 name = id_to_name.get(user_id, user_id)
                 if not name:
                     continue
                 if name not in report_completion:
-                    report_completion[name] = {"completed": 0, "total": 0}
-                report_completion[name]["total"] += 1
+                    report_completion[name] = {"completed": 0, "total": total_weeks}
                 if (r.get("status") or "").lower() == "finalized":
                     report_completion[name]["completed"] += 1
         except Exception as e:
